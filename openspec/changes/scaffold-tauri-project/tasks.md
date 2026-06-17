@@ -39,15 +39,15 @@ Chain strategy: stacked-to-main
 
 ## Phase 2: Rust Backend Commands (PR 2)
 
-- [ ] 2.1 Write `find_git()` helper in `src-tauri/src/lib.rs`: Linux `which git`, Windows `PATH` + `C:\Program Files\Git\bin\git.exe` fallback (specs: git-abstraction S1-S3)
-- [ ] 2.2 Write `crear_proyecto(path, nombre)` in `src-tauri/src/lib.rs`: create `.config/`, `capitulos/`, `personajes/`, `notas/`; seed `metadata.json` + `timeline.json` (specs: project-file-management S1-S3)
-- [ ] 2.3 Write `inicializar_git(path)` in `src-tauri/src/lib.rs`: call `find_git()`, run `git init`, degrade gracefully (specs: git-abstraction S4-S6)
-- [ ] 2.4 Write `guardar_capitulo(proyecto_path, filename, contenido)` in `src-tauri/src/lib.rs`: write `.md` to `capitulos/`, no git commit (specs: project-file-management S4-S6)
-- [ ] 2.5 Write `crear_checkpoint(proyecto_path)` in `src-tauri/src/lib.rs`: `git add . && git commit` with progress message (specs: git-abstraction S7-S9)
-- [ ] 2.6 Write `cargar_indice(proyecto_path)` in `src-tauri/src/lib.rs`: read and return `metadata.json` as string (specs: project-file-management S7-S9)
-- [ ] 2.7 Write `run()` builder in `src-tauri/src/lib.rs` registering all 5 commands with `tauri::Builder`
-- [ ] 2.8 Write `src-tauri/src/main.rs` entry point calling `lib::run()`
-- [ ] 2.9 Wire `crear_proyecto` to auto-call `inicializar_git` after directory creation per design contract
+- [x] 2.1 Write `find_git()` helper in `src-tauri/src/lib.rs`: Linux `which git`, Windows `PATH` + `C:\Program Files\Git\bin\git.exe` fallback (specs: git-abstraction S1-S3)
+- [x] 2.2 Write `crear_proyecto(path, nombre)` in `src-tauri/src/lib.rs`: create `.config/`, `capitulos/`, `personajes/`, `notas/`; seed `metadata.json` + `timeline.json` (specs: project-file-management S1-S3)
+- [x] 2.3 Write `inicializar_git(path)` in `src-tauri/src/lib.rs`: call `find_git()`, run `git init`, degrade gracefully (specs: git-abstraction S4-S6)
+- [x] 2.4 Write `guardar_capitulo(proyecto_path, filename, contenido)` in `src-tauri/src/lib.rs`: write `.md` to `capitulos/`, no git commit (specs: project-file-management S4-S6)
+- [x] 2.5 Write `crear_checkpoint(proyecto_path)` in `src-tauri/src/lib.rs`: `git add . && git commit` with progress message (specs: git-abstraction S7-S9)
+- [x] 2.6 Write `cargar_indice(proyecto_path)` in `src-tauri/src/lib.rs`: read and return `metadata.json` as string (specs: project-file-management S7-S9)
+- [x] 2.7 Write `run()` builder in `src-tauri/src/lib.rs` registering all 5 commands with `tauri::Builder`
+- [x] 2.8 Write `src-tauri/src/main.rs` entry point calling `lib::run()`
+- [x] 2.9 Wire `crear_proyecto` to auto-call `inicializar_git` after directory creation per design contract
 
 ## Phase 3: Frontend Skeleton (PR 3)
 
