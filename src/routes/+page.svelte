@@ -143,6 +143,7 @@
 
   // ── Editor & project state ──────────────────────────────────
   let projectPath = $state("");
+  let gitEnabled = $state(false);
   let chapters = $state<string[]>([]);
   let pendingDelete = $state<string | null>(null);
   let activeChapter = $state("");
@@ -156,6 +157,7 @@
     try {
       getCurrentWindow().onCloseRequested(async (event) => {
         if (!projectPath) return;
+        if (!gitEnabled) return; // Project created without git — skip checkpoint
 
         event.preventDefault(); // Wait for save before closing
 
@@ -330,6 +332,7 @@
         const msg = await crearProyecto(path, name.trim());
         console.log("[cronista] Project created:", msg);
         projectPath = path;
+        gitEnabled = await detectarGit();
         await refreshChapters();
       } catch (e) {
         console.error("[cronista] Failed to create project:", e);
@@ -377,6 +380,7 @@
       const raw = await cargarIndice(path);
       const meta = JSON.parse(raw);
       projectPath = path;
+      gitEnabled = await detectarGit();
       chapters = meta.chapters_order ?? [];
       console.log("[cronista] Project opened:", meta.project_name, chapters);
 
@@ -714,9 +718,10 @@
     console.log("[cronista] Trying to reopen last project:", lastPath);
 
     cargarIndice(lastPath)
-      .then((raw) => {
+      .then(async (raw) => {
         const meta = JSON.parse(raw);
         projectPath = lastPath;
+        gitEnabled = await detectarGit();
         chapters = meta.chapters_order ?? [];
         console.log("[cronista] Project reopened:", meta.project_name, chapters);
 
