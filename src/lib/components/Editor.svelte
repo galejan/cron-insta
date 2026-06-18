@@ -4,6 +4,7 @@
   import { StarterKit } from "@tiptap/starter-kit";
   import { BubbleMenu } from "@tiptap/extension-bubble-menu";
   import { TextStyle, FontFamily } from "@tiptap/extension-text-style";
+  import { t } from "$lib/i18n";
 
   interface Props {
     /** Initial HTML content to load into the editor. */
@@ -83,7 +84,7 @@
   <div bind:this={bubbleMenuEl} class="bubble-menu">
     <button
       type="button"
-      title="Título 1 (Ctrl+Alt+1)"
+      title={t("editor.heading1Title")}
       onclick={() =>
         editor?.chain().focus().toggleHeading({ level: 1 }).run()}
       class:active={editor?.isActive("heading", { level: 1 })}
@@ -92,7 +93,7 @@
     </button>
     <button
       type="button"
-      title="Título 2 (Ctrl+Alt+2)"
+      title={t("editor.heading2Title")}
       onclick={() =>
         editor?.chain().focus().toggleHeading({ level: 2 }).run()}
       class:active={editor?.isActive("heading", { level: 2 })}
@@ -101,7 +102,7 @@
     </button>
     <button
       type="button"
-      title="Título 3 (Ctrl+Alt+3)"
+      title={t("editor.heading3Title")}
       onclick={() =>
         editor?.chain().focus().toggleHeading({ level: 3 }).run()}
       class:active={editor?.isActive("heading", { level: 3 })}

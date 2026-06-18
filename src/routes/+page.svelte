@@ -1,6 +1,7 @@
 <script lang="ts">
   import Editor from "$lib/components/Editor.svelte";
   import { debounce } from "$lib/debounce";
+  import { t, setLang, currentLang } from "$lib/i18n";
   import {
     actualizarPersonaje,
     agregarEventoTimeline,
@@ -164,7 +165,7 @@
         await refreshChapters();
       } catch (e) {
         console.error("[cronista] Delete chapter failed:", e);
-        alert(`Error al eliminar capítulo: ${e}`);
+        alert(`${t("chapters.deleteError")} ${e}`);
       }
       pendingDelete = null;
     } else {
@@ -182,12 +183,12 @@
       const selected = await open({
         directory: true,
         multiple: false,
-        title: "Seleccioná la carpeta donde crear el proyecto",
+        title: t("dialog.selectCreateFolder"),
         defaultPath: docsDir,
       });
       if (!selected) return;
 
-      const name = prompt("Nombre del proyecto (ej: Mi Novela):", "Mi Novela");
+      const name = prompt(t("dialog.projectName"), t("dialog.projectNameDefault"));
       if (!name) return;
 
       const path = `${selected}/${name.trim()}`;
@@ -200,16 +201,16 @@
         await refreshChapters();
       } catch (e) {
         console.error("[cronista] Failed to create project:", e);
-        alert(`Error al crear proyecto: ${e}`);
+        alert(`${t("dialog.createProjectError")} ${e}`);
         return;
       }
     }
 
-    const filename = prompt("Nombre del archivo (ej: 0001_prologo.md):", "0001_prologo.md");
+    const filename = prompt(t("chapters.newFilePrompt"), "0001_prologue.md");
     if (!filename) return;
 
     // Simple heading + empty paragraph so the editor isn't blank.
-    const initialHTML = "<h1>Sin título</h1><p></p>";
+    const initialHTML = `<h1>${t("chapters.untitled")}</h1><p></p>`;
 
     console.log("[cronista] Creating chapter:", filename);
     try {
@@ -222,7 +223,7 @@
       await refreshChapters();
     } catch (e) {
       console.error("[cronista] Create chapter failed:", e);
-      alert(`Error al crear capítulo: ${e}`);
+      alert(`${t("chapters.createError")} ${e}`);
     }
   }
 
@@ -232,7 +233,7 @@
     const selected = await open({
       directory: true,
       multiple: false,
-      title: "Seleccioná la carpeta del proyecto",
+      title: t("dialog.selectProjectFolder"),
       defaultPath: docsDir,
     });
     if (!selected) return;
@@ -253,9 +254,7 @@
       }
     } catch (e) {
       console.error("[cronista] Failed to open project:", e);
-      alert(
-        `No se pudo abrir el proyecto. ¿La carpeta contiene .config/metadata.json?\n\n${e}`,
-      );
+      alert(t("dialog.openProjectError") + `\n\n${e}`);
     }
   }
 
@@ -274,7 +273,7 @@
 
   async function crearPersonajeHandler(): Promise<void> {
     if (!personajeNuevoNombre.trim()) {
-      alert("El nombre del personaje es obligatorio.");
+      alert(t("characters.nameRequired"));
       return;
     }
     const id = personajeNuevoNombre
@@ -300,7 +299,7 @@
       await refreshPersonajes();
     } catch (e) {
       console.error("[cronista] Create character failed:", e);
-      alert(`Error al crear personaje: ${e}`);
+      alert(`${t("characters.createError")} ${e}`);
     }
   }
 
@@ -328,12 +327,12 @@
       await refreshPersonajes();
     } catch (e) {
       console.error("[cronista] Update character failed:", e);
-      alert(`Error al guardar personaje: ${e}`);
+      alert(`${t("characters.saveError")} ${e}`);
     }
   }
 
   async function eliminarPersonajeHandler(id: string): Promise<void> {
-    if (!confirm("¿Eliminar este personaje?")) return;
+    if (!confirm(t("characters.deleteConfirm"))) return;
     try {
       await eliminarPersonaje(projectPath, id);
       personajeExpandido = null;
@@ -342,7 +341,7 @@
       await refreshTimeline();
     } catch (e) {
       console.error("[cronista] Delete character failed:", e);
-      alert(`Error al eliminar personaje: ${e}`);
+      alert(`${t("characters.deleteError")} ${e}`);
     }
   }
 
@@ -375,7 +374,7 @@
   }
 
   async function crearNotaHandler(): Promise<void> {
-    const title = prompt("Título de la nota:");
+    const title = prompt(t("notes.titlePrompt"));
     if (!title?.trim()) return;
     const id = title
       .trim()
@@ -389,7 +388,7 @@
       await refreshNotas();
     } catch (e) {
       console.error("[cronista] Create note failed:", e);
-      alert(`Error al crear nota: ${e}`);
+      alert(`${t("notes.createError")} ${e}`);
     }
   }
 
@@ -425,7 +424,7 @@
   }
 
   async function eliminarNotaHandler(id: string): Promise<void> {
-    if (!confirm("¿Eliminar esta nota?")) return;
+    if (!confirm(t("notes.deleteConfirm"))) return;
     try {
       await eliminarNota(projectPath, id);
       if (activeNote === id) {
@@ -436,7 +435,7 @@
       await refreshNotas();
     } catch (e) {
       console.error("[cronista] Delete note failed:", e);
-      alert(`Error al eliminar nota: ${e}`);
+      alert(`${t("notes.deleteError")} ${e}`);
     }
   }
 
@@ -457,7 +456,7 @@
 
   async function agregarEventoHandler(): Promise<void> {
     if (!nuevoEventoFecha || !nuevoEventoTitulo) {
-      alert("Fecha y título son obligatorios.");
+      alert(t("timeline.requiredFields"));
       return;
     }
     const evento = {
@@ -478,18 +477,18 @@
       await refreshTimeline();
     } catch (e) {
       console.error("[cronista] Add timeline event failed:", e);
-      alert(`Error al agregar evento: ${e}`);
+      alert(`${t("timeline.addError")} ${e}`);
     }
   }
 
   async function eliminarEventoHandler(id: string): Promise<void> {
-    if (!confirm("¿Eliminar este evento?")) return;
+    if (!confirm(t("timeline.deleteConfirm"))) return;
     try {
       await eliminarEventoTimeline(projectPath, id);
       await refreshTimeline();
     } catch (e) {
       console.error("[cronista] Delete timeline event failed:", e);
-      alert(`Error al eliminar evento: ${e}`);
+      alert(`${t("timeline.deleteError")} ${e}`);
     }
   }
 
@@ -621,17 +620,17 @@
         class="tab"
         class:active={activeTab === "capitulos"}
         onclick={() => { pendingDelete = null; activeTab = "capitulos"; activeNote = ""; }}
-      >Capítulos</button>
+      >{t("tabs.chapters")}</button>
       <button
         class="tab"
         class:active={activeTab === "personajes"}
         onclick={() => { pendingDelete = null; activeTab = "personajes"; }}
-      >Personajes</button>
+      >{t("tabs.characters")}</button>
       <button
         class="tab"
         class:active={activeTab === "notas"}
         onclick={() => { pendingDelete = null; activeTab = "notas"; }}
-      >Notas</button>
+      >{t("tabs.notes")}</button>
     </nav>
 
     <div class="sidebar-content">
@@ -639,7 +638,7 @@
       {#if activeTab === "capitulos"}
         <div class="tab-panel">
           {#if chapters.length > 0}
-            <p class="chapter-list-label">Capítulos:</p>
+            <p class="chapter-list-label">{t("chapters.label")}</p>
             <ul class="chapter-list">
               {#each chapters as ch}
                 <li class="chapter-row">
@@ -653,13 +652,13 @@
                   {#if pendingDelete === ch}
                     <button
                       class="delete-confirm"
-                      title="Confirmar eliminación"
+                      title={t("chapters.confirmDeleteTitle")}
                       onclick={() => eliminarCapituloHandler(ch)}
-                    >¿Eliminar?</button>
+                    >{t("chapters.confirmDelete")}</button>
                   {:else}
                     <button
                       class="item-delete"
-                      title="Eliminar capítulo"
+                      title={t("chapters.deleteTitle")}
                       onclick={() => eliminarCapituloHandler(ch)}
                     >×</button>
                   {/if}
@@ -667,15 +666,15 @@
               {/each}
             </ul>
           {:else}
-            <p class="empty-hint">Sin capítulos aún.</p>
+            <p class="empty-hint">{t("chapters.empty")}</p>
           {/if}
 
           <button class="btn-load" onclick={() => {
             pendingDelete = null;
-            const fn = prompt("Nombre del archivo a cargar (ej: 0001_prologo.md):");
+            const fn = prompt(t("chapters.loadPrompt"));
             if (fn) cargarCapituloActual(fn.trim());
           }}>
-            Cargar capítulo
+            {t("chapters.load")}
           </button>
         </div>
       {/if}
@@ -697,7 +696,7 @@
 
                   {#if personajeExpandido === p.id && personajeEditando}
                     <div class="inline-form">
-                      <label class="field-label" for="char-name-{p.id}">Nombre</label>
+                      <label class="field-label" for="char-name-{p.id}">{t("characters.name")}</label>
                       <input
                         id="char-name-{p.id}"
                         class="field-input"
@@ -705,7 +704,7 @@
                         bind:value={personajeEditando.name}
                       />
 
-                      <label class="field-label" for="char-desc-{p.id}">Descripción física</label>
+                      <label class="field-label" for="char-desc-{p.id}">{t("characters.physicalDescription")}</label>
                       <textarea
                         id="char-desc-{p.id}"
                         class="field-textarea"
@@ -713,7 +712,7 @@
                         rows="2"
                       ></textarea>
 
-                      <label class="field-label" for="char-pers-{p.id}">Personalidad</label>
+                      <label class="field-label" for="char-pers-{p.id}">{t("characters.personality")}</label>
                       <textarea
                         id="char-pers-{p.id}"
                         class="field-textarea"
@@ -721,7 +720,7 @@
                         rows="2"
                       ></textarea>
 
-                      <label class="field-label" for="char-trau-{p.id}">Traumas</label>
+                      <label class="field-label" for="char-trau-{p.id}">{t("characters.traumas")}</label>
                       <textarea
                         id="char-trau-{p.id}"
                         class="field-textarea"
@@ -729,26 +728,26 @@
                         rows="2"
                       ></textarea>
 
-                      <label class="field-label" for="char-rel-{p.id}">Relaciones</label>
+                      <label class="field-label" for="char-rel-{p.id}">{t("characters.relationships")}</label>
                       {#if personajeEditando.relationships?.length > 0}
                         {#each personajeEditando.relationships as rel, ri}
                           <div class="relationship-row">
                             <input
                               class="field-input small"
                               type="text"
-                              placeholder="Nombre"
+                              placeholder={t("characters.relName")}
                               bind:value={rel.targetName}
                             />
                             <input
                               class="field-input small"
                               type="text"
-                              placeholder="Tipo (hermano, amigo...)"
+                              placeholder={t("characters.relType")}
                               bind:value={rel.type}
                             />
                             <input
                               class="field-input small"
                               type="text"
-                              placeholder="Notas"
+                              placeholder={t("characters.relNotes")}
                               bind:value={rel.notes}
                             />
                             <button
@@ -759,12 +758,12 @@
                         {/each}
                       {/if}
                       <button class="btn-sm" onclick={agregarRelacionPersonaje}>
-                        + Añadir relación
+                        {t("characters.addRelationship")}
                       </button>
 
                       <div class="form-actions">
-                        <button class="btn-sm btn-primary" onclick={guardarPersonaje}>Guardar</button>
-                        <button class="btn-sm btn-danger" onclick={() => eliminarPersonajeHandler(p.id)}>Eliminar</button>
+                        <button class="btn-sm btn-primary" onclick={guardarPersonaje}>{t("characters.save")}</button>
+                        <button class="btn-sm btn-danger" onclick={() => eliminarPersonajeHandler(p.id)}>{t("characters.delete")}</button>
                       </div>
                     </div>
                   {/if}
@@ -772,7 +771,7 @@
               {/each}
             </ul>
           {:else}
-            <p class="empty-hint">Sin personajes aún.</p>
+            <p class="empty-hint">{t("characters.empty")}</p>
           {/if}
 
           {#if personajeFormVisible}
@@ -780,18 +779,18 @@
               <input
                 class="field-input"
                 type="text"
-                placeholder="Nombre del personaje"
+                placeholder={t("characters.namePlaceholder")}
                 bind:value={personajeNuevoNombre}
                 onkeydown={(e: KeyboardEvent) => { if (e.key === "Enter") crearPersonajeHandler(); }}
               />
               <div class="form-actions">
-                <button class="btn-sm btn-primary" onclick={crearPersonajeHandler}>Crear</button>
-                <button class="btn-sm" onclick={() => personajeFormVisible = false}>Cancelar</button>
+                <button class="btn-sm btn-primary" onclick={crearPersonajeHandler}>{t("characters.create")}</button>
+                <button class="btn-sm" onclick={() => personajeFormVisible = false}>{t("common.cancel")}</button>
               </div>
             </div>
           {:else}
             <button class="btn-add" onclick={() => personajeFormVisible = true}>
-              + Nuevo personaje
+              {t("characters.new")}
             </button>
           {/if}
         </div>
@@ -811,21 +810,21 @@
                   >
                     {n.title}
                   </button>
-                  <button
+                   <button
                     class="item-delete"
-                    title="Eliminar nota"
+                    title={t("notes.deleteTitle")}
                     onclick={() => eliminarNotaHandler(n.id)}
                   >×</button>
                 </li>
               {/each}
             </ul>
           {:else}
-            <p class="empty-hint">Sin notas aún.</p>
+            <p class="empty-hint">{t("notes.empty")}</p>
           {/if}
 
           {#if activeNote}
             <div class="inline-form">
-              <label class="field-label" for="note-title">Título de la nota</label>
+              <label class="field-label" for="note-title">{t("notes.titleLabel")}</label>
               <input
                 id="note-title"
                 class="field-input"
@@ -833,17 +832,17 @@
                 bind:value={notaTitulo}
               />
               <div class="form-actions">
-                <button class="btn-sm btn-primary" onclick={guardarNotaActual}>Guardar</button>
+                <button class="btn-sm btn-primary" onclick={guardarNotaActual}>{t("notes.save")}</button>
                 <button
                   class="btn-sm"
                   onclick={() => { activeNote = ""; notaTitulo = ""; }}
-                >Cerrar</button>
+                >{t("notes.close")}</button>
               </div>
             </div>
           {/if}
 
           <button class="btn-add" onclick={() => crearNotaHandler()}>
-            + Nueva nota
+            {t("notes.new")}
           </button>
         </div>
       {/if}
@@ -854,7 +853,7 @@
           class="timeline-toggle"
           onclick={() => { timelineVisible = !timelineVisible; if (timelineVisible) refreshTimeline(); }}
         >
-          {timelineVisible ? "▼" : "▶"} Línea de tiempo
+          {timelineVisible ? "▼" : "▶"} {t("timeline.title")}
           {#if timeline.length > 0}
             <span class="timeline-badge">{timeline.length}</span>
           {/if}
@@ -870,44 +869,44 @@
                     <span class="event-title">{evt.title}</span>
                     <button
                       class="item-delete"
-                      title="Eliminar evento"
+                      title={t("timeline.deleteTitle")}
                       onclick={() => eliminarEventoHandler(evt.id)}
                     >×</button>
                   </li>
                 {/each}
               </ul>
             {:else}
-              <p class="empty-hint">Sin eventos en la línea de tiempo.</p>
+              <p class="empty-hint">{t("timeline.empty")}</p>
             {/if}
 
             {#if eventoFormVisible}
               <div class="inline-form">
-                <label class="field-label" for="evt-date">Fecha</label>
+                <label class="field-label" for="evt-date">{t("timeline.date")}</label>
                 <input
                   id="evt-date"
                   class="field-input"
                   type="date"
                   bind:value={nuevoEventoFecha}
                 />
-                <label class="field-label" for="evt-title">Título</label>
+                <label class="field-label" for="evt-title">{t("timeline.eventTitle")}</label>
                 <input
                   id="evt-title"
                   class="field-input"
                   type="text"
                   bind:value={nuevoEventoTitulo}
-                  placeholder="¿Qué pasó?"
+                  placeholder={t("timeline.titlePlaceholder")}
                 />
-                <label class="field-label" for="evt-desc">Descripción</label>
+                <label class="field-label" for="evt-desc">{t("timeline.description")}</label>
                 <textarea
                   id="evt-desc"
                   class="field-textarea"
                   bind:value={nuevoEventoDescripcion}
                   rows="2"
-                  placeholder="Detalles del evento..."
+                  placeholder={t("timeline.descriptionPlaceholder")}
                 ></textarea>
 
                 {#if personajes.length > 0}
-                  <span class="field-label">Personajes relacionados</span>
+                  <span class="field-label">{t("timeline.relatedCharacters")}</span>
                   <div class="checkbox-group">
                     {#each personajes as p}
                       <label class="checkbox-label">
@@ -923,7 +922,7 @@
                 {/if}
 
                 {#if chapters.length > 0}
-                  <span class="field-label">Capítulos relacionados</span>
+                  <span class="field-label">{t("timeline.relatedChapters")}</span>
                   <div class="checkbox-group">
                     {#each chapters as ch}
                       <label class="checkbox-label">
@@ -939,13 +938,13 @@
                 {/if}
 
                 <div class="form-actions">
-                  <button class="btn-sm btn-primary" onclick={agregarEventoHandler}>Agregar</button>
-                  <button class="btn-sm" onclick={() => eventoFormVisible = false}>Cancelar</button>
+                  <button class="btn-sm btn-primary" onclick={agregarEventoHandler}>{t("timeline.add")}</button>
+                  <button class="btn-sm" onclick={() => eventoFormVisible = false}>{t("common.cancel")}</button>
                 </div>
               </div>
             {:else}
               <button class="btn-add" onclick={() => eventoFormVisible = true}>
-                + Nuevo evento
+                {t("timeline.newEvent")}
               </button>
             {/if}
           </div>
@@ -959,19 +958,19 @@
     {#if !projectPath}
       <!-- First launch: prompt for project path -->
       <div class="setup-prompt">
-        <p class="setup-text">Selecciona una carpeta de proyecto para comenzar</p>
+        <p class="setup-text">{t("setup.selectFolder")}</p>
         <div class="setup-actions">
           <button
             class="btn-primary"
             onclick={() => crearCapituloNuevo()}
           >
-            + Nuevo proyecto
+            {t("setup.newProject")}
           </button>
           <button
             class="btn-secondary"
             onclick={() => abrirProyecto()}
           >
-            Abrir proyecto
+            {t("setup.openProject")}
           </button>
         </div>
       </div>
@@ -983,8 +982,8 @@
             <span class="project-label" title={projectPath}>
               {projectPath.split("/").pop() || projectPath}
             </span>
-            <button class="toolbar-btn" onclick={crearCapituloNuevo} title="Nuevo capítulo (Ctrl+N)">
-              + Nuevo capítulo
+            <button class="toolbar-btn" onclick={crearCapituloNuevo} title={t("toolbar.newChapterTitle")}>
+              {t("toolbar.newChapter")}
             </button>
           </div>
 
@@ -995,21 +994,33 @@
             <button
               class="toolbar-btn"
               onclick={() => { saveStatus = "saving"; save.trigger(); }}
-              title="Guardar ahora (Ctrl+S)"
+              title={t("toolbar.saveTitle")}
             >
-              Guardar
+              {t("toolbar.save")}
             </button>
             <button
               class="help-btn"
               onclick={() => (helpMode = !helpMode)}
-              title="Ayuda (F1)"
+              title={t("toolbar.helpTitle")}
             >
               ?
             </button>
             <button
+              class="lang-btn"
+              class:active-lang={currentLang === "es"}
+              onclick={() => setLang("es")}
+              title="Español"
+            >🇪🇸</button>
+            <button
+              class="lang-btn"
+              class:active-lang={currentLang === "en"}
+              onclick={() => setLang("en")}
+              title="English"
+            >🇬🇧</button>
+            <button
               class="theme-toggle"
               onclick={() => (theme = theme === "light" ? "dark" : "light")}
-              title={theme === "light" ? "Activar tema oscuro" : "Activar tema claro"}
+              title={theme === "light" ? t("toolbar.darkMode") : t("toolbar.lightMode")}
             >
               {theme === "light" ? "🌙" : "☀️"}
             </button>
@@ -1020,11 +1031,11 @@
               class:unsaved={saveStatus === "unsaved"}
             >
               {saveStatus === "saving"
-                ? "Guardando…"
+                ? t("toolbar.saving")
                 : saveStatus === "saved"
-                  ? "Guardado"
+                  ? t("toolbar.saved")
                   : saveStatus === "unsaved"
-                    ? "Sin guardar"
+                    ? t("toolbar.unsaved")
                     : ""}
             </span>
           </div>
@@ -1047,7 +1058,7 @@
   <div
     class="help-overlay"
     role="dialog"
-    aria-label="Ayuda de Cronista"
+    aria-label={t("help.ariaLabel")}
     onclick={() => (helpMode = false)}
     onkeydown={(e) => e.key === "Escape" && (helpMode = false)}
   >
@@ -1059,46 +1070,46 @@
         <button class="help-close" onclick={() => (helpMode = false)}>✕</button>
       </div>
 
-      <p class="help-creator">creado por <a href="mailto:galejan@gmail.com">galejan@gmail.com</a></p>
+      <p class="help-creator">{t("help.createdBy")} <a href="mailto:galejan@gmail.com">galejan@gmail.com</a></p>
 
       <div class="help-section">
-        <h3>📖 Editor</h3>
-        <p>Escribe en la zona central. El texto se guarda automáticamente tras 2 segundos de inactividad. Usa el menú flotante para dar formato al seleccionar texto.</p>
+        <h3>{t("help.editorTitle")}</h3>
+        <p>{t("help.editorDesc")}</p>
       </div>
 
       <div class="help-section">
-        <h3>📂 Capítulos</h3>
-        <p>Crea, carga y elimina capítulos desde la pestaña <strong>Capítulos</strong> o con el botón <strong>+ Nuevo capítulo</strong>. Doble clic en ✕ para eliminar con confirmación.</p>
+        <h3>{t("help.chaptersTitle")}</h3>
+        <p>{@html t("help.chaptersDesc")}</p>
       </div>
 
       <div class="help-section">
-        <h3>👤 Personajes</h3>
-        <p>Fichas con descripción física, personalidad, traumas y relaciones. Las relaciones pueden ser unilaterales (ej.: A está enamorado de B, pero no al revés).</p>
+        <h3>{t("help.charactersTitle")}</h3>
+        <p>{t("help.charactersDesc")}</p>
       </div>
 
       <div class="help-section">
-        <h3>📝 Notas</h3>
-        <p>Ideas, recordatorios y análisis. Al hacer clic en una nota, su contenido se carga en el editor principal para trabajar con formato.</p>
+        <h3>{t("help.notesTitle")}</h3>
+        <p>{t("help.notesDesc")}</p>
       </div>
 
       <div class="help-section">
-        <h3>⏳ Línea de tiempo</h3>
-        <p>Línea temporal al final del panel lateral. Añade eventos con fecha, descripción y vincúlalos a personajes y capítulos.</p>
+        <h3>{t("help.timelineTitle")}</h3>
+        <p>{t("help.timelineDesc")}</p>
       </div>
 
       <div class="help-section">
-        <h3>⌨️ Atajos de teclado</h3>
+        <h3>{t("help.shortcutsTitle")}</h3>
         <table class="help-shortcuts">
           <tbody>
-          <tr><td><kbd>Ctrl+B</kbd></td><td>Colapsar / restaurar panel lateral</td></tr>
-          <tr><td><kbd>Ctrl+Shift+,</kbd> / <kbd>Ctrl+Shift+.</kbd></td><td>Reducir / ampliar panel lateral (5&nbsp;% por paso)</td></tr>
-          <tr><td><kbd>Ctrl+S</kbd></td><td>Guardar ahora</td></tr>
-          <tr><td><kbd>Ctrl+N</kbd></td><td>Nuevo capítulo</td></tr>
-          <tr><td><kbd>Ctrl+O</kbd></td><td>Abrir proyecto existente</td></tr>
-          <tr><td><kbd>Ctrl+Shift+N</kbd></td><td>Nuevo proyecto (reinicia)</td></tr>
-          <tr><td><kbd>Ctrl+Alt+1</kbd> / <kbd>2</kbd> / <kbd>3</kbd></td><td>Aplicar Título 1 / 2 / 3</td></tr>
-          <tr><td><kbd>F11</kbd></td><td>Pantalla completa</td></tr>
-          <tr><td><kbd>F1</kbd> o <kbd>?</kbd></td><td>Mostrar / ocultar esta ayuda</td></tr>
+          <tr><td><kbd>Ctrl+B</kbd></td><td>{t("help.shortcuts.toggleSidebar")}</td></tr>
+          <tr><td><kbd>Ctrl+Shift+,</kbd> / <kbd>Ctrl+Shift+.</kbd></td><td>{t("help.shortcuts.resizeSidebar")}</td></tr>
+          <tr><td><kbd>Ctrl+S</kbd></td><td>{t("help.shortcuts.saveNow")}</td></tr>
+          <tr><td><kbd>Ctrl+N</kbd></td><td>{t("help.shortcuts.newChapter")}</td></tr>
+          <tr><td><kbd>Ctrl+O</kbd></td><td>{t("help.shortcuts.openProject")}</td></tr>
+          <tr><td><kbd>Ctrl+Shift+N</kbd></td><td>{t("help.shortcuts.newProject")}</td></tr>
+          <tr><td><kbd>Ctrl+Alt+1</kbd> / <kbd>2</kbd> / <kbd>3</kbd></td><td>{t("help.shortcuts.applyHeading")}</td></tr>
+          <tr><td><kbd>F11</kbd></td><td>{t("help.shortcuts.fullscreen")}</td></tr>
+          <tr><td><kbd>F1</kbd> o <kbd>?</kbd></td><td>{t("help.shortcuts.toggleHelp")}</td></tr>
           </tbody>
         </table>
       </div>
@@ -1919,6 +1930,45 @@
     background: #334155;
     border-color: #475569;
     color: #e2e8f0;
+  }
+
+  /* ── Language switcher buttons ─────────────────────────────── */
+  .lang-btn {
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 0.25rem;
+    background: transparent;
+    font-size: 0.8125rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 120ms, border-color 120ms;
+    opacity: 0.6;
+  }
+
+  .lang-btn:hover {
+    background: #f1f5f9;
+    border-color: #e2e8f0;
+    opacity: 1;
+  }
+
+  .lang-btn.active-lang {
+    opacity: 1;
+    border-color: #3b82f6;
+    background: #eff6ff;
+  }
+
+  :global(.dark) .lang-btn:hover {
+    background: #334155;
+    border-color: #475569;
+  }
+
+  :global(.dark) .lang-btn.active-lang {
+    border-color: #60a5fa;
+    background: #1e3a5f;
   }
 
   /* ── Help overlay ─────────────────────────────────────────── */

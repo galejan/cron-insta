@@ -1,0 +1,335 @@
+/**
+ * Cronista i18n — lightweight Spanish/English translation system.
+ *
+ * Architecture:
+ * - `currentLang` is a `$state` rune, so templates calling `t()` are reactive.
+ * - `setLang()` persists the choice to localStorage.
+ * - On init, reads `cronista-lang` from localStorage; fallback `"es"`.
+ *
+ * Usage in components:
+ *   import { t, setLang, currentLang } from "$lib/i18n";
+ *   <button>{t("common.cancel")}</button>
+ *   <button onclick={() => setLang("en")}>🇬🇧</button>
+ */
+
+export type Lang = "es" | "en";
+
+/** Reactive language state — changing this re-renders all `t()` calls in templates. */
+export let currentLang = $state<Lang>("es");
+
+// ── Init: read persisted language ────────────────────────────
+if (typeof localStorage !== "undefined") {
+  const stored = localStorage.getItem("cronista-lang");
+  if (stored === "es" || stored === "en") {
+    currentLang = stored as Lang;
+  }
+}
+
+// ── Translations dictionary ──────────────────────────────────
+
+const translations: Record<Lang, Record<string, string>> = {
+  es: {
+    // ── Setup screen ───────────────────────────────────────
+    "setup.selectFolder": "Seleccioná una carpeta de proyecto para comenzar",
+    "setup.newProject": "+ Nuevo proyecto",
+    "setup.openProject": "Abrir proyecto",
+    "setup.reopening": "Reabriendo último proyecto…",
+
+    // ── Toolbar ────────────────────────────────────────────
+    "toolbar.newChapter": "+ Nuevo capítulo",
+    "toolbar.newChapterTitle": "Nuevo capítulo (Ctrl+N)",
+    "toolbar.save": "Guardar",
+    "toolbar.saveTitle": "Guardar ahora (Ctrl+S)",
+    "toolbar.helpTitle": "Ayuda (F1)",
+    "toolbar.darkMode": "Activar tema oscuro",
+    "toolbar.lightMode": "Activar tema claro",
+    "toolbar.saving": "Guardando…",
+    "toolbar.saved": "Guardado",
+    "toolbar.unsaved": "Sin guardar",
+
+    // ── Sidebar tabs ───────────────────────────────────────
+    "tabs.chapters": "Capítulos",
+    "tabs.characters": "Personajes",
+    "tabs.notes": "Notas",
+
+    // ── Chapters ───────────────────────────────────────────
+    "chapters.label": "Capítulos:",
+    "chapters.empty": "Sin capítulos aún.",
+    "chapters.load": "Cargar capítulo",
+    "chapters.loadPrompt":
+      "Nombre del archivo a cargar (ej: 0001_prologo.md):",
+    "chapters.confirmDelete": "¿Eliminar?",
+    "chapters.confirmDeleteTitle": "Confirmar eliminación",
+    "chapters.deleteTitle": "Eliminar capítulo",
+    "chapters.newFilePrompt": "Nombre del archivo (ej: 0001_prologo.md):",
+    "chapters.untitled": "Sin título",
+    "chapters.deleteError": "Error al eliminar capítulo:",
+    "chapters.createError": "Error al crear capítulo:",
+
+    // ── Characters ─────────────────────────────────────────
+    "characters.empty": "Sin personajes aún.",
+    "characters.new": "+ Nuevo personaje",
+    "characters.namePlaceholder": "Nombre del personaje",
+    "characters.nameRequired": "El nombre del personaje es obligatorio.",
+    "characters.create": "Crear",
+    "characters.name": "Nombre",
+    "characters.physicalDescription": "Descripción física",
+    "characters.personality": "Personalidad",
+    "characters.traumas": "Traumas",
+    "characters.relationships": "Relaciones",
+    "characters.addRelationship": "+ Añadir relación",
+    "characters.relName": "Nombre",
+    "characters.relType": "Tipo (hermano, amigo…)",
+    "characters.relNotes": "Notas",
+    "characters.save": "Guardar",
+    "characters.delete": "Eliminar",
+    "characters.deleteConfirm": "¿Eliminar este personaje?",
+    "characters.createError": "Error al crear personaje:",
+    "characters.saveError": "Error al guardar personaje:",
+    "characters.deleteError": "Error al eliminar personaje:",
+
+    // ── Notes ──────────────────────────────────────────────
+    "notes.empty": "Sin notas aún.",
+    "notes.titleLabel": "Título de la nota",
+    "notes.titlePrompt": "Título de la nota:",
+    "notes.save": "Guardar",
+    "notes.close": "Cerrar",
+    "notes.deleteTitle": "Eliminar nota",
+    "notes.new": "+ Nueva nota",
+    "notes.deleteConfirm": "¿Eliminar esta nota?",
+    "notes.createError": "Error al crear nota:",
+    "notes.deleteError": "Error al eliminar nota:",
+
+    // ── Timeline ───────────────────────────────────────────
+    "timeline.title": "Línea de tiempo",
+    "timeline.empty": "Sin eventos en la línea de tiempo.",
+    "timeline.deleteTitle": "Eliminar evento",
+    "timeline.deleteConfirm": "¿Eliminar este evento?",
+    "timeline.date": "Fecha",
+    "timeline.eventTitle": "Título",
+    "timeline.titlePlaceholder": "¿Qué pasó?",
+    "timeline.description": "Descripción",
+    "timeline.descriptionPlaceholder": "Detalles del evento…",
+    "timeline.relatedCharacters": "Personajes relacionados",
+    "timeline.relatedChapters": "Capítulos relacionados",
+    "timeline.add": "Agregar",
+    "timeline.newEvent": "+ Nuevo evento",
+    "timeline.requiredFields": "Fecha y título son obligatorios.",
+    "timeline.addError": "Error al agregar evento:",
+    "timeline.deleteError": "Error al eliminar evento:",
+
+    // ── Help panel ─────────────────────────────────────────
+    "help.ariaLabel": "Ayuda de Cronista",
+    "help.createdBy": "creado por",
+    "help.editorTitle": "📖 Editor",
+    "help.editorDesc":
+      "Escribí en la zona central. El texto se guarda automáticamente tras 2 segundos de inactividad. Usá el menú flotante para dar formato al seleccionar texto.",
+    "help.chaptersTitle": "📂 Capítulos",
+    "help.chaptersDesc":
+      "Creá, cargá y eliminá capítulos desde la pestaña Capítulos o con el botón + Nuevo capítulo. Doble clic en × para eliminar con confirmación.",
+    "help.charactersTitle": "👤 Personajes",
+    "help.charactersDesc":
+      "Fichas con descripción física, personalidad, traumas y relaciones. Las relaciones pueden ser unilaterales (ej.: A está enamorado de B, pero no al revés).",
+    "help.notesTitle": "📝 Notas",
+    "help.notesDesc":
+      "Ideas, recordatorios y análisis. Al hacer clic en una nota, su contenido se carga en el editor principal para trabajar con formato.",
+    "help.timelineTitle": "⏳ Línea de tiempo",
+    "help.timelineDesc":
+      "Línea temporal al final del panel lateral. Añadí eventos con fecha, descripción y vinculalos a personajes y capítulos.",
+    "help.shortcutsTitle": "⌨️ Atajos de teclado",
+    "help.shortcuts.toggleSidebar": "Colapsar / restaurar panel lateral",
+    "help.shortcuts.resizeSidebar":
+      "Reducir / ampliar panel lateral (5 % por paso)",
+    "help.shortcuts.saveNow": "Guardar ahora",
+    "help.shortcuts.newChapter": "Nuevo capítulo",
+    "help.shortcuts.openProject": "Abrir proyecto existente",
+    "help.shortcuts.newProject": "Nuevo proyecto (reinicia)",
+    "help.shortcuts.applyHeading": "Aplicar Título 1 / 2 / 3",
+    "help.shortcuts.fullscreen": "Pantalla completa",
+    "help.shortcuts.toggleHelp": "Mostrar / ocultar esta ayuda",
+
+    // ── Dialogs (prompts and confirmations) ────────────────
+    "dialog.selectCreateFolder":
+      "Seleccioná la carpeta donde crear el proyecto",
+    "dialog.projectName": "Nombre del proyecto (ej: Mi Novela):",
+    "dialog.projectNameDefault": "Mi Novela",
+    "dialog.projectFolderPath": "Ruta de la carpeta del proyecto:",
+    "dialog.selectProjectFolder": "Seleccioná la carpeta del proyecto",
+    "dialog.createProjectError": "Error al crear proyecto:",
+    "dialog.openProjectError":
+      "No se pudo abrir el proyecto. ¿La carpeta contiene .config/metadata.json?",
+    "dialog.filename": "Nombre del archivo:",
+
+    // ── Common ─────────────────────────────────────────────
+    "common.error": "Error",
+    "common.cancel": "Cancelar",
+    "common.delete": "Eliminar",
+
+    // ── Bubble menu (Editor.svelte) ────────────────────────
+    "editor.heading1Title": "Título 1 (Ctrl+Alt+1)",
+    "editor.heading2Title": "Título 2 (Ctrl+Alt+2)",
+    "editor.heading3Title": "Título 3 (Ctrl+Alt+3)",
+  },
+
+  en: {
+    // ── Setup screen ───────────────────────────────────────
+    "setup.selectFolder": "Select a project folder to get started",
+    "setup.newProject": "+ New Project",
+    "setup.openProject": "Open Project",
+    "setup.reopening": "Reopening last project…",
+
+    // ── Toolbar ────────────────────────────────────────────
+    "toolbar.newChapter": "+ New Chapter",
+    "toolbar.newChapterTitle": "New chapter (Ctrl+N)",
+    "toolbar.save": "Save",
+    "toolbar.saveTitle": "Save now (Ctrl+S)",
+    "toolbar.helpTitle": "Help (F1)",
+    "toolbar.darkMode": "Enable dark theme",
+    "toolbar.lightMode": "Enable light theme",
+    "toolbar.saving": "Saving…",
+    "toolbar.saved": "Saved",
+    "toolbar.unsaved": "Unsaved",
+
+    // ── Sidebar tabs ───────────────────────────────────────
+    "tabs.chapters": "Chapters",
+    "tabs.characters": "Characters",
+    "tabs.notes": "Notes",
+
+    // ── Chapters ───────────────────────────────────────────
+    "chapters.label": "Chapters:",
+    "chapters.empty": "No chapters yet.",
+    "chapters.load": "Load chapter",
+    "chapters.loadPrompt": "Filename to load (e.g. 0001_prologue.md):",
+    "chapters.confirmDelete": "Delete?",
+    "chapters.confirmDeleteTitle": "Confirm deletion",
+    "chapters.deleteTitle": "Delete chapter",
+    "chapters.newFilePrompt": "Filename (e.g. 0001_prologue.md):",
+    "chapters.untitled": "Untitled",
+    "chapters.deleteError": "Error deleting chapter:",
+    "chapters.createError": "Error creating chapter:",
+
+    // ── Characters ─────────────────────────────────────────
+    "characters.empty": "No characters yet.",
+    "characters.new": "+ New Character",
+    "characters.namePlaceholder": "Character name",
+    "characters.nameRequired": "Character name is required.",
+    "characters.create": "Create",
+    "characters.name": "Name",
+    "characters.physicalDescription": "Physical description",
+    "characters.personality": "Personality",
+    "characters.traumas": "Traumas",
+    "characters.relationships": "Relationships",
+    "characters.addRelationship": "+ Add relationship",
+    "characters.relName": "Name",
+    "characters.relType": "Type (brother, friend…)",
+    "characters.relNotes": "Notes",
+    "characters.save": "Save",
+    "characters.delete": "Delete",
+    "characters.deleteConfirm": "Delete this character?",
+    "characters.createError": "Error creating character:",
+    "characters.saveError": "Error saving character:",
+    "characters.deleteError": "Error deleting character:",
+
+    // ── Notes ──────────────────────────────────────────────
+    "notes.empty": "No notes yet.",
+    "notes.titleLabel": "Note title",
+    "notes.titlePrompt": "Note title:",
+    "notes.save": "Save",
+    "notes.close": "Close",
+    "notes.deleteTitle": "Delete note",
+    "notes.new": "+ New Note",
+    "notes.deleteConfirm": "Delete this note?",
+    "notes.createError": "Error creating note:",
+    "notes.deleteError": "Error deleting note:",
+
+    // ── Timeline ───────────────────────────────────────────
+    "timeline.title": "Timeline",
+    "timeline.empty": "No events in the timeline.",
+    "timeline.deleteTitle": "Delete event",
+    "timeline.deleteConfirm": "Delete this event?",
+    "timeline.date": "Date",
+    "timeline.eventTitle": "Title",
+    "timeline.titlePlaceholder": "What happened?",
+    "timeline.description": "Description",
+    "timeline.descriptionPlaceholder": "Event details…",
+    "timeline.relatedCharacters": "Related characters",
+    "timeline.relatedChapters": "Related chapters",
+    "timeline.add": "Add",
+    "timeline.newEvent": "+ New Event",
+    "timeline.requiredFields": "Date and title are required.",
+    "timeline.addError": "Error adding event:",
+    "timeline.deleteError": "Error deleting event:",
+
+    // ── Help panel ─────────────────────────────────────────
+    "help.ariaLabel": "Cronista Help",
+    "help.createdBy": "created by",
+    "help.editorTitle": "📖 Editor",
+    "help.editorDesc":
+      "Write in the central area. Text is auto-saved after 2 seconds of inactivity. Use the floating menu to format selected text.",
+    "help.chaptersTitle": "📂 Chapters",
+    "help.chaptersDesc":
+      "Create, load, and delete chapters from the Chapters tab or using the + New Chapter button. Double-click × to delete with confirmation.",
+    "help.charactersTitle": "👤 Characters",
+    "help.charactersDesc":
+      "Character sheets with physical description, personality, traumas, and relationships. Relationships can be one-sided (e.g., A loves B, but not the other way around).",
+    "help.notesTitle": "📝 Notes",
+    "help.notesDesc":
+      "Ideas, reminders, and analysis. Clicking a note loads its content into the main editor so you can work with formatting.",
+    "help.timelineTitle": "⏳ Timeline",
+    "help.timelineDesc":
+      "Timeline at the bottom of the sidebar. Add events with date, description, and link them to characters and chapters.",
+    "help.shortcutsTitle": "⌨️ Keyboard Shortcuts",
+    "help.shortcuts.toggleSidebar": "Toggle sidebar collapse",
+    "help.shortcuts.resizeSidebar": "Shrink / grow sidebar (5% per step)",
+    "help.shortcuts.saveNow": "Save now",
+    "help.shortcuts.newChapter": "New chapter",
+    "help.shortcuts.openProject": "Open existing project",
+    "help.shortcuts.newProject": "New project (restart)",
+    "help.shortcuts.applyHeading": "Apply Heading 1 / 2 / 3",
+    "help.shortcuts.fullscreen": "Full screen",
+    "help.shortcuts.toggleHelp": "Show / hide this help",
+
+    // ── Dialogs (prompts and confirmations) ────────────────
+    "dialog.selectCreateFolder":
+      "Select the folder where to create the project",
+    "dialog.projectName": "Project name (e.g. My Novel):",
+    "dialog.projectNameDefault": "My Novel",
+    "dialog.projectFolderPath": "Project folder path:",
+    "dialog.selectProjectFolder": "Select the project folder",
+    "dialog.createProjectError": "Error creating project:",
+    "dialog.openProjectError":
+      "Could not open the project. Does the folder contain .config/metadata.json?",
+    "dialog.filename": "Filename:",
+
+    // ── Common ─────────────────────────────────────────────
+    "common.error": "Error",
+    "common.cancel": "Cancel",
+    "common.delete": "Delete",
+
+    // ── Bubble menu (Editor.svelte) ────────────────────────
+    "editor.heading1Title": "Heading 1 (Ctrl+Alt+1)",
+    "editor.heading2Title": "Heading 2 (Ctrl+Alt+2)",
+    "editor.heading3Title": "Heading 3 (Ctrl+Alt+3)",
+  },
+};
+
+/**
+ * Translate a key to the current language.
+ *
+ * Usage: `t("common.cancel")` → "Cancelar" (es) or "Cancel" (en)
+ *
+ * Falls back to the key itself if translation is missing.
+ */
+export function t(key: string): string {
+  return translations[currentLang]?.[key] ?? key;
+}
+
+/**
+ * Change the active language and persist the choice.
+ */
+export function setLang(lang: Lang): void {
+  currentLang = lang;
+  if (typeof localStorage !== "undefined") {
+    localStorage.setItem("cronista-lang", lang);
+  }
+}
