@@ -688,10 +688,10 @@ fn listar_notas(proyecto_path: String) -> Result<String, String> {
         .map_err(|e| format!("No se pudo leer el índice de notas: {}", e))
 }
 
-/// Create a new note.
+/// Create or update a note (upsert — follows guardar_capitulo pattern).
 ///
-/// Creates `notas/{id}.md` with the given content.
-/// Updates `notas/index.json`. Rejects duplicates.
+/// Creates or overwrites `notas/{id}.md` with the given content.
+/// Updates `notas/index.json` (adds or updates title).
 #[tauri::command]
 fn crear_nota(
     proyecto_path: String,
@@ -709,18 +709,15 @@ fn crear_nota(
     let notas_dir = Path::new(&proyecto_path).join("notas");
     let note_file = notas_dir.join(format!("{}.md", id));
 
-    // Reject duplicates
-    if note_file.exists() {
-        return Err(format!("La nota '{}' ya existe.", id));
-    }
+    let existed = note_file.exists();
 
     // Ensure directory exists
     std::fs::create_dir_all(&notas_dir)
         .map_err(|e| format!("No se pudo crear el directorio notas: {}", e))?;
 
-    // Write note file
+    // Write / overwrite note file
     std::fs::write(&note_file, &contenido)
-        .map_err(|e| format!("Error al crear la nota: {}", e))?;
+        .map_err(|e| format!("Error al guardar la nota: {}", e))?;
 
     // Update index
     let index_path = notas_dir.join("index.json");
@@ -732,17 +729,28 @@ fn crear_nota(
         vec![]
     };
 
-    index.push(NoteIndexItem {
-        id: id.clone(),
-        title: titulo.clone(),
-    });
+    if existed {
+        // Update existing entry
+        for item in &mut index {
+            if item.id == id {
+                item.title = titulo.clone();
+                break;
+            }
+        }
+    } else {
+        index.push(NoteIndexItem {
+            id: id.clone(),
+            title: titulo.clone(),
+        });
+    }
 
     let index_json = serde_json::to_string_pretty(&index)
         .map_err(|e| format!("Error al serializar el índice de notas: {}", e))?;
     std::fs::write(&index_path, index_json)
         .map_err(|e| format!("Error al escribir el índice de notas: {}", e))?;
 
-    Ok(format!("Nota '{}' creada.", titulo))
+    let action = if existed { "actualizada" } else { "creada" };
+    Ok(format!("Nota '{}' {}.", titulo, action))
 }
 
 /// Load a note by ID.
@@ -1947,7 +1955,7 @@ mod tests {
     }
 
     #[test]
-    fn test_crear_nota_rechaza_duplicado() {
+    fn test_crear_nota_permite_sobrescribir() {
         let dir = TempDir::new().expect("failed to create temp dir");
         let path = dir.path().to_str().unwrap().to_string();
 
@@ -1956,19 +1964,29 @@ mod tests {
         let _ = crear_nota(
             path.clone(),
             "n1".to_string(),
-            "Nota 1".to_string(),
-            "contenido".to_string(),
+            "Nota original".to_string(),
+            "contenido viejo".to_string(),
         );
 
+        // Overwrite with new content and title (upsert)
         let result = crear_nota(
             path.clone(),
             "n1".to_string(),
-            "Duplicada".to_string(),
-            "otro".to_string(),
+            "Nota actualizada".to_string(),
+            "contenido nuevo".to_string(),
         );
-        assert!(result.is_err(), "Expected Err for duplicate note");
-        let err = result.unwrap_err();
-        assert!(err.contains("ya existe"), "Should mention duplicate: {}", err);
+        assert!(result.is_ok(), "Expected Ok for upsert, got {:?}", result);
+
+        // Verify content was overwritten
+        let loaded = cargar_nota(path.clone(), "n1".to_string()).unwrap();
+        assert_eq!(loaded, "contenido nuevo");
+
+        // Verify index title was updated
+        let index_raw = listar_notas(path).unwrap();
+        let index: Vec<NoteIndexItem> =
+            serde_json::from_str(&index_raw).unwrap();
+        assert_eq!(index.len(), 1, "Index should still have one entry");
+        assert_eq!(index[0].title, "Nota actualizada");
     }
 
     // --- cargar_nota (1 test) ---
