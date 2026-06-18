@@ -436,6 +436,72 @@ fn crear_capitulo(
     Ok(format!("Capítulo creado: {}", file_path.display()))
 }
 
+/// Delete a chapter.
+///
+/// 1. Validates non-empty path and filename.
+/// 2. Deletes `capitulos/{filename}` — returns error if not found.
+/// 3. Removes `filename` from `chapters_order` in metadata.json.
+/// 4. Cleans references from timeline events' `relatedChapters` arrays.
+#[tauri::command]
+fn eliminar_capitulo(proyecto_path: String, filename: String) -> Result<String, String> {
+    if proyecto_path.trim().is_empty() {
+        return Err("La ruta del proyecto no puede estar vacía.".to_string());
+    }
+    if filename.trim().is_empty() {
+        return Err("El nombre del archivo no puede estar vacío.".to_string());
+    }
+
+    let file_path = Path::new(&proyecto_path).join("capitulos").join(&filename);
+
+    if !file_path.exists() {
+        return Err(format!("El capítulo '{}' no existe.", filename));
+    }
+
+    // Delete the chapter file
+    std::fs::remove_file(&file_path)
+        .map_err(|e| format!("Error al eliminar el capítulo: {}", e))?;
+
+    // Remove from metadata chapters_order
+    let metadata_path = Path::new(&proyecto_path).join(".config").join("metadata.json");
+
+    if !metadata_path.exists() {
+        return Err("Archivo de metadatos no encontrado.".to_string());
+    }
+
+    let metadata_str = std::fs::read_to_string(&metadata_path)
+        .map_err(|e| format!("Error al leer metadata.json: {}", e))?;
+
+    let mut metadata: Metadata = serde_json::from_str(&metadata_str)
+        .map_err(|e| format!("Error al parsear metadata.json: {}", e))?;
+
+    metadata.chapters_order.retain(|ch| ch != &filename);
+    metadata.last_modified = Utc::now().to_rfc3339();
+
+    let updated_json = serde_json::to_string_pretty(&metadata)
+        .map_err(|e| format!("Error al serializar metadata.json: {}", e))?;
+
+    std::fs::write(&metadata_path, updated_json)
+        .map_err(|e| format!("Error al escribir metadata.json: {}", e))?;
+
+    // Clean references from timeline
+    let timeline_path = Path::new(&proyecto_path).join(".config").join("timeline.json");
+    if timeline_path.exists() {
+        let raw = std::fs::read_to_string(&timeline_path)
+            .map_err(|e| format!("Error al leer la línea de tiempo: {}", e))?;
+        let mut timeline: Vec<TimelineEvent> =
+            serde_json::from_str(&raw).unwrap_or_default();
+        for event in &mut timeline {
+            event.relatedChapters.retain(|ch| ch != &filename);
+        }
+        let timeline_json = serde_json::to_string_pretty(&timeline)
+            .map_err(|e| format!("Error al serializar la línea de tiempo: {}", e))?;
+        std::fs::write(&timeline_path, timeline_json)
+            .map_err(|e| format!("Error al escribir la línea de tiempo: {}", e))?;
+    }
+
+    Ok(format!("Capítulo '{}' eliminado.", filename))
+}
+
 // ---------------------------------------------------------------------------
 // Characters — personajes
 // ---------------------------------------------------------------------------
@@ -975,6 +1041,7 @@ pub fn run() {
             cargar_indice,
             cargar_capitulo,
             crear_capitulo,
+            eliminar_capitulo,
             listar_personajes,
             crear_personaje,
             cargar_personaje,
@@ -2152,6 +2219,104 @@ mod tests {
         let result = listar_notas(path);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "[]");
+    }
+
+    // ========================================================================
+    // eliminar_capitulo tests
+    // ========================================================================
+
+    #[test]
+    fn test_eliminar_capitulo_removes_file_and_metadata() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        let _ = crear_proyecto(path.clone(), "Test".to_string());
+
+        // Create a chapter
+        let _ = crear_capitulo(
+            path.clone(),
+            "0001_prologo.md".to_string(),
+            "# Prólogo\n\n".to_string(),
+        );
+
+        // Verify chapter exists
+        assert!(
+            dir.path().join("capitulos").join("0001_prologo.md").exists(),
+            "Chapter file should exist before deletion"
+        );
+
+        let result = eliminar_capitulo(path.clone(), "0001_prologo.md".to_string());
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+
+        // File must be gone
+        assert!(
+            !dir.path().join("capitulos").join("0001_prologo.md").exists(),
+            "Chapter file should be deleted"
+        );
+
+        // Metadata chapters_order must be empty
+        let metadata_path = dir.path().join(".config").join("metadata.json");
+        let metadata_str = fs::read_to_string(&metadata_path).unwrap();
+        let metadata: Metadata =
+            serde_json::from_str(&metadata_str).expect("invalid metadata.json");
+        assert!(
+            metadata.chapters_order.is_empty(),
+            "chapters_order should be empty after deletion, got: {:?}",
+            metadata.chapters_order
+        );
+    }
+
+    #[test]
+    fn test_eliminar_capitulo_rejects_nonexistent() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        let _ = crear_proyecto(path.clone(), "Test".to_string());
+
+        let result = eliminar_capitulo(path.clone(), "9999_fantasma.md".to_string());
+        assert!(result.is_err(), "Expected Err for nonexistent chapter");
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("no existe"),
+            "Error should mention non-existence, got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_eliminar_capitulo_cleans_timeline_references() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        let _ = crear_proyecto(path.clone(), "Test".to_string());
+
+        // Create a chapter
+        let _ = crear_capitulo(
+            path.clone(),
+            "cap1.md".to_string(),
+            "# Cap 1\n\n".to_string(),
+        );
+
+        // Add a timeline event referencing the chapter
+        let event_json = format!(
+            r#"{{"date":"2020-06-15","title":"Evento con cap","description":"...","relatedChapters":["cap1.md"]}}"#
+        );
+        let _ = agregar_evento_timeline(path.clone(), event_json);
+
+        // Delete the chapter
+        let result = eliminar_capitulo(path.clone(), "cap1.md".to_string());
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+
+        // Timeline event should no longer reference the deleted chapter
+        let timeline_raw = cargar_timeline(path.clone()).unwrap();
+        let timeline: Vec<TimelineEvent> =
+            serde_json::from_str(&timeline_raw).unwrap();
+        assert_eq!(timeline.len(), 1);
+        assert!(
+            timeline[0].relatedChapters.is_empty(),
+            "relatedChapters should be empty after chapter deletion, got: {:?}",
+            timeline[0].relatedChapters
+        );
     }
 
     // ========================================================================

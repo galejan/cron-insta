@@ -13,6 +13,7 @@
     crearNota,
     crearPersonaje,
     crearProyecto,
+    eliminarCapitulo,
     eliminarEventoTimeline,
     eliminarNota,
     eliminarPersonaje,
@@ -47,6 +48,7 @@
   // ── Editor & project state ──────────────────────────────────
   let projectPath = $state("");
   let chapters = $state<string[]>([]);
+  let pendingDelete = $state<string | null>(null);
   let activeChapter = $state("");
   let editorContent = $state("");
   let saveStatus = $state<"" | "saved" | "unsaved" | "saving">("");
@@ -144,6 +146,31 @@
       console.log("[cronista] Chapters refreshed:", chapters);
     } catch (e) {
       console.error("[cronista] Failed to read project index:", e);
+    }
+  }
+
+  async function eliminarCapituloHandler(filename: string): Promise<void> {
+    if (pendingDelete === filename) {
+      // Second click — execute deletion
+      try {
+        await eliminarCapitulo(projectPath, filename);
+        if (activeChapter === filename) {
+          activeChapter = "";
+          editorRef?.setContent("");
+          editorContent = "";
+          saveStatus = "";
+        }
+        await refreshChapters();
+      } catch (e) {
+        console.error("[cronista] Delete chapter failed:", e);
+        alert(`Error al eliminar capítulo: ${e}`);
+      }
+      pendingDelete = null;
+    } else {
+      // First click — mark for confirmation
+      pendingDelete = filename;
+      // Auto-reset after 3 seconds
+      setTimeout(() => { pendingDelete = null; }, 3_000);
     }
   }
 
@@ -578,17 +605,17 @@
       <button
         class="tab"
         class:active={activeTab === "capitulos"}
-        onclick={() => { activeTab = "capitulos"; activeNote = ""; }}
+        onclick={() => { pendingDelete = null; activeTab = "capitulos"; activeNote = ""; }}
       >Capítulos</button>
       <button
         class="tab"
         class:active={activeTab === "personajes"}
-        onclick={() => { activeTab = "personajes"; }}
+        onclick={() => { pendingDelete = null; activeTab = "personajes"; }}
       >Personajes</button>
       <button
         class="tab"
         class:active={activeTab === "notas"}
-        onclick={() => { activeTab = "notas"; }}
+        onclick={() => { pendingDelete = null; activeTab = "notas"; }}
       >Notas</button>
     </nav>
 
@@ -604,15 +631,23 @@
                   <button
                     class="chapter-link"
                     class:active-chapter={activeChapter === ch}
-                    onclick={() => { activeNote = ""; cargarCapituloActual(ch); }}
+                    onclick={() => { pendingDelete = null; activeNote = ""; cargarCapituloActual(ch); }}
                   >
                     {ch}
                   </button>
-                  <button
-                    class="item-delete"
-                    title="Eliminar capítulo"
-                    onclick={() => alert("Eliminar capítulo estará disponible próximamente.")}
-                  >×</button>
+                  {#if pendingDelete === ch}
+                    <button
+                      class="delete-confirm"
+                      title="Confirmar eliminación"
+                      onclick={() => eliminarCapituloHandler(ch)}
+                    >¿Eliminar?</button>
+                  {:else}
+                    <button
+                      class="item-delete"
+                      title="Eliminar capítulo"
+                      onclick={() => eliminarCapituloHandler(ch)}
+                    >×</button>
+                  {/if}
                 </li>
               {/each}
             </ul>
@@ -621,6 +656,7 @@
           {/if}
 
           <button class="btn-load" onclick={() => {
+            pendingDelete = null;
             const fn = prompt("Nombre del archivo a cargar (ej: 0001_prologo.md):");
             if (fn) cargarCapituloActual(fn.trim());
           }}>
@@ -1407,6 +1443,24 @@
   :global(.dark) .item-delete:hover {
     background: #7f1d1d33;
     color: #f87171;
+  }
+
+  .delete-confirm {
+    background: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 0.25rem;
+    padding: 0.125rem 0.375rem;
+    font-size: 0.6875rem;
+    cursor: pointer;
+    animation: pulse 0.6s infinite alternate;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  @keyframes pulse {
+    from { opacity: 1; }
+    to   { opacity: 0.6; }
   }
 
   /* ── Inline forms (characters, notes, timeline) ────────────── */

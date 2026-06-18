@@ -44,6 +44,13 @@ export async function crearCapitulo(
   return invoke("crear_capitulo", { proyectoPath, filename, contenido });
 }
 
+export async function eliminarCapitulo(
+  proyectoPath: string,
+  filename: string,
+): Promise<string> {
+  return invoke("eliminar_capitulo", { proyectoPath, filename });
+}
+
 // ── Characters ────────────────────────────────────────────────
 
 export async function listarPersonajes(
