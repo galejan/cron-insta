@@ -643,6 +643,23 @@
     (e.currentTarget as HTMLElement).classList.add("dragging");
   }
 
+  function handleDragEnd(e: DragEvent) {
+    (e.currentTarget as HTMLElement).classList.remove("dragging");
+    // Clean up all drag-over highlights
+    document.querySelectorAll(".timeline-event.drag-over").forEach(el => {
+      el.classList.remove("drag-over");
+    });
+  }
+
+  function handleDragOver(e: DragEvent) {
+    e.preventDefault();
+    (e.currentTarget as HTMLElement).classList.add("drag-over");
+  }
+
+  function handleDragLeave(e: DragEvent) {
+    (e.currentTarget as HTMLElement).classList.remove("drag-over");
+  }
+
   function handleDrop(e: DragEvent, targetId: string) {
     e.preventDefault();
     if (!dragId || dragId === targetId) return;
@@ -1075,7 +1092,9 @@
                     class="timeline-event"
                     draggable="true"
                     ondragstart={(e) => handleDragStart(e, evt.id)}
-                    ondragover={(e) => e.preventDefault()}
+                    ondragend={(e) => handleDragEnd(e)}
+                    ondragover={(e) => handleDragOver(e)}
+                    ondragleave={(e) => handleDragLeave(e)}
                     ondrop={(e) => handleDrop(e, evt.id)}
                   >
                     <span class="event-date">{evt.date}</span>
@@ -1277,6 +1296,7 @@
   <div
     class="help-overlay"
     role="dialog"
+    tabindex="-1"
     aria-label={t("help.ariaLabel")}
     onclick={() => (helpMode = false)}
     onkeydown={(e) => e.key === "Escape" && (helpMode = false)}
@@ -2056,8 +2076,8 @@
     font-size: 0.75rem;
     cursor: grab;
   }
-  .timeline-event.dragging { opacity: 0.4; }
-  .timeline-event.drag-over { border-top: 2px solid #3b82f6; }
+  .timeline-event:global(.dragging) { opacity: 0.4; }
+  .timeline-event:global(.drag-over) { border-top: 2px solid #3b82f6; }
 
   .event-date {
     flex-shrink: 0;

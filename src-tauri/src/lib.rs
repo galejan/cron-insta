@@ -1087,7 +1087,7 @@ fn count_words_in_chapters(project_path: &Path) -> usize {
     if let Ok(entries) = std::fs::read_dir(&cap_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "md") {
+            if path.extension().is_some_and(|ext| ext == "md") {
                 if let Ok(content) = std::fs::read_to_string(&path) {
                     total += content.split_whitespace().count();
                 }
