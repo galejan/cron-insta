@@ -165,6 +165,13 @@ const translations: Record<Lang, Record<string, string>> = {
     "common.cancel": "Cancelar",
     "common.delete": "Eliminar",
 
+    // ── Git ────────────────────────────────────────────────
+    "git.notInstalled": "Git no está instalado",
+    "git.notInstalledDesc": "El control de versiones automático no estará disponible.",
+    "git.installInstructions": "Instalar Git:\n• Linux: sudo pacman -S git (Arch) / sudo apt install git (Debian/Ubuntu)\n• Windows: https://git-scm.com/download/win\n• macOS: brew install git",
+    "git.continueWithout": "¿Continuar sin Git?",
+    "git.autoCommit": "Cierre de sesión",
+
     // ── Bubble menu (Editor.svelte) ────────────────────────
     "editor.heading1Title": "Título 1 (Ctrl+Alt+1)",
     "editor.heading2Title": "Título 2 (Ctrl+Alt+2)",
@@ -305,6 +312,13 @@ const translations: Record<Lang, Record<string, string>> = {
     "common.error": "Error",
     "common.cancel": "Cancel",
     "common.delete": "Delete",
+
+    // ── Git ────────────────────────────────────────────────
+    "git.notInstalled": "Git is not installed",
+    "git.notInstalledDesc": "Automatic version control will not be available.",
+    "git.installInstructions": "Install Git:\n• Linux: sudo pacman -S git (Arch) / sudo apt install git (Debian/Ubuntu)\n• Windows: https://git-scm.com/download/win\n• macOS: brew install git",
+    "git.continueWithout": "Continue without Git?",
+    "git.autoCommit": "Session closed",
 
     // ── Bubble menu (Editor.svelte) ────────────────────────
     "editor.heading1Title": "Heading 1 (Ctrl+Alt+1)",

@@ -11,9 +11,11 @@
     cargarPersonaje,
     cargarTimeline,
     crearCapitulo,
+    crearCheckpoint,
     crearNota,
     crearPersonaje,
     crearProyecto,
+    detectarGit,
     eliminarCapitulo,
     eliminarEventoTimeline,
     eliminarNota,
@@ -146,6 +148,32 @@
   let activeChapter = $state("");
   let editorContent = $state("");
   let saveStatus = $state<"" | "saved" | "unsaved" | "saving">("");
+
+  // ── Auto-commit on close (Tauri window event) ─────────────────
+  $effect(() => {
+    let unlisten: (() => void) | undefined;
+
+    try {
+      getCurrentWindow().onCloseRequested(async (_event) => {
+        if (projectPath) {
+          // Save any unsaved work
+          if (activeChapter && saveStatus === "unsaved") {
+            try {
+              await guardarCapitulo(projectPath, activeChapter, editorContent);
+            } catch { /* silent */ }
+          }
+          // Create checkpoint
+          try {
+            await crearCheckpoint(projectPath);
+          } catch { /* silent */ }
+        }
+      }).then((fn) => { unlisten = fn; }).catch(() => { /* not in Tauri */ });
+    } catch {
+      // Not in Tauri.
+    }
+
+    return () => { unlisten?.(); };
+  });
 
   /** Editor component reference — exposes setContent(html) + toggleHeading(level). */
   let editorRef = $state<{
@@ -280,6 +308,17 @@
       });
       if (!selected) return;
 
+      const gitDisponible = await detectarGit();
+      if (!gitDisponible) {
+        const continuar = confirm(
+          t("git.notInstalled") + "\n\n" +
+          t("git.notInstalledDesc") + "\n\n" +
+          t("git.installInstructions") + "\n\n" +
+          t("git.continueWithout")
+        );
+        if (!continuar) return;
+      }
+
       const name = prompt(t("dialog.projectName"), t("dialog.projectNameDefault"));
       if (!name) return;
 
@@ -339,6 +378,13 @@
       projectPath = path;
       chapters = meta.chapters_order ?? [];
       console.log("[cronista] Project opened:", meta.project_name, chapters);
+
+      // Warn if git is not available (checkpoints will fail silently)
+      const gitOk = await detectarGit();
+      if (!gitOk) {
+        console.warn("[cronista] Git not detected — automatic version control disabled");
+        alert(t("git.notInstalled") + "\n\n" + t("git.notInstalledDesc"));
+      }
 
       // Auto-load first chapter if there is one
       if (chapters.length > 0) {

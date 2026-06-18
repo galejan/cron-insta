@@ -11,6 +11,10 @@ export async function inicializarGit(path: string): Promise<string> {
   return invoke("inicializar_git", { path });
 }
 
+export async function detectarGit(): Promise<boolean> {
+  return invoke("detectar_git");
+}
+
 export async function guardarCapitulo(
   proyectoPath: string,
   filename: string,

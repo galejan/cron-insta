@@ -214,11 +214,34 @@ fn inicializar_git(path: String) -> Result<String, String> {
         .map_err(|e| format!("Error al ejecutar git init: {}", e))?;
 
     if output.status.success() {
+        // Set anonymous user for commits (best-effort, silent on failure)
+        let _ = Command::new(&git_path)
+            .arg("config")
+            .arg("user.name")
+            .arg("Cronista")
+            .current_dir(project_path)
+            .output();
+        let _ = Command::new(&git_path)
+            .arg("config")
+            .arg("user.email")
+            .arg("cronista@local")
+            .current_dir(project_path)
+            .output();
+
         Ok("Repositorio Git inicializado correctamente.".to_string())
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
         Err(format!("Error al inicializar Git: {}", stderr.trim()))
     }
+}
+
+/// Detect whether Git is installed on the system.
+///
+/// Returns `true` when `find_git()` locates a valid Git binary.
+/// Lightweight command — no I/O beyond binary discovery.
+#[tauri::command]
+fn detectar_git() -> Result<bool, String> {
+    Ok(find_git().is_ok())
 }
 
 /// Save chapter content to disk (Nivel 1 — no git commit).
@@ -1087,6 +1110,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             crear_proyecto,
             inicializar_git,
+            detectar_git,
             guardar_capitulo,
             crear_checkpoint,
             cargar_indice,
