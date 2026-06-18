@@ -1315,7 +1315,7 @@
     <div class="help-panel" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
       <div class="help-header">
         <h2>Cronista</h2>
-        <span class="help-version">v1.0</span>
+        <span class="help-version">v0.1.1</span>
         <button class="help-close" onclick={() => (helpMode = false)}>✕</button>
       </div>
 
