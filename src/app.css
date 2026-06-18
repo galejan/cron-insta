@@ -12,12 +12,28 @@ html.dark {
   font-size: 1.125rem; /* 18px */
   line-height: 1.8;
   color: #1a1a1a;
-  max-width: 65ch;
+  max-width: 80ch;
   margin: 0 auto;
-  padding: 2rem 1rem;
+  padding: 2rem 2rem;
   outline: none;
   word-wrap: break-word;
   white-space: pre-wrap;
+}
+
+/* Responsive: narrower screens get more generous padding, wider screens use more width */
+@media (max-width: 900px) {
+  .ProseMirror {
+    max-width: 100%;
+    padding: 2rem 1.25rem;
+    font-size: 1rem;
+  }
+}
+
+@media (min-width: 1400px) {
+  .ProseMirror {
+    max-width: 90ch;
+    font-size: 1.2rem;
+  }
 }
 
 .ProseMirror h1 {
