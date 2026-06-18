@@ -11,3 +11,9 @@ vite.config.ts.timestamp-*
 
 # User test projects created inside src-tauri during development
 src-tauri/Prueba/
+
+# Tooling caches
+.atl/
+
+# User test projects
+Primera prueba/
