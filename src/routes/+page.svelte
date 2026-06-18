@@ -1,7 +1,13 @@
 <script lang="ts">
   import Editor from "$lib/components/Editor.svelte";
   import { debounce } from "$lib/debounce";
-  import { cargarCapitulo, crearCapitulo, guardarCapitulo } from "$lib/tauri";
+  import {
+    cargarCapitulo,
+    cargarIndice,
+    crearCapitulo,
+    crearProyecto,
+    guardarCapitulo,
+  } from "$lib/tauri";
 
   let sidebarVisible = $state(true);
 
@@ -19,11 +25,13 @@
   const save = debounce(async () => {
     if (!projectPath || !activeChapter) return;
     saveStatus = "saving";
+    console.log("[cronista] Saving chapter:", activeChapter);
     try {
       await guardarCapitulo(projectPath, activeChapter, editorContent);
       saveStatus = "saved";
+      console.log("[cronista] Save OK:", activeChapter);
     } catch (e) {
-      console.error("Save failed:", e);
+      console.error("[cronista] Save failed:", e);
       saveStatus = "unsaved";
     }
   }, 2_000);
@@ -39,39 +47,71 @@
   async function cargarCapituloActual(filename: string): Promise<void> {
     if (!projectPath) return;
     save.cancel();
+    console.log("[cronista] Loading chapter:", filename);
     try {
       const content = await cargarCapitulo(projectPath, filename);
       editorRef?.setContent(content);
       activeChapter = filename;
       editorContent = content;
       saveStatus = "saved";
+      console.log("[cronista] Load OK:", filename, `(${content.length} chars)`);
     } catch (e) {
-      console.error("Failed to load chapter:", e);
+      console.error("[cronista] Failed to load chapter:", e);
+    }
+  }
+
+  /** Refresh the chapter list from metadata.json on disk. */
+  async function refreshChapters(): Promise<void> {
+    if (!projectPath) return;
+    try {
+      const raw = await cargarIndice(projectPath);
+      const meta = JSON.parse(raw);
+      chapters = meta.chapters_order ?? [];
+      console.log("[cronista] Chapters refreshed:", chapters);
+    } catch (e) {
+      console.error("[cronista] Failed to read project index:", e);
     }
   }
 
   async function crearCapituloNuevo(): Promise<void> {
+    // ── Initial project setup (only when no project is loaded) ─
     if (!projectPath) {
-      const p = prompt("Ruta del proyecto (ej: /tmp/mi-novela):");
-      if (!p) return;
-      projectPath = p.trim();
+      const path = prompt("Ruta de la carpeta del proyecto (ej: /tmp/mi-novela):");
+      if (!path) return;
+
+      const name = prompt("Nombre del proyecto (ej: Mi Novela):");
+      if (!name) return;
+
+      console.log("[cronista] Creating project:", { path, name });
+      try {
+        const msg = await crearProyecto(path.trim(), name.trim());
+        console.log("[cronista] Project created:", msg);
+        projectPath = path.trim();
+        await refreshChapters();
+      } catch (e) {
+        console.error("[cronista] Failed to create project:", e);
+        alert(`Error al crear proyecto: ${e}`);
+        return;
+      }
     }
 
-    const filename = prompt("Nombre del archivo (ej: 0003_capitulo_3.md):");
+    const filename = prompt("Nombre del archivo (ej: 0001_prologo.md):");
     if (!filename) return;
 
     // Simple heading + empty paragraph so the editor isn't blank.
     const initialHTML = "<h1>Sin título</h1><p></p>";
 
+    console.log("[cronista] Creating chapter:", filename);
     try {
-      await crearCapitulo(projectPath, filename, initialHTML);
+      const msg = await crearCapitulo(projectPath, filename, initialHTML);
+      console.log("[cronista] Chapter created:", msg);
       activeChapter = filename;
       editorRef?.setContent(initialHTML);
       editorContent = initialHTML;
       saveStatus = "saved";
-      chapters = [...chapters, filename];
+      await refreshChapters();
     } catch (e) {
-      console.error("Create chapter failed:", e);
+      console.error("[cronista] Create chapter failed:", e);
       alert(`Error al crear capítulo: ${e}`);
     }
   }
