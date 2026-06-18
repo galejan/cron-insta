@@ -836,7 +836,11 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<div class="app-layout" class:sidebar-collapsed={sidebarCollapsed} style="grid-template-columns: {sidebarCollapsed ? 0 : sidebarPct}% {sidebarCollapsed ? 100 : 100 - sidebarPct}%">
+<div
+  class="app-layout"
+  class:sidebar-collapsed={sidebarCollapsed}
+  style:grid-template-columns={sidebarCollapsed ? "0 100%" : `${sidebarPct}% ${100 - sidebarPct}%`}
+>
   <!-- Sidebar (40 % when visible) — placeholder, not modified per spec -->
   <aside class="sidebar">
     <nav class="tabs">
