@@ -123,6 +123,13 @@
     position: relative;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* TipTap mounts inside this — must scroll */
+  .editor-wrapper :global(.ProseMirror) {
+    flex: 1;
+    overflow-y: auto;
   }
 
   /* ── Formatting bar ───────────────────────────────────────── */

@@ -1719,7 +1719,7 @@
   /* ── Editor body ───────────────────────────────────────────── */
   .editor-body {
     flex: 1;
-    overflow: hidden;
+    overflow-y: auto;
     min-width: 0;
   }
 
