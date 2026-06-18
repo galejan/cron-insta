@@ -211,35 +211,38 @@
 
   /* ── Dark mode ─────────────────────────────────────────────── */
 
-  :global(.dark) .bubble-menu {
+  :global(.dark .bubble-menu) {
     background: #1e293b;
     border-color: #334155;
+    box-shadow:
+      0 4px 12px rgba(0, 0, 0, 0.30),
+      0 1px 3px rgba(0, 0, 0, 0.20);
   }
 
-  :global(.dark) .bubble-menu button {
+  :global(.dark .bubble-menu button) {
     color: #94a3b8;
   }
 
-  :global(.dark) .bubble-menu button:hover {
+  :global(.dark .bubble-menu button:hover) {
     background: #334155;
   }
 
-  :global(.dark) .bubble-menu button.active {
+  :global(.dark .bubble-menu button.active) {
     background: #3b82f6;
     color: #ffffff;
   }
 
-  :global(.dark) .menu-divider {
+  :global(.dark .menu-divider) {
     background: #334155;
   }
 
-  :global(.dark) .bubble-menu select {
+  :global(.dark .bubble-menu select) {
     background: #1e293b;
     border-color: #334155;
     color: #94a3b8;
   }
 
-  :global(.dark) .bubble-menu select:focus {
+  :global(.dark .bubble-menu select:focus) {
     border-color: #60a5fa;
   }
 </style>
