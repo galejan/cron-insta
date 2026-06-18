@@ -172,10 +172,16 @@ const translations: Record<Lang, Record<string, string>> = {
     "git.continueWithout": "¿Continuar sin Git?",
     "git.autoCommit": "Cierre de sesión",
 
-    // ── Bubble menu (Editor.svelte) ────────────────────────
-    "editor.heading1Title": "Título 1 (Ctrl+Alt+1)",
-    "editor.heading2Title": "Título 2 (Ctrl+Alt+2)",
-    "editor.heading3Title": "Título 3 (Ctrl+Alt+3)",
+    // ── Formatting toolbar (Editor.svelte) ──────────────────
+    "editor.heading1": "Título 1 (Ctrl+Alt+1)",
+    "editor.heading2": "Título 2 (Ctrl+Alt+2)",
+    "editor.heading3": "Título 3 (Ctrl+Alt+3)",
+    "editor.paragraph": "Párrafo",
+    "editor.fontFamily": "Tipografía",
+    "editor.fontDefault": "Por defecto",
+    "editor.fontSerif": "Serif",
+    "editor.fontSans": "Sans-serif",
+    "editor.fontMono": "Monospace",
   },
 
   en: {
@@ -320,10 +326,16 @@ const translations: Record<Lang, Record<string, string>> = {
     "git.continueWithout": "Continue without Git?",
     "git.autoCommit": "Session closed",
 
-    // ── Bubble menu (Editor.svelte) ────────────────────────
-    "editor.heading1Title": "Heading 1 (Ctrl+Alt+1)",
-    "editor.heading2Title": "Heading 2 (Ctrl+Alt+2)",
-    "editor.heading3Title": "Heading 3 (Ctrl+Alt+3)",
+    // ── Formatting toolbar (Editor.svelte) ──────────────────
+    "editor.heading1": "Heading 1 (Ctrl+Alt+1)",
+    "editor.heading2": "Heading 2 (Ctrl+Alt+2)",
+    "editor.heading3": "Heading 3 (Ctrl+Alt+3)",
+    "editor.paragraph": "Paragraph",
+    "editor.fontFamily": "Font family",
+    "editor.fontDefault": "Default",
+    "editor.fontSerif": "Serif",
+    "editor.fontSans": "Sans-serif",
+    "editor.fontMono": "Monospace",
   },
 };
 

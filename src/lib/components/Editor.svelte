@@ -2,7 +2,6 @@
   import { onMount } from "svelte";
   import { Editor } from "@tiptap/core";
   import { StarterKit } from "@tiptap/starter-kit";
-  import { BubbleMenu } from "@tiptap/extension-bubble-menu";
   import { TextStyle, FontFamily } from "@tiptap/extension-text-style";
   import { t } from "$lib/i18n";
 
@@ -15,9 +14,7 @@
 
   const { content = "", onUpdate }: Props = $props();
 
-  // DOM refs set via bind:this during mount.
   let editorContainer: HTMLDivElement;
-  let bubbleMenuEl: HTMLDivElement;
 
   // The editor instance — $state so template bindings react.
   let editor = $state<Editor | null>(null);
@@ -37,7 +34,6 @@
       element: editorContainer,
       extensions: [
         StarterKit.configure({
-          // Disable formatting not in scope for the literary editor MVP.
           bold: false,
           italic: false,
           strike: false,
@@ -52,14 +48,9 @@
           link: false,
           horizontalRule: false,
           hardBreak: false,
-          // Kept: heading, paragraph, document, text,
-          //        undoRedo, dropcursor, gapcursor, trailingNode.
         }),
         TextStyle,
         FontFamily,
-        BubbleMenu.configure({
-          element: bubbleMenuEl,
-        }),
       ],
       content,
       onUpdate: ({ editor: ed }) => {
@@ -76,51 +67,37 @@
 </script>
 
 <div class="editor-wrapper">
-  <!--
-    Bubble menu — always rendered in the DOM.
-    The BubbleMenu extension manages positioning and visibility.
-    Optional-chaining keeps buttons inert when the editor hasn't been created yet.
-  -->
-  <div bind:this={bubbleMenuEl} class="bubble-menu">
+  <!-- Fixed formatting toolbar -->
+  <div class="formatting-bar">
     <button
       type="button"
-      title={t("editor.heading1Title")}
-      onclick={() =>
-        editor?.chain().focus().toggleHeading({ level: 1 }).run()}
       class:active={editor?.isActive("heading", { level: 1 })}
-    >
-      H1
-    </button>
+      onclick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
+      title={t("editor.heading1")}
+    >H1</button>
     <button
       type="button"
-      title={t("editor.heading2Title")}
-      onclick={() =>
-        editor?.chain().focus().toggleHeading({ level: 2 }).run()}
       class:active={editor?.isActive("heading", { level: 2 })}
-    >
-      H2
-    </button>
+      onclick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
+      title={t("editor.heading2")}
+    >H2</button>
     <button
       type="button"
-      title={t("editor.heading3Title")}
-      onclick={() =>
-        editor?.chain().focus().toggleHeading({ level: 3 }).run()}
       class:active={editor?.isActive("heading", { level: 3 })}
-    >
-      H3
-    </button>
+      onclick={() => editor?.chain().focus().toggleHeading({ level: 3 }).run()}
+      title={t("editor.heading3")}
+    >H3</button>
     <button
       type="button"
-      onclick={() => editor?.chain().focus().setParagraph().run()}
       class:active={editor?.isActive("paragraph")}
-    >
-      ¶
-    </button>
+      onclick={() => editor?.chain().focus().setParagraph().run()}
+      title={t("editor.paragraph")}
+    >¶</button>
 
-    <span class="menu-divider" aria-hidden="true"></span>
+    <span class="bar-divider" aria-hidden="true"></span>
 
     <select
-      aria-label="Font family"
+      aria-label={t("editor.fontFamily")}
       onchange={(e) =>
         editor
           ?.chain()
@@ -128,10 +105,10 @@
           .setFontFamily(e.currentTarget.value)
           .run()}
     >
-      <option value="">Default</option>
-      <option value="Georgia, 'Times New Roman', serif">Serif</option>
-      <option value="Arial, Helvetica, sans-serif">Sans-serif</option>
-      <option value="'Courier New', Courier, monospace">Monospace</option>
+      <option value="">{t("editor.fontDefault")}</option>
+      <option value="Georgia, 'Times New Roman', serif">{t("editor.fontSerif")}</option>
+      <option value="Arial, Helvetica, sans-serif">{t("editor.fontSans")}</option>
+      <option value="'Courier New', Courier, monospace">{t("editor.fontMono")}</option>
     </select>
   </div>
 
@@ -144,50 +121,65 @@
     width: 100%;
     height: 100%;
     position: relative;
-    overflow-y: auto;
     display: flex;
     flex-direction: column;
   }
 
-  /* ── Bubble Menu ───────────────────────────────────────────── */
+  /* ── Formatting bar ───────────────────────────────────────── */
 
-  .bubble-menu {
+  .formatting-bar {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
-    padding: 0.375rem 0.5rem;
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 0.5rem;
-    box-shadow:
-      0 4px 12px rgba(0, 0, 0, 0.08),
-      0 1px 3px rgba(0, 0, 0, 0.06);
-    z-index: 50;
+    gap: 0.125rem;
+    padding: 0.25rem 0.75rem;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    flex-shrink: 0;
   }
 
-  .bubble-menu button {
-    padding: 0.25rem 0.5rem;
+  :global(.dark) .formatting-bar {
+    background: #0f172a;
+    border-bottom-color: #334155;
+  }
+
+  .formatting-bar button {
+    padding: 0.2rem 0.45rem;
     border: none;
     background: transparent;
     border-radius: 0.25rem;
     cursor: pointer;
-    font-size: 0.8125rem;
-    font-weight: 500;
-    color: #475569;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #64748b;
     line-height: 1.4;
     transition: background 120ms, color 120ms;
   }
 
-  .bubble-menu button:hover {
-    background: #f1f5f9;
+  .formatting-bar button:hover {
+    background: #e2e8f0;
+    color: #1e293b;
   }
 
-  .bubble-menu button.active {
+  .formatting-bar button.active {
     background: #3b82f6;
     color: #ffffff;
   }
 
-  .menu-divider {
+  :global(.dark) .formatting-bar button {
+    color: #94a3b8;
+  }
+
+  :global(.dark) .formatting-bar button:hover {
+    background: #334155;
+    color: #e2e8f0;
+  }
+
+  :global(.dark) .formatting-bar button.active {
+    background: #3b82f6;
+    color: #ffffff;
+  }
+
+  .bar-divider {
     display: inline-block;
     width: 1px;
     height: 1.25rem;
@@ -195,55 +187,32 @@
     margin: 0 0.25rem;
   }
 
-  .bubble-menu select {
-    padding: 0.25rem 0.375rem;
+  :global(.dark) .bar-divider {
+    background: #334155;
+  }
+
+  .formatting-bar select {
+    padding: 0.15rem 0.3rem;
     border: 1px solid #e2e8f0;
     border-radius: 0.25rem;
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
     color: #475569;
     background: #ffffff;
     cursor: pointer;
     outline: none;
   }
 
-  .bubble-menu select:focus {
+  .formatting-bar select:focus {
     border-color: #3b82f6;
   }
 
-  /* ── Dark mode ─────────────────────────────────────────────── */
-
-  :global(.dark .bubble-menu) {
-    background: #1e293b;
-    border-color: #334155;
-    box-shadow:
-      0 4px 12px rgba(0, 0, 0, 0.30),
-      0 1px 3px rgba(0, 0, 0, 0.20);
-  }
-
-  :global(.dark .bubble-menu button) {
-    color: #94a3b8;
-  }
-
-  :global(.dark .bubble-menu button:hover) {
-    background: #334155;
-  }
-
-  :global(.dark .bubble-menu button.active) {
-    background: #3b82f6;
-    color: #ffffff;
-  }
-
-  :global(.dark .menu-divider) {
-    background: #334155;
-  }
-
-  :global(.dark .bubble-menu select) {
+  :global(.dark) .formatting-bar select {
     background: #1e293b;
     border-color: #334155;
     color: #94a3b8;
   }
 
-  :global(.dark .bubble-menu select:focus) {
+  :global(.dark) .formatting-bar select:focus {
     border-color: #60a5fa;
   }
 </style>
