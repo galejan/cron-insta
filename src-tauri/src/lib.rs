@@ -27,6 +27,60 @@ struct CharacterIndex {
     name: String,
 }
 
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct Character {
+    id: String,
+    name: String,
+    #[serde(default)]
+    physicalDescription: Option<String>,
+    #[serde(default)]
+    personality: Option<String>,
+    #[serde(default)]
+    traumas: Option<String>,
+    #[serde(default)]
+    relationships: Vec<Relationship>,
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct Relationship {
+    #[serde(default)]
+    targetId: Option<String>,
+    targetName: String,
+    #[serde(rename = "type")]
+    rel_type: String,
+    #[serde(default)]
+    notes: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct CharacterIndexItem {
+    id: String,
+    name: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct NoteIndexItem {
+    id: String,
+    title: String,
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct TimelineEvent {
+    #[serde(default)]
+    id: String,
+    date: String,
+    title: String,
+    #[serde(default)]
+    description: String,
+    #[serde(default)]
+    relatedCharacters: Vec<String>,
+    #[serde(default)]
+    relatedChapters: Vec<String>,
+}
+
 // ---------------------------------------------------------------------------
 // Helper: locate the git binary across platforms
 // ---------------------------------------------------------------------------
@@ -383,6 +437,492 @@ fn crear_capitulo(
 }
 
 // ---------------------------------------------------------------------------
+// Characters — personajes
+// ---------------------------------------------------------------------------
+
+/// List all characters in a project.
+///
+/// Reads `personajes/index.json`. Returns JSON array string.
+/// If file is missing, returns "[]".
+#[tauri::command]
+fn listar_personajes(proyecto_path: String) -> Result<String, String> {
+    if proyecto_path.trim().is_empty() {
+        return Err("La ruta del proyecto no puede estar vacía.".to_string());
+    }
+
+    let index_path = Path::new(&proyecto_path).join("personajes").join("index.json");
+
+    if !index_path.exists() {
+        return Ok("[]".to_string());
+    }
+
+    std::fs::read_to_string(&index_path)
+        .map_err(|e| format!("No se pudo leer el índice de personajes: {}", e))
+}
+
+/// Create a new character.
+///
+/// Parses the input JSON to extract `id` and `name`. Rejects duplicates.
+/// Creates `personajes/{id}.json` and updates `personajes/index.json`.
+#[tauri::command]
+fn crear_personaje(proyecto_path: String, personaje_json: String) -> Result<String, String> {
+    if proyecto_path.trim().is_empty() {
+        return Err("La ruta del proyecto no puede estar vacía.".to_string());
+    }
+
+    let character: Character = serde_json::from_str(&personaje_json)
+        .map_err(|e| format!("Error al parsear el personaje: {}", e))?;
+
+    if character.id.trim().is_empty() {
+        return Err("El ID del personaje no puede estar vacío.".to_string());
+    }
+    if character.name.trim().is_empty() {
+        return Err("El nombre del personaje no puede estar vacío.".to_string());
+    }
+
+    let personajes_dir = Path::new(&proyecto_path).join("personajes");
+    let char_file = personajes_dir.join(format!("{}.json", character.id));
+
+    // Reject duplicates
+    if char_file.exists() {
+        return Err(format!("El personaje '{}' ya existe.", character.id));
+    }
+
+    // Ensure directory exists
+    std::fs::create_dir_all(&personajes_dir)
+        .map_err(|e| format!("No se pudo crear el directorio personajes: {}", e))?;
+
+    // Write character file
+    let char_json = serde_json::to_string_pretty(&character)
+        .map_err(|e| format!("Error al serializar el personaje: {}", e))?;
+    std::fs::write(&char_file, char_json)
+        .map_err(|e| format!("Error al crear el personaje: {}", e))?;
+
+    // Update index
+    let index_path = personajes_dir.join("index.json");
+    let mut index: Vec<CharacterIndexItem> = if index_path.exists() {
+        let raw = std::fs::read_to_string(&index_path)
+            .map_err(|e| format!("Error al leer el índice de personajes: {}", e))?;
+        serde_json::from_str(&raw).unwrap_or_default()
+    } else {
+        vec![]
+    };
+
+    index.push(CharacterIndexItem {
+        id: character.id.clone(),
+        name: character.name.clone(),
+    });
+
+    let index_json = serde_json::to_string_pretty(&index)
+        .map_err(|e| format!("Error al serializar el índice de personajes: {}", e))?;
+    std::fs::write(&index_path, index_json)
+        .map_err(|e| format!("Error al escribir el índice de personajes: {}", e))?;
+
+    Ok(format!("Personaje '{}' creado.", character.name))
+}
+
+/// Load a character by ID.
+///
+/// Reads `personajes/{id}.json` and returns the full JSON string.
+#[tauri::command]
+fn cargar_personaje(proyecto_path: String, id: String) -> Result<String, String> {
+    if proyecto_path.trim().is_empty() {
+        return Err("La ruta del proyecto no puede estar vacía.".to_string());
+    }
+    if id.trim().is_empty() {
+        return Err("El ID del personaje no puede estar vacío.".to_string());
+    }
+
+    let char_path = Path::new(&proyecto_path)
+        .join("personajes")
+        .join(format!("{}.json", id));
+
+    if !char_path.exists() {
+        return Err(format!("Personaje '{}' no encontrado.", id));
+    }
+
+    std::fs::read_to_string(&char_path)
+        .map_err(|e| format!("Error al leer el personaje: {}", e))
+}
+
+/// Update a character.
+///
+/// Overwrites `personajes/{id}.json`. If the name changed, updates the index entry.
+#[tauri::command]
+fn actualizar_personaje(
+    proyecto_path: String,
+    id: String,
+    personaje_json: String,
+) -> Result<String, String> {
+    if proyecto_path.trim().is_empty() {
+        return Err("La ruta del proyecto no puede estar vacía.".to_string());
+    }
+    if id.trim().is_empty() {
+        return Err("El ID del personaje no puede estar vacío.".to_string());
+    }
+
+    let personajes_dir = Path::new(&proyecto_path).join("personajes");
+    let char_path = personajes_dir.join(format!("{}.json", id));
+
+    if !char_path.exists() {
+        return Err(format!("Personaje '{}' no encontrado.", id));
+    }
+
+    // Read old character to detect name change
+    let old_raw = std::fs::read_to_string(&char_path)
+        .map_err(|e| format!("Error al leer el personaje existente: {}", e))?;
+    let old_char: Character = serde_json::from_str(&old_raw)
+        .map_err(|e| format!("Error al parsear el personaje existente: {}", e))?;
+
+    let character: Character = serde_json::from_str(&personaje_json)
+        .map_err(|e| format!("Error al parsear el personaje actualizado: {}", e))?;
+
+    // Overwrite file
+    let char_json = serde_json::to_string_pretty(&character)
+        .map_err(|e| format!("Error al serializar el personaje: {}", e))?;
+    std::fs::write(&char_path, char_json)
+        .map_err(|e| format!("Error al guardar el personaje: {}", e))?;
+
+    // Update index if name changed
+    if old_char.name != character.name {
+        let index_path = personajes_dir.join("index.json");
+        if index_path.exists() {
+            let raw = std::fs::read_to_string(&index_path)
+                .map_err(|e| format!("Error al leer el índice de personajes: {}", e))?;
+            let mut index: Vec<CharacterIndexItem> =
+                serde_json::from_str(&raw).unwrap_or_default();
+            for item in &mut index {
+                if item.id == id {
+                    item.name = character.name.clone();
+                    break;
+                }
+            }
+            let index_json = serde_json::to_string_pretty(&index)
+                .map_err(|e| format!("Error al serializar el índice de personajes: {}", e))?;
+            std::fs::write(&index_path, index_json)
+                .map_err(|e| format!("Error al escribir el índice de personajes: {}", e))?;
+        }
+    }
+
+    Ok(format!("Personaje '{}' actualizado.", character.name))
+}
+
+/// Delete a character.
+///
+/// Deletes `personajes/{id}.json`, removes from `personajes/index.json`,
+/// and removes references from timeline events' `relatedCharacters` arrays.
+#[tauri::command]
+fn eliminar_personaje(proyecto_path: String, id: String) -> Result<String, String> {
+    if proyecto_path.trim().is_empty() {
+        return Err("La ruta del proyecto no puede estar vacía.".to_string());
+    }
+    if id.trim().is_empty() {
+        return Err("El ID del personaje no puede estar vacío.".to_string());
+    }
+
+    let personajes_dir = Path::new(&proyecto_path).join("personajes");
+    let char_path = personajes_dir.join(format!("{}.json", id));
+
+    if !char_path.exists() {
+        return Err(format!("Personaje '{}' no encontrado.", id));
+    }
+
+    // Delete the file
+    std::fs::remove_file(&char_path)
+        .map_err(|e| format!("Error al eliminar el personaje: {}", e))?;
+
+    // Remove from index
+    let index_path = personajes_dir.join("index.json");
+    if index_path.exists() {
+        let raw = std::fs::read_to_string(&index_path)
+            .map_err(|e| format!("Error al leer el índice de personajes: {}", e))?;
+        let mut index: Vec<CharacterIndexItem> =
+            serde_json::from_str(&raw).unwrap_or_default();
+        index.retain(|item| item.id != id);
+        let index_json = serde_json::to_string_pretty(&index)
+            .map_err(|e| format!("Error al serializar el índice de personajes: {}", e))?;
+        std::fs::write(&index_path, index_json)
+            .map_err(|e| format!("Error al escribir el índice de personajes: {}", e))?;
+    }
+
+    // Remove references from timeline
+    let timeline_path = Path::new(&proyecto_path).join(".config").join("timeline.json");
+    if timeline_path.exists() {
+        let raw = std::fs::read_to_string(&timeline_path)
+            .map_err(|e| format!("Error al leer la línea de tiempo: {}", e))?;
+        let mut timeline: Vec<TimelineEvent> =
+            serde_json::from_str(&raw).unwrap_or_default();
+        for event in &mut timeline {
+            event.relatedCharacters.retain(|cid| cid != &id);
+        }
+        let timeline_json = serde_json::to_string_pretty(&timeline)
+            .map_err(|e| format!("Error al serializar la línea de tiempo: {}", e))?;
+        std::fs::write(&timeline_path, timeline_json)
+            .map_err(|e| format!("Error al escribir la línea de tiempo: {}", e))?;
+    }
+
+    Ok(format!("Personaje '{}' eliminado.", id))
+}
+
+// ---------------------------------------------------------------------------
+// Notes — notas
+// ---------------------------------------------------------------------------
+
+/// List all notes in a project.
+///
+/// Reads `notas/index.json`. Returns JSON array string.
+/// If file is missing, returns "[]".
+#[tauri::command]
+fn listar_notas(proyecto_path: String) -> Result<String, String> {
+    if proyecto_path.trim().is_empty() {
+        return Err("La ruta del proyecto no puede estar vacía.".to_string());
+    }
+
+    let index_path = Path::new(&proyecto_path).join("notas").join("index.json");
+
+    if !index_path.exists() {
+        return Ok("[]".to_string());
+    }
+
+    std::fs::read_to_string(&index_path)
+        .map_err(|e| format!("No se pudo leer el índice de notas: {}", e))
+}
+
+/// Create a new note.
+///
+/// Creates `notas/{id}.md` with the given content.
+/// Updates `notas/index.json`. Rejects duplicates.
+#[tauri::command]
+fn crear_nota(
+    proyecto_path: String,
+    id: String,
+    titulo: String,
+    contenido: String,
+) -> Result<String, String> {
+    if proyecto_path.trim().is_empty() {
+        return Err("La ruta del proyecto no puede estar vacía.".to_string());
+    }
+    if id.trim().is_empty() {
+        return Err("El ID de la nota no puede estar vacío.".to_string());
+    }
+
+    let notas_dir = Path::new(&proyecto_path).join("notas");
+    let note_file = notas_dir.join(format!("{}.md", id));
+
+    // Reject duplicates
+    if note_file.exists() {
+        return Err(format!("La nota '{}' ya existe.", id));
+    }
+
+    // Ensure directory exists
+    std::fs::create_dir_all(&notas_dir)
+        .map_err(|e| format!("No se pudo crear el directorio notas: {}", e))?;
+
+    // Write note file
+    std::fs::write(&note_file, &contenido)
+        .map_err(|e| format!("Error al crear la nota: {}", e))?;
+
+    // Update index
+    let index_path = notas_dir.join("index.json");
+    let mut index: Vec<NoteIndexItem> = if index_path.exists() {
+        let raw = std::fs::read_to_string(&index_path)
+            .map_err(|e| format!("Error al leer el índice de notas: {}", e))?;
+        serde_json::from_str(&raw).unwrap_or_default()
+    } else {
+        vec![]
+    };
+
+    index.push(NoteIndexItem {
+        id: id.clone(),
+        title: titulo.clone(),
+    });
+
+    let index_json = serde_json::to_string_pretty(&index)
+        .map_err(|e| format!("Error al serializar el índice de notas: {}", e))?;
+    std::fs::write(&index_path, index_json)
+        .map_err(|e| format!("Error al escribir el índice de notas: {}", e))?;
+
+    Ok(format!("Nota '{}' creada.", titulo))
+}
+
+/// Load a note by ID.
+///
+/// Reads `notas/{id}.md` and returns its markdown content.
+#[tauri::command]
+fn cargar_nota(proyecto_path: String, id: String) -> Result<String, String> {
+    if proyecto_path.trim().is_empty() {
+        return Err("La ruta del proyecto no puede estar vacía.".to_string());
+    }
+    if id.trim().is_empty() {
+        return Err("El ID de la nota no puede estar vacío.".to_string());
+    }
+
+    let note_path = Path::new(&proyecto_path)
+        .join("notas")
+        .join(format!("{}.md", id));
+
+    if !note_path.exists() {
+        return Err(format!("Nota '{}' no encontrada.", id));
+    }
+
+    std::fs::read_to_string(&note_path)
+        .map_err(|e| format!("Error al leer la nota: {}", e))
+}
+
+/// Delete a note.
+///
+/// Deletes `notas/{id}.md` and removes the entry from `notas/index.json`.
+#[tauri::command]
+fn eliminar_nota(proyecto_path: String, id: String) -> Result<String, String> {
+    if proyecto_path.trim().is_empty() {
+        return Err("La ruta del proyecto no puede estar vacía.".to_string());
+    }
+    if id.trim().is_empty() {
+        return Err("El ID de la nota no puede estar vacío.".to_string());
+    }
+
+    let notas_dir = Path::new(&proyecto_path).join("notas");
+    let note_path = notas_dir.join(format!("{}.md", id));
+
+    if !note_path.exists() {
+        return Err(format!("Nota '{}' no encontrada.", id));
+    }
+
+    // Delete the file
+    std::fs::remove_file(&note_path)
+        .map_err(|e| format!("Error al eliminar la nota: {}", e))?;
+
+    // Remove from index
+    let index_path = notas_dir.join("index.json");
+    if index_path.exists() {
+        let raw = std::fs::read_to_string(&index_path)
+            .map_err(|e| format!("Error al leer el índice de notas: {}", e))?;
+        let mut index: Vec<NoteIndexItem> = serde_json::from_str(&raw).unwrap_or_default();
+        index.retain(|item| item.id != id);
+        let index_json = serde_json::to_string_pretty(&index)
+            .map_err(|e| format!("Error al serializar el índice de notas: {}", e))?;
+        std::fs::write(&index_path, index_json)
+            .map_err(|e| format!("Error al escribir el índice de notas: {}", e))?;
+    }
+
+    Ok(format!("Nota '{}' eliminada.", id))
+}
+
+// ---------------------------------------------------------------------------
+// Timeline — .config/timeline.json
+// ---------------------------------------------------------------------------
+
+/// Read the timeline.
+///
+/// Reads `.config/timeline.json` and returns the JSON array.
+#[tauri::command]
+fn cargar_timeline(proyecto_path: String) -> Result<String, String> {
+    if proyecto_path.trim().is_empty() {
+        return Err("La ruta del proyecto no puede estar vacía.".to_string());
+    }
+
+    let timeline_path = Path::new(&proyecto_path).join(".config").join("timeline.json");
+
+    if !timeline_path.exists() {
+        return Ok("[]".to_string());
+    }
+
+    std::fs::read_to_string(&timeline_path)
+        .map_err(|e| format!("Error al leer la línea de tiempo: {}", e))
+}
+
+/// Add an event to the timeline.
+///
+/// Parses the event JSON. Generates an `id` if not provided.
+/// Appends to the timeline array in `.config/timeline.json`.
+#[tauri::command]
+fn agregar_evento_timeline(proyecto_path: String, evento_json: String) -> Result<String, String> {
+    if proyecto_path.trim().is_empty() {
+        return Err("La ruta del proyecto no puede estar vacía.".to_string());
+    }
+
+    let mut event: TimelineEvent = serde_json::from_str(&evento_json)
+        .map_err(|e| format!("Error al parsear el evento: {}", e))?;
+
+    // Generate ID if missing
+    if event.id.trim().is_empty() {
+        event.id = format!("evt-{}", Utc::now().timestamp_millis());
+    }
+
+    if event.date.trim().is_empty() {
+        return Err("La fecha del evento no puede estar vacía.".to_string());
+    }
+    if event.title.trim().is_empty() {
+        return Err("El título del evento no puede estar vacío.".to_string());
+    }
+
+    let timeline_path = Path::new(&proyecto_path).join(".config").join("timeline.json");
+
+    let mut timeline: Vec<TimelineEvent> = if timeline_path.exists() {
+        let raw = std::fs::read_to_string(&timeline_path)
+            .map_err(|e| format!("Error al leer la línea de tiempo: {}", e))?;
+        serde_json::from_str(&raw).unwrap_or_default()
+    } else {
+        vec![]
+    };
+
+    // Reject duplicate IDs
+    if timeline.iter().any(|e| e.id == event.id) {
+        return Err(format!("Ya existe un evento con el ID '{}'.", event.id));
+    }
+
+    let event_id = event.id.clone();
+    timeline.push(event);
+
+    let timeline_json = serde_json::to_string_pretty(&timeline)
+        .map_err(|e| format!("Error al serializar la línea de tiempo: {}", e))?;
+    std::fs::write(&timeline_path, timeline_json)
+        .map_err(|e| format!("Error al escribir la línea de tiempo: {}", e))?;
+
+    Ok(format!("Evento '{}' agregado a la línea de tiempo.", event_id))
+}
+
+/// Remove an event from the timeline.
+///
+/// Deletes the event with the matching `id` from `.config/timeline.json`.
+#[tauri::command]
+fn eliminar_evento_timeline(proyecto_path: String, id: String) -> Result<String, String> {
+    if proyecto_path.trim().is_empty() {
+        return Err("La ruta del proyecto no puede estar vacía.".to_string());
+    }
+    if id.trim().is_empty() {
+        return Err("El ID del evento no puede estar vacío.".to_string());
+    }
+
+    let timeline_path = Path::new(&proyecto_path).join(".config").join("timeline.json");
+
+    if !timeline_path.exists() {
+        return Err("El archivo de línea de tiempo no existe.".to_string());
+    }
+
+    let raw = std::fs::read_to_string(&timeline_path)
+        .map_err(|e| format!("Error al leer la línea de tiempo: {}", e))?;
+    let mut timeline: Vec<TimelineEvent> = serde_json::from_str(&raw).unwrap_or_default();
+
+    let len_before = timeline.len();
+    timeline.retain(|e| e.id != id);
+
+    if timeline.len() == len_before {
+        return Err(format!(
+            "Evento '{}' no encontrado en la línea de tiempo.",
+            id
+        ));
+    }
+
+    let timeline_json = serde_json::to_string_pretty(&timeline)
+        .map_err(|e| format!("Error al serializar la línea de tiempo: {}", e))?;
+    std::fs::write(&timeline_path, timeline_json)
+        .map_err(|e| format!("Error al escribir la línea de tiempo: {}", e))?;
+
+    Ok(format!("Evento '{}' eliminado de la línea de tiempo.", id))
+}
+
+// ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
 
@@ -427,6 +967,18 @@ pub fn run() {
             cargar_indice,
             cargar_capitulo,
             crear_capitulo,
+            listar_personajes,
+            crear_personaje,
+            cargar_personaje,
+            actualizar_personaje,
+            eliminar_personaje,
+            listar_notas,
+            crear_nota,
+            cargar_nota,
+            eliminar_nota,
+            cargar_timeline,
+            agregar_evento_timeline,
+            eliminar_evento_timeline,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -1115,4 +1667,477 @@ mod tests {
             _ => 0,
         }
     }
+
+    // ========================================================================
+    // sidebar-characters-notes-timeline tests
+    // ========================================================================
+
+    // --- listar_personajes (1 test) ---
+
+    #[test]
+    fn test_listar_personajes_empty() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        let result = listar_personajes(path);
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+        assert_eq!(result.unwrap(), "[]");
+    }
+
+    // --- crear_personaje (2 tests) ---
+
+    #[test]
+    fn test_crear_personaje_y_listar() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        let _ = crear_proyecto(path.clone(), "Test".to_string());
+
+        let personaje_json = r#"{
+            "id": "maria-garcia",
+            "name": "María García",
+            "physicalDescription": "Alta, pelo oscuro",
+            "personality": "Introvertida"
+        }"#;
+
+        let result = crear_personaje(path.clone(), personaje_json.to_string());
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+
+        // Verify file exists
+        let char_file = dir.path().join("personajes").join("maria-garcia.json");
+        assert!(char_file.exists(), "Character file should exist");
+
+        // Verify index
+        let index_raw = listar_personajes(path.clone()).unwrap();
+        let index: Vec<CharacterIndexItem> =
+            serde_json::from_str(&index_raw).expect("index should be valid JSON");
+        assert_eq!(index.len(), 1);
+        assert_eq!(index[0].id, "maria-garcia");
+        assert_eq!(index[0].name, "María García");
+    }
+
+    #[test]
+    fn test_crear_personaje_rechaza_duplicado() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        let _ = crear_proyecto(path.clone(), "Test".to_string());
+
+        let personaje_json = r#"{"id": "juan", "name": "Juan"}"#;
+
+        let _ = crear_personaje(path.clone(), personaje_json.to_string());
+
+        let result = crear_personaje(path.clone(), personaje_json.to_string());
+        assert!(result.is_err(), "Expected Err for duplicate");
+        let err = result.unwrap_err();
+        assert!(err.contains("ya existe"), "Should mention duplicate: {}", err);
+    }
+
+    // --- cargar_personaje (2 tests) ---
+
+    #[test]
+    fn test_cargar_personaje_returns_json() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        let _ = crear_proyecto(path.clone(), "Test".to_string());
+
+        let personaje_json = r#"{
+            "id": "ana",
+            "name": "Ana López",
+            "personality": "Alegre"
+        }"#;
+
+        let _ = crear_personaje(path.clone(), personaje_json.to_string());
+
+        let result = cargar_personaje(path.clone(), "ana".to_string());
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+
+        let loaded: serde_json::Value =
+            serde_json::from_str(&result.unwrap()).expect("should be valid JSON");
+        assert_eq!(loaded["id"], "ana");
+        assert_eq!(loaded["name"], "Ana López");
+        assert_eq!(loaded["personality"], "Alegre");
+    }
+
+    #[test]
+    fn test_cargar_personaje_not_found() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        let _ = crear_proyecto(path.clone(), "Test".to_string());
+
+        let result = cargar_personaje(path, "fantasma".to_string());
+        assert!(result.is_err(), "Expected Err for missing character");
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("no encontrado"),
+            "Should mention not found: {}",
+            err
+        );
+    }
+
+    // --- actualizar_personaje (2 tests) ---
+
+    #[test]
+    fn test_actualizar_personaje_overwrites() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        let _ = crear_proyecto(path.clone(), "Test".to_string());
+
+        let original = r#"{
+            "id": "pedro",
+            "name": "Pedro",
+            "personality": "Serio",
+            "traumas": "Ninguno"
+        }"#;
+
+        let _ = crear_personaje(path.clone(), original.to_string());
+
+        let updated = r#"{
+            "id": "pedro",
+            "name": "Pedro Modificado",
+            "personality": "Alegre ahora",
+            "traumas": "Muchos"
+        }"#;
+
+        let result = actualizar_personaje(
+            path.clone(),
+            "pedro".to_string(),
+            updated.to_string(),
+        );
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+
+        // Verify file content
+        let loaded = cargar_personaje(path.clone(), "pedro".to_string()).unwrap();
+        let char: serde_json::Value =
+            serde_json::from_str(&loaded).expect("should be valid JSON");
+        assert_eq!(char["name"], "Pedro Modificado");
+        assert_eq!(char["personality"], "Alegre ahora");
+
+        // Verify index was updated with new name
+        let index_raw = listar_personajes(path.clone()).unwrap();
+        let index: Vec<CharacterIndexItem> =
+            serde_json::from_str(&index_raw).unwrap();
+        assert_eq!(index[0].name, "Pedro Modificado");
+    }
+
+    #[test]
+    fn test_actualizar_personaje_not_found() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        let _ = crear_proyecto(path.clone(), "Test".to_string());
+
+        let result = actualizar_personaje(
+            path,
+            "inexistente".to_string(),
+            r#"{"id":"inexistente","name":"X"}"#.to_string(),
+        );
+        assert!(result.is_err(), "Expected Err for missing character");
+    }
+
+    // --- eliminar_personaje (2 tests) ---
+
+    #[test]
+    fn test_eliminar_personaje_removes_file_and_index() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        let _ = crear_proyecto(path.clone(), "Test".to_string());
+
+        let _ = crear_personaje(
+            path.clone(),
+            r#"{"id": "laura", "name": "Laura"}"#.to_string(),
+        );
+
+        let result = eliminar_personaje(path.clone(), "laura".to_string());
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+
+        // File must be gone
+        assert!(
+            !dir.path().join("personajes").join("laura.json").exists(),
+            "Character file should be deleted"
+        );
+
+        // Index must be empty
+        let index_raw = listar_personajes(path).unwrap();
+        let index: Vec<CharacterIndexItem> =
+            serde_json::from_str(&index_raw).unwrap();
+        assert!(index.is_empty(), "Index should be empty after deletion");
+    }
+
+    #[test]
+    fn test_eliminar_personaje_limpia_timeline() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        let _ = crear_proyecto(path.clone(), "Test".to_string());
+
+        // Create a character
+        let _ = crear_personaje(
+            path.clone(),
+            r#"{"id": "maria", "name": "María"}"#.to_string(),
+        );
+
+        // Add a timeline event referencing the character
+        let event_json = format!(
+            r#"{{"date":"1998-03-15","title":"María se va","description":"...","relatedCharacters":["maria"]}}"#
+        );
+        let _ = agregar_evento_timeline(path.clone(), event_json);
+
+        // Delete the character
+        let result = eliminar_personaje(path.clone(), "maria".to_string());
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+
+        // Timeline event should no longer reference the deleted character
+        let timeline_raw = cargar_timeline(path.clone()).unwrap();
+        let timeline: Vec<TimelineEvent> =
+            serde_json::from_str(&timeline_raw).unwrap();
+        assert_eq!(timeline.len(), 1);
+        assert!(
+            timeline[0].relatedCharacters.is_empty(),
+            "relatedCharacters should be empty after character deletion"
+        );
+    }
+
+    // --- listar_notas (1 test) ---
+
+    #[test]
+    fn test_listar_notas_empty() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        let result = listar_notas(path);
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+        assert_eq!(result.unwrap(), "[]");
+    }
+
+    // --- crear_nota (2 tests) ---
+
+    #[test]
+    fn test_crear_nota_y_listar() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        let _ = crear_proyecto(path.clone(), "Test".to_string());
+
+        let result = crear_nota(
+            path.clone(),
+            "idea-1".to_string(),
+            "Idea para trama".to_string(),
+            "# Gran idea\n\nContenido de la nota.".to_string(),
+        );
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+
+        // Verify file exists with correct content
+        let note_file = dir.path().join("notas").join("idea-1.md");
+        assert!(note_file.exists(), "Note file should exist");
+        let content = fs::read_to_string(&note_file).unwrap();
+        assert_eq!(content, "# Gran idea\n\nContenido de la nota.");
+
+        // Verify index
+        let index_raw = listar_notas(path.clone()).unwrap();
+        let index: Vec<NoteIndexItem> =
+            serde_json::from_str(&index_raw).unwrap();
+        assert_eq!(index.len(), 1);
+        assert_eq!(index[0].id, "idea-1");
+        assert_eq!(index[0].title, "Idea para trama");
+    }
+
+    #[test]
+    fn test_crear_nota_rechaza_duplicado() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        let _ = crear_proyecto(path.clone(), "Test".to_string());
+
+        let _ = crear_nota(
+            path.clone(),
+            "n1".to_string(),
+            "Nota 1".to_string(),
+            "contenido".to_string(),
+        );
+
+        let result = crear_nota(
+            path.clone(),
+            "n1".to_string(),
+            "Duplicada".to_string(),
+            "otro".to_string(),
+        );
+        assert!(result.is_err(), "Expected Err for duplicate note");
+        let err = result.unwrap_err();
+        assert!(err.contains("ya existe"), "Should mention duplicate: {}", err);
+    }
+
+    // --- cargar_nota (1 test) ---
+
+    #[test]
+    fn test_cargar_nota_returns_content() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        let _ = crear_proyecto(path.clone(), "Test".to_string());
+
+        let contenido = "# Título\n\nPárrafo con **negrita** y más texto.";
+        let _ = crear_nota(
+            path.clone(),
+            "nota-abc".to_string(),
+            "Mi nota".to_string(),
+            contenido.to_string(),
+        );
+
+        let result = cargar_nota(path, "nota-abc".to_string());
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+        assert_eq!(result.unwrap(), contenido);
+    }
+
+    // --- eliminar_nota (1 test) ---
+
+    #[test]
+    fn test_eliminar_nota_removes_file_and_index() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        let _ = crear_proyecto(path.clone(), "Test".to_string());
+
+        let _ = crear_nota(
+            path.clone(),
+            "n-del".to_string(),
+            "Para borrar".to_string(),
+            "contenido".to_string(),
+        );
+
+        let result = eliminar_nota(path.clone(), "n-del".to_string());
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+
+        // File must be gone
+        assert!(
+            !dir.path().join("notas").join("n-del.md").exists(),
+            "Note file should be deleted"
+        );
+
+        // Index must be empty
+        let index_raw = listar_notas(path).unwrap();
+        let index: Vec<NoteIndexItem> =
+            serde_json::from_str(&index_raw).unwrap();
+        assert!(index.is_empty(), "Index should be empty after deletion");
+    }
+
+    // --- cargar_timeline (1 test) ---
+
+    #[test]
+    fn test_cargar_timeline_vacio() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        let _ = crear_proyecto(path.clone(), "Test".to_string());
+
+        let result = cargar_timeline(path);
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+        assert_eq!(result.unwrap(), "[]");
+    }
+
+    // --- agregar_evento_timeline (2 tests) ---
+
+    #[test]
+    fn test_agregar_evento_timeline_creates_event() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        let _ = crear_proyecto(path.clone(), "Test".to_string());
+
+        let evento_json = r#"{
+            "id": "evt-test",
+            "date": "1998-03-15",
+            "title": "María abandona el pueblo",
+            "description": "Tras la discusión con Juan."
+        }"#;
+
+        let result = agregar_evento_timeline(path.clone(), evento_json.to_string());
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+
+        // Verify it's in the timeline
+        let raw = cargar_timeline(path.clone()).unwrap();
+        let timeline: Vec<TimelineEvent> =
+            serde_json::from_str(&raw).unwrap();
+        assert_eq!(timeline.len(), 1);
+        assert_eq!(timeline[0].id, "evt-test");
+        assert_eq!(timeline[0].title, "María abandona el pueblo");
+        assert_eq!(timeline[0].date, "1998-03-15");
+    }
+
+    #[test]
+    fn test_agregar_evento_timeline_generates_id() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        let _ = crear_proyecto(path.clone(), "Test".to_string());
+
+        // Event without an explicit id
+        let evento_json = r#"{
+            "date": "2000-01-01",
+            "title": "Evento sin ID explícito",
+            "description": ""
+        }"#;
+
+        let result = agregar_evento_timeline(path.clone(), evento_json.to_string());
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+
+        let raw = cargar_timeline(path).unwrap();
+        let timeline: Vec<TimelineEvent> =
+            serde_json::from_str(&raw).unwrap();
+        assert_eq!(timeline.len(), 1);
+        assert!(
+            timeline[0].id.starts_with("evt-"),
+            "ID should start with 'evt-': {}",
+            timeline[0].id
+        );
+        assert!(!timeline[0].id.is_empty());
+    }
+
+    // --- eliminar_evento_timeline (1 test) ---
+
+    #[test]
+    fn test_eliminar_evento_timeline_removes_event() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        let _ = crear_proyecto(path.clone(), "Test".to_string());
+
+        let _ = agregar_evento_timeline(
+            path.clone(),
+            r#"{"id":"evt-1","date":"2020-01-01","title":"Evento 1","description":""}"#.to_string(),
+        );
+
+        let result = eliminar_evento_timeline(path.clone(), "evt-1".to_string());
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+
+        let raw = cargar_timeline(path).unwrap();
+        let timeline: Vec<TimelineEvent> =
+            serde_json::from_str(&raw).unwrap();
+        assert!(timeline.is_empty(), "Timeline should be empty after deletion");
+    }
+
+    // --- listar_notas with actual project (1 test) ---
+
+    #[test]
+    fn test_listar_notas_after_crear_proyecto() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        let _ = crear_proyecto(path.clone(), "Test".to_string());
+
+        // After crear_proyecto, the notas/index.json doesn't exist yet,
+        // so listar_notas should return "[]"
+        let result = listar_notas(path);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "[]");
+    }
+
+    // ========================================================================
+    // Boundary: close the tests module
+    // ========================================================================
+
 }
