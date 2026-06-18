@@ -8,6 +8,7 @@
     crearProyecto,
     guardarCapitulo,
   } from "$lib/tauri";
+  import { documentDir } from "@tauri-apps/api/path";
 
   let sidebarVisible = $state(true);
   let theme = $state<"light" | "dark">("light");
@@ -93,10 +94,15 @@
   async function crearCapituloNuevo(): Promise<void> {
     // ── Initial project setup (only when no project is loaded) ─
     if (!projectPath) {
-      const path = prompt("Ruta de la carpeta del proyecto (ej: /tmp/mi-novela):");
+      const docsDir = await documentDir();
+      const defaultPath = `${docsDir}mi-novela`;
+      const path = prompt(
+        "Ruta de la carpeta del proyecto:",
+        defaultPath,
+      );
       if (!path) return;
 
-      const name = prompt("Nombre del proyecto (ej: Mi Novela):");
+      const name = prompt("Nombre del proyecto (ej: Mi Novela):", "Mi Novela");
       if (!name) return;
 
       console.log("[cronista] Creating project:", { path, name });
@@ -112,7 +118,7 @@
       }
     }
 
-    const filename = prompt("Nombre del archivo (ej: 0001_prologo.md):");
+    const filename = prompt("Nombre del archivo (ej: 0001_prologo.md):", "0001_prologo.md");
     if (!filename) return;
 
     // Simple heading + empty paragraph so the editor isn't blank.
@@ -130,6 +136,36 @@
     } catch (e) {
       console.error("[cronista] Create chapter failed:", e);
       alert(`Error al crear capítulo: ${e}`);
+    }
+  }
+
+  /** Open an existing project by loading its metadata.json. */
+  async function abrirProyecto(): Promise<void> {
+    const docsDir = await documentDir();
+    const path = prompt(
+      "Ruta de la carpeta del proyecto existente:",
+      docsDir,
+    );
+    if (!path) return;
+
+    console.log("[cronista] Opening project:", path);
+    try {
+      // Verify it's a valid project by reading the index
+      const raw = await cargarIndice(path.trim());
+      const meta = JSON.parse(raw);
+      projectPath = path.trim();
+      chapters = meta.chapters_order ?? [];
+      console.log("[cronista] Project opened:", meta.project_name, chapters);
+
+      // Auto-load first chapter if there is one
+      if (chapters.length > 0) {
+        await cargarCapituloActual(chapters[0]);
+      }
+    } catch (e) {
+      console.error("[cronista] Failed to open project:", e);
+      alert(
+        `No se pudo abrir el proyecto. ¿La carpeta contiene .config/metadata.json?\n\n${e}`,
+      );
     }
   }
 
@@ -188,12 +224,20 @@
       <!-- First launch: prompt for project path -->
       <div class="setup-prompt">
         <p class="setup-text">Seleccioná una carpeta de proyecto para comenzar</p>
-        <button
-          class="btn-primary"
-          onclick={() => crearCapituloNuevo()}
-        >
-          Configurar proyecto
-        </button>
+        <div class="setup-actions">
+          <button
+            class="btn-primary"
+            onclick={() => crearCapituloNuevo()}
+          >
+            + Nuevo proyecto
+          </button>
+          <button
+            class="btn-secondary"
+            onclick={() => abrirProyecto()}
+          >
+            Abrir proyecto
+          </button>
+        </div>
       </div>
     {:else}
       <!-- Toolbar + Editor -->
@@ -438,6 +482,11 @@
     color: #64748b;
   }
 
+  .setup-actions {
+    display: flex;
+    gap: 0.75rem;
+  }
+
   .btn-primary {
     padding: 0.5rem 1.25rem;
     border: none;
@@ -452,6 +501,33 @@
 
   .btn-primary:hover {
     background: #2563eb;
+  }
+
+  .btn-secondary {
+    padding: 0.5rem 1.25rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.375rem;
+    background: #ffffff;
+    color: #475569;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 150ms, border-color 150ms;
+  }
+
+  .btn-secondary:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+  }
+
+  :global(.dark) .btn-secondary {
+    background: #1e293b;
+    border-color: #334155;
+    color: #94a3b8;
+  }
+  :global(.dark) .btn-secondary:hover {
+    background: #334155;
+    border-color: #475569;
   }
 
   /* ── Editor pane ───────────────────────────────────────────── */
