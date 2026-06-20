@@ -1472,8 +1472,9 @@
           </span>
           {#if activeChapter}
             <span class="chapter-label">{activeChapter}</span>
+          {:else}
+            <span></span>
           {/if}
-          <span class="toolbar-spacer"></span>
           <button
             class="help-btn"
             onclick={() => (helpMode = !helpMode)}
@@ -1808,6 +1809,7 @@
   .tabs {
     display: flex;
     border-bottom: 1px solid #e2e8f0;
+    min-height: 2.5rem;
   }
 
   :global(.dark) .tabs {
@@ -1992,13 +1994,14 @@
   }
 
   .editor-toolbar {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
     padding: 0 1rem;
     border-bottom: 1px solid #e2e8f0;
     background: #f8fafc;
     flex-shrink: 0;
-    min-height: 2.5rem;
+    height: 2.5rem;
   }
 
   :global(.dark) .editor-toolbar {
@@ -2006,11 +2009,36 @@
     border-bottom-color: #334155;
   }
 
-  .toolbar-spacer {
-    flex: 1;
+  .project-label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #1e293b;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    justify-self: start;
+  }
+
+  :global(.dark) .project-label {
+    color: #e2e8f0;
+  }
+
+  .chapter-label {
+    font-size: 0.75rem;
+    color: #64748b;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  :global(.dark) .chapter-label {
+    color: #94a3b8;
   }
 
   .help-btn {
+    justify-self: end;
     width: 1.5rem;
     height: 1.5rem;
     padding: 0;
@@ -2040,33 +2068,6 @@
     background: #334155;
   }
 
-
-  .project-label {
-    font-size: 0.8125rem;
-    font-weight: 500;
-    color: #1e293b;
-    max-width: 180px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  :global(.dark) .project-label {
-    color: #e2e8f0;
-  }
-
-  .chapter-label {
-    font-size: 0.75rem;
-    color: #64748b;
-    max-width: 180px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  :global(.dark) .chapter-label {
-    color: #94a3b8;
-  }
 
   /* ── Save indicator ────────────────────────────────────────── */
   .save-indicator {
