@@ -57,7 +57,11 @@ const translations: Record<Lang, Record<string, string>> = {
     "toolbar.saved": "Guardado",
     "toolbar.unsaved": "Sin guardar",
     "toolbar.openProjectTitle": "Abrir otro proyecto (Ctrl+O)",
+    "toolbar.openProject": "Abrir proyecto",
+    "toolbar.newProjectTitle": "Crear un proyecto nuevo (Ctrl+Shift+N)",
+    "toolbar.newProject": "Nuevo proyecto",
     "toolbar.closeProjectTitle": "Cerrar proyecto",
+    "toolbar.closeProject": "Cerrar",
     "toolbar.collapseFooter": "Colapsar panel de herramientas",
     "toolbar.expandFooter": "Expandir panel de herramientas",
 
@@ -263,7 +267,11 @@ const translations: Record<Lang, Record<string, string>> = {
     "toolbar.saved": "Saved",
     "toolbar.unsaved": "Unsaved",
     "toolbar.openProjectTitle": "Open another project (Ctrl+O)",
+    "toolbar.openProject": "Open project",
+    "toolbar.newProjectTitle": "Create a new project (Ctrl+Shift+N)",
+    "toolbar.newProject": "New project",
     "toolbar.closeProjectTitle": "Close project",
+    "toolbar.closeProject": "Close",
     "toolbar.collapseFooter": "Collapse tools panel",
     "toolbar.expandFooter": "Expand tools panel",
 

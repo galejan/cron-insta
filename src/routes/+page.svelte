@@ -292,7 +292,7 @@
         saveStatus = "unsaved";
       }
     }
-  }, 2_000);
+  }, 20_000);
 
   // ── Editor callbacks ────────────────────────────────────────
   function handleEditorUpdate(html: string): void {
@@ -469,7 +469,12 @@
     }
   }
 
-  /** Close the current project and return to the setup screen. */
+  /** Close current project and start the new-project setup flow. */
+  async function nuevoProyectoHandler(): Promise<void> {
+    if (projectPath) await cerrarProyecto();
+    localStorage.removeItem("cronista-last-project");
+    crearCapituloNuevo();
+  }
   async function cerrarProyecto(): Promise<void> {
     if (!projectPath) return;
 
@@ -1022,6 +1027,9 @@
       <!-- ═══ Capítulos tab ═══ -->
       {#if activeTab === "capitulos"}
         <div class="tab-panel">
+          <button class="btn-add" onclick={() => crearCapituloNuevo()}>
+            {t("toolbar.newChapter")}
+          </button>
           {#if chapters.length > 0}
             <p class="chapter-list-label">{t("chapters.label")}</p>
             <ul class="chapter-list">
@@ -1345,7 +1353,7 @@
       </div>
     </div>
 
-    <!-- Sidebar footer — utility buttons + git status, collapsible -->
+    <!-- Sidebar footer — tools + git, collapsible -->
     <div class="sidebar-footer">
       <button
         class="footer-toggle"
@@ -1356,94 +1364,76 @@
       </button>
 
       {#if footerExpanded}
-        <div class="footer-actions">
-          <button
-            class="footer-btn"
-            onclick={() => abrirProyecto()}
-            title={t("toolbar.openProjectTitle")}
-          >📂</button>
-          <button
-            class="footer-btn"
-            onclick={() => cerrarProyecto()}
-            title={t("toolbar.closeProjectTitle")}
-          >✕</button>
-          <button
-            class="footer-btn"
-            onclick={crearCapituloNuevo}
-            title={t("toolbar.newChapterTitle")}
-          >+</button>
-          <span class="footer-sep"></span>
-          <button
-            class="footer-btn"
-            onclick={() => { saveStatus = "saving"; save.trigger(); }}
-            title={t("toolbar.saveTitle")}
-          >💾</button>
-          <button
-            class="footer-btn"
-            onclick={() => (helpMode = !helpMode)}
-            title={t("toolbar.helpTitle")}
-          >?</button>
-          <button
-            class="footer-btn footer-lang"
-            class:active={$lang === "es"}
-            onclick={() => setLang("es")}
-            title="Español"
-          >ES</button>
-          <button
-            class="footer-btn footer-lang"
-            class:active={$lang === "en"}
-            onclick={() => setLang("en")}
-            title="English"
-          >EN</button>
-          <button
-            class="footer-btn"
-            onclick={() => (theme = theme === "light" ? "dark" : "light")}
-            title={theme === "light" ? t("toolbar.darkMode") : t("toolbar.lightMode")}
-          >{theme === "light" ? "🌙" : "☀️"}</button>
-          <span class="footer-sep"></span>
-          <span
-            class="save-indicator"
-            class:saving={saveStatus === "saving"}
-            class:saved={saveStatus === "saved"}
-            class:unsaved={saveStatus === "unsaved"}
-          >
-            {saveStatus === "saving"
-              ? t("toolbar.saving")
-              : saveStatus === "saved"
-                ? t("toolbar.saved")
-                : saveStatus === "unsaved"
-                  ? t("toolbar.unsaved")
-                  : ""}
-          </span>
-        </div>
-      {/if}
+        <div class="footer-rows">
+          <!-- Row 1: language + theme -->
+          <div class="footer-row">
+            <button
+              class="footer-btn footer-lang"
+              class:active={$lang === "es"}
+              onclick={() => setLang("es")}
+              title="Español"
+            >ES</button>
+            <button
+              class="footer-btn footer-lang"
+              class:active={$lang === "en"}
+              onclick={() => setLang("en")}
+              title="English"
+            >EN</button>
+            <span class="footer-sep"></span>
+            <button
+              class="footer-btn"
+              onclick={() => (theme = theme === "light" ? "dark" : "light")}
+              title={theme === "light" ? t("toolbar.darkMode") : t("toolbar.lightMode")}
+            >{theme === "light" ? "🌙" : "☀️"}</button>
+          </div>
 
-      {#if gitStatus !== "unknown"}
-        <div class="sidebar-git-footer">
-          {#if gitStatus === "active"}
-            <span class="git-indicator git-active" title={t("git.activeTitle")}>
-              🟢 {t("git.active")}
+          <!-- Row 2: project management -->
+          <div class="footer-row">
+            <button class="footer-btn" onclick={() => abrirProyecto()} title={t("toolbar.openProjectTitle")}>
+              📂 {t("toolbar.openProject")}
+            </button>
+            <button class="footer-btn" onclick={nuevoProyectoHandler} title={t("toolbar.newProjectTitle")}>
+              ✨ {t("toolbar.newProject")}
+            </button>
+            <button class="footer-btn" onclick={() => cerrarProyecto()} title={t("toolbar.closeProjectTitle")}>
+              ✕ {t("toolbar.closeProject")}
+            </button>
+          </div>
+
+          <!-- Row 3: save + versioning -->
+          <div class="footer-row">
+            <button
+              class="footer-btn"
+              onclick={() => { saveStatus = "saving"; save.trigger(); }}
+              title={t("toolbar.saveTitle")}
+            >💾 {t("toolbar.save")}</button>
+            <span class="save-indicator"
+              class:saving={saveStatus === "saving"}
+              class:saved={saveStatus === "saved"}
+              class:unsaved={saveStatus === "unsaved"}
+            >
+              {saveStatus === "saving"
+                ? t("toolbar.saving")
+                : saveStatus === "saved"
+                  ? t("toolbar.saved")
+                  : saveStatus === "unsaved"
+                    ? t("toolbar.unsaved")
+                    : ""}
             </span>
-            <button class="git-log-link" onclick={cargarGitLog}>
-              {t("git.viewSessions")} →
-            </button>
-          {:else if gitStatus === "not-initialized"}
-            <button
-              class="git-indicator git-warn"
-              onclick={() => { gitInitNombre = t("git.defaultName"); gitInitEmail = t("git.defaultEmail"); gitInitModal = true; }}
-              title={t("git.notInitTitle")}
-            >
-              🟠 {t("git.notInit")}
-            </button>
-          {:else if gitStatus === "unavailable"}
-            <button
-              class="git-indicator git-off"
-              onclick={() => (gitHelpModal = true)}
-              title={t("git.unavailableTitle")}
-            >
-              🔴 {t("git.unavailable")}
-            </button>
-          {/if}
+            <span class="footer-sep"></span>
+            {#if gitStatus === "active"}
+              <span class="git-indicator git-active" title={t("git.activeTitle")}>🟢</span>
+              <button class="git-log-link" onclick={cargarGitLog}>{t("git.viewSessions")} →</button>
+            {:else if gitStatus === "not-initialized"}
+              <button class="git-indicator git-warn"
+                onclick={() => { gitInitNombre = t("git.defaultName"); gitInitEmail = t("git.defaultEmail"); gitInitModal = true; }}
+                title={t("git.notInitTitle")}>🟠 {t("git.notInit")}</button>
+            {:else if gitStatus === "unavailable"}
+              <button class="git-indicator git-off"
+                onclick={() => (gitHelpModal = true)}
+                title={t("git.unavailableTitle")}>🔴 {t("git.unavailable")}</button>
+            {/if}
+          </div>
         </div>
       {/if}
     </div>
@@ -1487,6 +1477,11 @@
           {#if activeChapter}
             <span class="chapter-label">{activeChapter}</span>
           {/if}
+          <button
+            class="help-btn"
+            onclick={() => (helpMode = !helpMode)}
+            title={t("toolbar.helpTitle")}
+          >?</button>
         </div>
 
         <div class="editor-body">
@@ -2043,6 +2038,36 @@
     flex: 1;
   }
 
+  .help-btn {
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    border: 1px solid #e2e8f0;
+    border-radius: 50%;
+    background: transparent;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #64748b;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 120ms;
+  }
+
+  .help-btn:hover {
+    background: #e2e8f0;
+  }
+
+  :global(.dark) .help-btn {
+    border-color: #334155;
+    color: #94a3b8;
+  }
+
+  :global(.dark) .help-btn:hover {
+    background: #334155;
+  }
+
 
   .project-label {
     font-size: 0.8125rem;
@@ -2457,24 +2482,6 @@
   }
   .timeline-event:global(.dragging) { opacity: 0.4; }
   .timeline-event:global(.drag-over) { border-top: 2px solid #3b82f6; }
-
-  /* ── Sidebar git footer ──────────────────────────────────────── */
-  .sidebar-git-footer {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    flex-wrap: wrap;
-    padding: 0.5rem 0.75rem;
-    border-top: 1px solid #e2e8f0;
-    font-size: 0.7rem;
-    background: #f8fafc;
-    flex-shrink: 0;
-  }
-
-  :global(.dark) .sidebar-git-footer {
-    border-top-color: #334155;
-    background: #0f172a;
-  }
 
   .event-date {
     flex-shrink: 0;
@@ -3161,12 +3168,18 @@
     color: #cbd5e1;
   }
 
-  .footer-actions {
+  .footer-rows {
+    padding: 0.3rem 0.5rem 0.45rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .footer-row {
     display: flex;
     align-items: center;
     gap: 0.3rem;
     flex-wrap: wrap;
-    padding: 0.3rem 0.5rem 0.45rem;
   }
 
   .footer-btn {
