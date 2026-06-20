@@ -198,34 +198,70 @@ fn crear_proyecto(path: String, nombre: String) -> Result<String, String> {
     Ok(format!("Proyecto '{}' creado en {}", nombre, path))
 }
 
-/// Copy the app icon into the project and set it as folder icon via gvfs.
+/// Copy the app icon into the project and set it as folder icon.
 ///
-/// Best-effort — never fails. Works on GNOME, Nemo, and other file
-/// managers that respect GVFS metadata. Call after project creation.
+/// Best-effort — never fails project creation.
+/// - **Linux**: copies 32x32.png as .cronista-icon.png, sets GVFS metadata.
+/// - **Windows**: copies icon.ico as .cronista-icon.ico, creates desktop.ini
+///   and marks the folder with +s attribute so Explorer picks up the icon.
 #[tauri::command]
 fn marcar_proyecto_cronista(app: tauri::AppHandle, path: String) -> Result<(), String> {
     let base = Path::new(&path);
 
-    // Copy icon from bundled resources to project root
-    let icon_dest = base.join(".cronista-icon.png");
-    if let Ok(resource_dir) = app.path().resource_dir() {
-        let icon_src = resource_dir.join("icons/32x32.png");
-        if icon_src.exists() {
-            std::fs::copy(&icon_src, &icon_dest)
-                .map_err(|e| format!("Error al copiar icono: {}", e))?;
+    #[cfg(target_os = "linux")]
+    {
+        let icon_dest = base.join(".cronista-icon.png");
+        if let Ok(resource_dir) = app.path().resource_dir() {
+            let icon_src = resource_dir.join("icons/32x32.png");
+            if icon_src.exists() {
+                std::fs::copy(&icon_src, &icon_dest)
+                    .map_err(|e| format!("Error al copiar icono: {}", e))?;
+            }
+        }
+        // Set folder icon via GVFS (GNOME, Nemo, Cinnamon...)
+        if let Ok(icon_abs) = icon_dest.canonicalize() {
+            let icon_uri = format!("file://{}", icon_abs.display());
+            let _ = std::process::Command::new("gio")
+                .arg("set").arg("-t").arg("string")
+                .arg(base)
+                .arg("metadata::custom-icon")
+                .arg(&icon_uri)
+                .output();
         }
     }
 
-    // Try to set folder icon via gvfs (GNOME, Cinnamon, Nemo, etc.)
-    if let Ok(icon_abs) = icon_dest.canonicalize() {
-        let icon_uri = format!("file://{}", icon_abs.display());
-        let _ = std::process::Command::new("gio")
-            .arg("set")
-            .arg("-t")
-            .arg("string")
+    #[cfg(target_os = "windows")]
+    {
+        let icon_dest = base.join(".cronista-icon.ico");
+        if let Ok(resource_dir) = app.path().resource_dir() {
+            let icon_src = resource_dir.join("icons/icon.ico");
+            if icon_src.exists() {
+                std::fs::copy(&icon_src, &icon_dest)
+                    .map_err(|e| format!("Error copying icon: {}", e))?;
+            }
+        }
+        // Create desktop.ini to tell Explorer about the custom icon
+        let desktop_ini = base.join("desktop.ini");
+        let ini_content = format!(
+            "[.ShellClassInfo]\r\nIconFile={}\r\nIconIndex=0\r\n",
+            ".cronista-icon.ico"
+        );
+        std::fs::write(&desktop_ini, ini_content)
+            .map_err(|e| format!("Error writing desktop.ini: {}", e))?;
+
+        // Mark folder as system so Explorer reads desktop.ini
+        let _ = std::process::Command::new("attrib")
+            .arg("+s")
             .arg(base)
-            .arg("metadata::custom-icon")
-            .arg(&icon_uri)
+            .output();
+        // Hide the desktop.ini and icon files
+        let _ = std::process::Command::new("attrib")
+            .arg("+h")
+            .arg(&desktop_ini)
+            .output();
+        let _ = std::process::Command::new("attrib")
+            .arg("+h")
+            .arg(&icon_dest)
             .output();
     }
 
