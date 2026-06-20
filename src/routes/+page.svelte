@@ -161,6 +161,7 @@
   // within the handler can deadlock because the Rust side is still
   // waiting for the JS promise to resolve.
   let closing = $state(false);
+  let closeStep = $state("");    // user-visible progress message
 
   $effect(() => {
     let unlisten: (() => void) | undefined;
@@ -197,6 +198,7 @@
           return;
         }
         closing = true;
+        closeStep = "Guardando capítulo...";
 
         console.log("[cronista:close] → preventing default, will save + checkpoint");
         event.preventDefault();
@@ -207,14 +209,21 @@
             const saveResult = await guardarCapitulo(path, chapter, content);
             console.log("[cronista:close]   save result:", saveResult);
           }
+          closeStep = "Creando checkpoint de Git...";
           console.log("[cronista:close] → creating checkpoint...");
           const checkpointResult = await crearCheckpoint(path);
           console.log("[cronista:close]   checkpoint result:", checkpointResult);
         } catch (err) {
           console.error("[cronista:close]   save/checkpoint FAILED:", err);
+          closeStep = "Error al guardar. Cerrando de todas formas...";
         }
 
+        closeStep = "Cerrando aplicación...";
         console.log("[cronista:close] → destroying window");
+
+        // Brief pause so the user sees the final message
+        await new Promise(r => setTimeout(r, 400));
+
         try {
           getCurrentWindow().destroy();
         } catch (e) {
@@ -1424,6 +1433,17 @@
   </div>
 {/if}
 
+{#if closing}
+  <!-- Closing overlay — shown while saving + checkpoint before destroy -->
+  <div class="closing-overlay" role="alertdialog" aria-label="Cerrando aplicación">
+    <div class="closing-panel">
+      <div class="closing-spinner"></div>
+      <p class="closing-message">{closeStep}</p>
+      <p class="closing-sub">Cronista v0.1.1</p>
+    </div>
+  </div>
+{/if}
+
 <style>
   /* ── Layout ────────────────────────────────────────────────── */
   .app-layout {
@@ -2429,5 +2449,73 @@
     background: #334155;
     border-color: #475569;
     color: #e2e8f0;
+  }
+
+  /* ── Closing overlay ────────────────────────────────────────── */
+  .closing-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 120ms ease;
+    backdrop-filter: blur(4px);
+  }
+
+  .closing-panel {
+    background: #ffffff;
+    border-radius: 1rem;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+    padding: 2.5rem 3rem;
+    text-align: center;
+    min-width: 280px;
+  }
+
+  :global(.dark) .closing-panel {
+    background: #1e293b;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+
+  .closing-spinner {
+    width: 40px;
+    height: 40px;
+    margin: 0 auto 1.25rem;
+    border: 3px solid #e2e8f0;
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  :global(.dark) .closing-spinner {
+    border-color: #334155;
+    border-top-color: #60a5fa;
+  }
+
+  .closing-message {
+    margin: 0 0 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1e293b;
+  }
+
+  :global(.dark) .closing-message {
+    color: #f1f5f9;
+  }
+
+  .closing-sub {
+    margin: 0;
+    font-size: 0.75rem;
+    color: #94a3b8;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
 </style>
