@@ -53,6 +53,26 @@
     }
   });
 
+  // ── Restore zoom level ────────────────────────────────────────
+  $effect(() => {
+    const stored = localStorage.getItem("cronista-zoom");
+    if (stored) zoomLevel = Math.min(2, Math.max(0, Number(stored)));
+  });
+
+  // ── Apply zoom to the whole UI ─────────────────────────────────
+  $effect(() => {
+    const scales = [1, 1.15, 1.3];
+    document.body.style.zoom = String(scales[zoomLevel] ?? 1);
+  });
+  $effect(() => {
+    const stored = localStorage.getItem("cronista-theme");
+    if (stored === "light" || stored === "dark") {
+      theme = stored;
+    } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      theme = "dark";
+    }
+  });
+
   // ── Apply dark class to <html> whenever theme changes ──────────
   $effect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -159,6 +179,7 @@
   let gitLogVisible = $state(false);
   let gitLogEntries = $state<GitLogEntry[]>([]);
   let footerExpanded = $state(true);
+  let zoomLevel = $state(0); // 0=normal, 1=medium, 2=large
   let chapters = $state<string[]>([]);
   let pendingDelete = $state<string | null>(null);
   let activeChapter = $state("");
@@ -987,6 +1008,22 @@
       return;
     }
 
+    // Ctrl+= (Ctrl++) — zoom in
+    if (e.ctrlKey && !e.shiftKey && (e.key === "=" || e.key === "+")) {
+      e.preventDefault();
+      zoomLevel = Math.min(2, zoomLevel + 1);
+      localStorage.setItem("cronista-zoom", String(zoomLevel));
+      return;
+    }
+
+    // Ctrl+- — zoom out
+    if (e.ctrlKey && !e.shiftKey && e.key === "-") {
+      e.preventDefault();
+      zoomLevel = Math.max(0, zoomLevel - 1);
+      localStorage.setItem("cronista-zoom", String(zoomLevel));
+      return;
+    }
+
     // ? — help toggle (without shift, plain key)
     if (!e.ctrlKey && !e.altKey && !e.metaKey && e.key === "?") {
       e.preventDefault();
@@ -1567,6 +1604,7 @@
           <tr><td><kbd>Ctrl+O</kbd></td><td>{t("help.shortcuts.openProject")}</td></tr>
           <tr><td><kbd>Ctrl+Shift+N</kbd></td><td>{t("help.shortcuts.newProject")}</td></tr>
           <tr><td><kbd>Ctrl+↑</kbd> / <kbd>Ctrl+↓</kbd></td><td>{t("help.shortcuts.applyHeading")}</td></tr>
+          <tr><td><kbd>Ctrl+=</kbd> / <kbd>Ctrl+-</kbd></td><td>{t("help.shortcuts.zoomIn")} / {t("help.shortcuts.zoomOut")}</td></tr>
           <tr><td><kbd>F11</kbd></td><td>{t("help.shortcuts.fullscreen")}</td></tr>
           <tr><td><kbd>F1</kbd> o <kbd>?</kbd></td><td>{t("help.shortcuts.toggleHelp")}</td></tr>
           </tbody>

@@ -194,6 +194,8 @@ const translations: Record<Lang, Record<string, string>> = {
     "help.shortcuts.resizeSidebar":
       "Reducir / ampliar panel lateral (5 % por paso)",
     "help.shortcuts.toggleFooter": "Mostrar / ocultar panel de herramientas",
+    "help.shortcuts.zoomIn": "Aumentar tamaño de letra",
+    "help.shortcuts.zoomOut": "Reducir tamaño de letra",
     "help.shortcuts.saveNow": "Guardar ahora",
     "help.shortcuts.newChapter": "Nuevo capítulo",
     "help.shortcuts.openProject": "Abrir otro proyecto (cierra el actual)",
@@ -404,6 +406,8 @@ const translations: Record<Lang, Record<string, string>> = {
     "help.shortcuts.restoreSidebar": "Restore sidebar",
     "help.shortcuts.resizeSidebar": "Shrink / grow sidebar (5% per step)",
     "help.shortcuts.toggleFooter": "Show / hide tools panel",
+    "help.shortcuts.zoomIn": "Increase font size",
+    "help.shortcuts.zoomOut": "Decrease font size",
     "help.shortcuts.saveNow": "Save now",
     "help.shortcuts.newChapter": "New chapter",
     "help.shortcuts.openProject": "Open another project (closes current)",
