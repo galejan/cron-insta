@@ -2,7 +2,7 @@
   import { untrack } from "svelte";
   import Editor from "$lib/components/Editor.svelte";
   import { debounce } from "$lib/debounce";
-  import { t, setLang, lang } from "$lib/i18n";
+  import { t, setLang, lang } from "$lib/i18n.svelte";
   import {
     actualizarPersonaje,
     agregarEventoTimeline,
@@ -1499,13 +1499,13 @@
           <div class="footer-row">
             <button
               class="footer-btn footer-lang"
-              class:active={$lang === "es"}
+              class:active={lang === "es"}
               onclick={() => setLang("es")}
               title="Español"
             >ES</button>
             <button
               class="footer-btn footer-lang"
-              class:active={$lang === "en"}
+              class:active={lang === "en"}
               onclick={() => setLang("en")}
               title="English"
             >EN</button>

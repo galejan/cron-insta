@@ -1,22 +1,20 @@
 /**
  * Cronista i18n — lightweight Spanish/English translation system.
  *
- * Uses a Svelte writable store (works in plain .ts files).
- * In templates, use the $lang auto-subscription: {$lang === "en" ? "🇬🇧" : "🇪🇸"}
- * In JS functions, use get(lang) to read the current value.
+ * Uses Svelte 5 $state runes for reactivity.
+ * In templates, t("key") is reactive because it reads the $state lang.
  *
  * Usage in components:
- *   import { t, setLang, lang } from "$lib/i18n";
- *   <button onclick={() => setLang("en")}>🇬🇧</button>
+ *   import { t, setLang, lang } from "$lib/i18n.svelte";
+ *   <button onclick={() => setLang("en")}>EN</button>
  *   <p>{t("common.cancel")}</p>
+ *   <span class:active={lang === "es"}>ES</span>
  */
-
-import { writable, get } from "svelte/store";
 
 export type Lang = "es" | "en";
 
-/** Reactive language store — use $lang in templates, get(lang) in JS. */
-export const lang = writable<Lang>(
+/** Reactive language state. Changes to this trigger template re-renders. */
+export let lang = $state<Lang>(
   (typeof localStorage !== "undefined"
     ? (localStorage.getItem("cronista-lang") as Lang | null)
     : null) ?? "es",
@@ -24,12 +22,12 @@ export const lang = writable<Lang>(
 
 /** Translate a key to the current language. Reactive in templates. */
 export function t(key: string): string {
-  return translations[get(lang)]?.[key] ?? key;
+  return translations[lang]?.[key] ?? key;
 }
 
 /** Change the active language and persist the choice. */
 export function setLang(l: Lang): void {
-  lang.set(l);
+  lang = l;
   if (typeof localStorage !== "undefined") {
     localStorage.setItem("cronista-lang", l);
   }
