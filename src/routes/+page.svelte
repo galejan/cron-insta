@@ -406,8 +406,12 @@
     const filename = prompt(t("chapters.newFilePrompt"), "0001_prologue.md");
     if (!filename) return;
 
-    // Simple heading + empty paragraph so the editor isn't blank.
-    const initialHTML = `<h1>${t("chapters.untitled")}</h1><p></p>`;
+    // Use the chapter filename (without .md) as the initial title
+    const titulo = filename.replace(/\.md$/, "")
+      .replace(/^[\d_]+/, "")
+      .replace(/_/g, " ")
+      .trim() || t("chapters.untitled");
+    const initialHTML = `<h1>${titulo}</h1><p></p>`;
 
     console.log("[cronista] Creating chapter:", filename);
     try {
@@ -1808,18 +1812,18 @@
 
   .tabs {
     display: flex;
-    border-bottom: 1px solid #e2e8f0;
-    min-height: 2.5rem;
+    height: 2.5rem;
+    box-shadow: inset 0 -1px 0 0 #e2e8f0;
   }
 
   :global(.dark) .tabs {
-    border-bottom-color: #334155;
+    box-shadow: inset 0 -1px 0 0 #334155;
   }
 
   .tab {
     flex: 1;
-    padding: 0.65rem 0.5rem;
-    font-size: 0.875rem;
+    padding: 0 0.5rem;
+    font-size: 0.8125rem;
     font-weight: 500;
     color: #64748b;
     background: transparent;
@@ -1827,6 +1831,9 @@
     border-bottom: 2px solid transparent;
     cursor: pointer;
     transition: color 150ms, border-color 150ms;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .tab:hover {
