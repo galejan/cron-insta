@@ -212,3 +212,33 @@ export async function reordenarTimeline(
 ): Promise<string> {
   return invoke("reordenar_timeline", { proyectoPath, idsJson: JSON.stringify(ids) });
 }
+
+// ── Git Identity & Remote ─────────────────────────────────────
+
+export async function cargarIdentidadGit(): Promise<{name: string, email: string} | null> {
+  const result = await invoke<string>("cargar_identidad_git");
+  if (result === "null") return null;
+  return JSON.parse(result);
+}
+
+export async function guardarIdentidadGit(name: string, email: string): Promise<string> {
+  return invoke("guardar_identidad_git", { name, email });
+}
+
+export async function cargarConfigRemoto(): Promise<{url: string, push_enabled: boolean, consecutive_failures: number} | null> {
+  const result = await invoke<string>("cargar_config_remoto");
+  if (result === "null") return null;
+  return JSON.parse(result);
+}
+
+export async function guardarConfigRemoto(url: string, pushEnabled: boolean): Promise<string> {
+  return invoke("guardar_config_remoto", { url, pushEnabled });
+}
+
+export async function configurarRemoto(path: string, url: string): Promise<string> {
+  return invoke("configurar_remoto", { path, url });
+}
+
+export async function reintentarPush(path: string): Promise<string> {
+  return invoke("reintentar_push", { path });
+}
