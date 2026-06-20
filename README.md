@@ -87,8 +87,8 @@ cronista/
 | <kbd>Ctrl</kbd> + <kbd>→</kbd> | Ampliar panel lateral (5 %) |
 | <kbd>Ctrl</kbd> + <kbd>S</kbd> | Guardar ahora |
 | <kbd>Ctrl</kbd> + <kbd>N</kbd> | Nuevo capítulo |
-| <kbd>Ctrl</kbd> + <kbd>O</kbd> | Abrir proyecto existente |
-| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>N</kbd> | Nuevo proyecto (reinicia la app) |
+| <kbd>Ctrl</kbd> + <kbd>O</kbd> | Abrir otro proyecto (cierra el actual) |
+| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>N</kbd> | Nuevo proyecto (cierra el actual) |
 | <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd> | Aplicar Título 1 / 2 / 3 al párrafo actual |
 | <kbd>F11</kbd> | Pantalla completa |
 | <kbd>F1</kbd> o <kbd>?</kbd> | Mostrar / ocultar panel de ayuda |
