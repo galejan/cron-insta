@@ -11,6 +11,26 @@ use std::sync::Mutex;
 use std::io::Write;
 use tauri::Manager;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+// ---------------------------------------------------------------------------
+// Process helper — hides terminal windows on Windows
+// ---------------------------------------------------------------------------
+
+/// Create a `Command` pre-configured for headless execution:
+/// - `CREATE_NO_WINDOW` on Windows (prevents console popups)
+/// - `stdin` set to null (prevents accidental blocking on stdin reads)
+fn system_command(program: &str) -> Command {
+    let mut cmd = Command::new(program);
+    cmd.stdin(std::process::Stdio::null());
+    #[cfg(target_os = "windows")]
+    {
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+    cmd
+}
+
 // ---------------------------------------------------------------------------
 // Data structures
 // ---------------------------------------------------------------------------
@@ -111,7 +131,7 @@ struct TimelineEvent {
 fn find_git() -> Result<String, String> {
     #[cfg(target_os = "linux")]
     {
-        let output = Command::new("which")
+        let output = system_command("which")
             .arg("git")
             .output()
             .map_err(|e| format!("Error al buscar git: {}", e))?;
@@ -127,7 +147,7 @@ fn find_git() -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
         // 1) Try PATH via `where git`
-        if let Ok(output) = Command::new("where").arg("git").output() {
+        if let Ok(output) = system_command("where").arg("git").output() {
             if output.status.success() {
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 // `where` may return multiple lines — take the first
@@ -229,7 +249,7 @@ fn marcar_proyecto_cronista(app: tauri::AppHandle, path: String) -> Result<(), S
         // Set folder icon via GVFS (GNOME, Nemo, Cinnamon...)
         if let Ok(icon_abs) = icon_dest.canonicalize() {
             let icon_uri = format!("file://{}", icon_abs.display());
-            let _ = std::process::Command::new("gio")
+            let _ = system_command("gio")
                 .arg("set").arg("-t").arg("string")
                 .arg(base)
                 .arg("metadata::custom-icon")
@@ -258,16 +278,16 @@ fn marcar_proyecto_cronista(app: tauri::AppHandle, path: String) -> Result<(), S
             .map_err(|e| format!("Error writing desktop.ini: {}", e))?;
 
         // Mark folder as system so Explorer reads desktop.ini
-        let _ = std::process::Command::new("attrib")
+        let _ = system_command("attrib")
             .arg("+s")
             .arg(base)
             .output();
         // Hide the desktop.ini and icon files
-        let _ = std::process::Command::new("attrib")
+        let _ = system_command("attrib")
             .arg("+h")
             .arg(&desktop_ini)
             .output();
-        let _ = std::process::Command::new("attrib")
+        let _ = system_command("attrib")
             .arg("+h")
             .arg(&icon_dest)
             .output();
@@ -293,7 +313,7 @@ fn inicializar_git(path: String) -> Result<String, String> {
     // Locate git binary (returns Err with user-facing message when absent)
     let git_path = find_git()?;
 
-    let output = Command::new(&git_path)
+    let output = system_command(&git_path)
         .arg("init")
         .current_dir(project_path)
         .output()
@@ -301,13 +321,13 @@ fn inicializar_git(path: String) -> Result<String, String> {
 
     if output.status.success() {
         // Set anonymous user for commits (best-effort, silent on failure)
-        let _ = Command::new(&git_path)
+        let _ = system_command(&git_path)
             .arg("config")
             .arg("user.name")
             .arg("Cronista")
             .current_dir(project_path)
             .output();
-        let _ = Command::new(&git_path)
+        let _ = system_command(&git_path)
             .arg("config")
             .arg("user.email")
             .arg("cronista@local")
@@ -341,7 +361,7 @@ fn inicializar_git_con_autor(
     let git_path = find_git()?;
 
     // git init
-    let output = Command::new(&git_path)
+    let output = system_command(&git_path)
         .arg("init")
         .current_dir(project_path)
         .output()
@@ -353,13 +373,13 @@ fn inicializar_git_con_autor(
     }
 
     // Configure author
-    let _ = Command::new(&git_path)
+    let _ = system_command(&git_path)
         .arg("config")
         .arg("user.name")
         .arg(&nombre)
         .current_dir(project_path)
         .output();
-    let _ = Command::new(&git_path)
+    let _ = system_command(&git_path)
         .arg("config")
         .arg("user.email")
         .arg(&email)
@@ -375,14 +395,14 @@ fn inicializar_git_con_autor(
     );
 
     // First commit — "Primera piedra"
-    let _ = Command::new(&git_path)
+    let _ = system_command(&git_path)
         .arg("add")
         .arg(".")
         .current_dir(project_path)
         .output();
 
     let commit_msg = "Primera piedra ✍️";
-    let commit_output = Command::new(&git_path)
+    let commit_output = system_command(&git_path)
         .arg("commit")
         .arg("-m")
         .arg(commit_msg)
@@ -418,7 +438,7 @@ fn get_changed_md_files(
     git_path: &str,
     hash: &str,
 ) -> Vec<String> {
-    let output = Command::new(git_path)
+    let output = system_command(git_path)
         .arg("show")
         .arg("--name-only")
         .arg("--format=")
@@ -454,7 +474,7 @@ fn obtener_git_log(path: String, limit: usize) -> Result<String, String> {
     let project_path = Path::new(&path);
     let git_path = find_git()?;
 
-    let output = Command::new(&git_path)
+    let output = system_command(&git_path)
         .arg("log")
         .arg(format!("--format=%H|%ai|%s"))
         .arg(format!("-{}", limit.max(1).min(20)))
@@ -570,7 +590,7 @@ fn crear_checkpoint(proyecto_path: String) -> Result<String, String> {
     let git_path = find_git()?;
 
     // Stage all changes
-    let add_output = Command::new(&git_path)
+    let add_output = system_command(&git_path)
         .arg("add")
         .arg(".")
         .current_dir(project_path)
@@ -591,7 +611,7 @@ fn crear_checkpoint(proyecto_path: String) -> Result<String, String> {
     );
 
     // Commit
-    let commit_output = Command::new(&git_path)
+    let commit_output = system_command(&git_path)
         .arg("commit")
         .arg("-m")
         .arg(&commit_msg)
@@ -601,7 +621,7 @@ fn crear_checkpoint(proyecto_path: String) -> Result<String, String> {
 
     if commit_output.status.success() {
         // Retrieve the commit hash
-        let hash_output = Command::new(&git_path)
+        let hash_output = system_command(&git_path)
             .arg("rev-parse")
             .arg("HEAD")
             .current_dir(project_path)
@@ -1394,7 +1414,7 @@ fn do_checkpoint(project_path: &str) -> Result<String, String> {
     let project_path = Path::new(project_path);
     let git_path = find_git()?;
 
-    let add_output = Command::new(&git_path)
+    let add_output = system_command(&git_path)
         .arg("add")
         .arg(".")
         .current_dir(project_path)
@@ -1413,7 +1433,7 @@ fn do_checkpoint(project_path: &str) -> Result<String, String> {
         date, word_count
     );
 
-    let commit_output = Command::new(&git_path)
+    let commit_output = system_command(&git_path)
         .arg("commit")
         .arg("-m")
         .arg(&commit_msg)
@@ -1422,7 +1442,7 @@ fn do_checkpoint(project_path: &str) -> Result<String, String> {
         .map_err(|e| format!("Error al ejecutar git commit: {}", e))?;
 
     if commit_output.status.success() {
-        let hash_output = Command::new(&git_path)
+        let hash_output = system_command(&git_path)
             .arg("rev-parse")
             .arg("HEAD")
             .current_dir(project_path)
@@ -2331,7 +2351,7 @@ mod tests {
             Ok(p) => p,
             Err(_) => return 0,
         };
-        let output = Command::new(&git_path)
+        let output = system_command(&git_path)
             .arg("rev-list")
             .arg("--count")
             .arg("HEAD")
