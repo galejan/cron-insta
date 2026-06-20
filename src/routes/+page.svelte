@@ -158,6 +158,7 @@
   let gitHelpModal = $state(false);
   let gitLogVisible = $state(false);
   let gitLogEntries = $state<GitLogEntry[]>([]);
+  let footerExpanded = $state(true);
   let chapters = $state<string[]>([]);
   let pendingDelete = $state<string | null>(null);
   let activeChapter = $state("");
@@ -1344,35 +1345,108 @@
       </div>
     </div>
 
-    <!-- Git status footer — pinned below scrollable content -->
-    {#if gitStatus !== "unknown"}
-      <div class="sidebar-git-footer">
-        {#if gitStatus === "active"}
-          <span class="git-indicator git-active" title={t("git.activeTitle")}>
-            🟢 {t("git.active")}
+    <!-- Sidebar footer — utility buttons + git status, collapsible -->
+    <div class="sidebar-footer">
+      <button
+        class="footer-toggle"
+        onclick={() => (footerExpanded = !footerExpanded)}
+        title={footerExpanded ? t("toolbar.collapseFooter") : t("toolbar.expandFooter")}
+      >
+        {footerExpanded ? "▼" : "▲"}
+      </button>
+
+      {#if footerExpanded}
+        <div class="footer-actions">
+          <button
+            class="footer-btn"
+            onclick={() => abrirProyecto()}
+            title={t("toolbar.openProjectTitle")}
+          >📂</button>
+          <button
+            class="footer-btn"
+            onclick={() => cerrarProyecto()}
+            title={t("toolbar.closeProjectTitle")}
+          >✕</button>
+          <button
+            class="footer-btn"
+            onclick={crearCapituloNuevo}
+            title={t("toolbar.newChapterTitle")}
+          >+</button>
+          <span class="footer-sep"></span>
+          <button
+            class="footer-btn"
+            onclick={() => { saveStatus = "saving"; save.trigger(); }}
+            title={t("toolbar.saveTitle")}
+          >💾</button>
+          <button
+            class="footer-btn"
+            onclick={() => (helpMode = !helpMode)}
+            title={t("toolbar.helpTitle")}
+          >?</button>
+          <button
+            class="footer-btn footer-lang"
+            class:active={$lang === "es"}
+            onclick={() => setLang("es")}
+            title="Español"
+          >ES</button>
+          <button
+            class="footer-btn footer-lang"
+            class:active={$lang === "en"}
+            onclick={() => setLang("en")}
+            title="English"
+          >EN</button>
+          <button
+            class="footer-btn"
+            onclick={() => (theme = theme === "light" ? "dark" : "light")}
+            title={theme === "light" ? t("toolbar.darkMode") : t("toolbar.lightMode")}
+          >{theme === "light" ? "🌙" : "☀️"}</button>
+          <span class="footer-sep"></span>
+          <span
+            class="save-indicator"
+            class:saving={saveStatus === "saving"}
+            class:saved={saveStatus === "saved"}
+            class:unsaved={saveStatus === "unsaved"}
+          >
+            {saveStatus === "saving"
+              ? t("toolbar.saving")
+              : saveStatus === "saved"
+                ? t("toolbar.saved")
+                : saveStatus === "unsaved"
+                  ? t("toolbar.unsaved")
+                  : ""}
           </span>
-          <button class="git-log-link" onclick={cargarGitLog}>
-            {t("git.viewSessions")} →
-          </button>
-        {:else if gitStatus === "not-initialized"}
-          <button
-            class="git-indicator git-warn"
-            onclick={() => { gitInitNombre = t("git.defaultName"); gitInitEmail = t("git.defaultEmail"); gitInitModal = true; }}
-            title={t("git.notInitTitle")}
-          >
-            🟠 {t("git.notInit")}
-          </button>
-        {:else if gitStatus === "unavailable"}
-          <button
-            class="git-indicator git-off"
-            onclick={() => (gitHelpModal = true)}
-            title={t("git.unavailableTitle")}
-          >
-            🔴 {t("git.unavailable")}
-          </button>
-        {/if}
-      </div>
-    {/if}
+        </div>
+      {/if}
+
+      {#if gitStatus !== "unknown"}
+        <div class="sidebar-git-footer">
+          {#if gitStatus === "active"}
+            <span class="git-indicator git-active" title={t("git.activeTitle")}>
+              🟢 {t("git.active")}
+            </span>
+            <button class="git-log-link" onclick={cargarGitLog}>
+              {t("git.viewSessions")} →
+            </button>
+          {:else if gitStatus === "not-initialized"}
+            <button
+              class="git-indicator git-warn"
+              onclick={() => { gitInitNombre = t("git.defaultName"); gitInitEmail = t("git.defaultEmail"); gitInitModal = true; }}
+              title={t("git.notInitTitle")}
+            >
+              🟠 {t("git.notInit")}
+            </button>
+          {:else if gitStatus === "unavailable"}
+            <button
+              class="git-indicator git-off"
+              onclick={() => (gitHelpModal = true)}
+              title={t("git.unavailableTitle")}
+            >
+              🔴 {t("git.unavailable")}
+            </button>
+          {/if}
+        </div>
+      {/if}
+    </div>
   </aside>
 
   <!-- Editor area (60 % when visible, 100 % when sidebar collapsed) -->
@@ -1406,82 +1480,13 @@
       <!-- Toolbar + Editor -->
       <div class="editor-pane">
         <div class="editor-toolbar">
-          <div class="toolbar-left">
-            <span class="project-label" title={projectPath}>
-              {projectPath.split("/").pop() || projectPath}
-            </span>
-            <button
-              class="toolbar-btn"
-              onclick={() => abrirProyecto()}
-              title={t("toolbar.openProjectTitle")}
-            >
-              📂
-            </button>
-            <button
-              class="toolbar-btn"
-              onclick={() => cerrarProyecto()}
-              title={t("toolbar.closeProjectTitle")}
-            >
-              ✕
-            </button>
-            <span class="toolbar-sep">|</span>
-            <button class="toolbar-btn" onclick={crearCapituloNuevo} title={t("toolbar.newChapterTitle")}>
-              {t("toolbar.newChapter")}
-            </button>
-          </div>
-
-          <div class="toolbar-right">
-            {#if activeChapter}
-              <span class="chapter-label">{activeChapter}</span>
-            {/if}
-            <button
-              class="toolbar-btn"
-              onclick={() => { saveStatus = "saving"; save.trigger(); }}
-              title={t("toolbar.saveTitle")}
-            >
-              {t("toolbar.save")}
-            </button>
-            <button
-              class="help-btn"
-              onclick={() => (helpMode = !helpMode)}
-              title={t("toolbar.helpTitle")}
-            >
-              ?
-            </button>
-            <button
-              class="lang-btn"
-              class:active-lang={$lang === "es"}
-              onclick={() => setLang("es")}
-              title="Español"
-            >ES</button>
-            <button
-              class="lang-btn"
-              class:active-lang={$lang === "en"}
-              onclick={() => setLang("en")}
-              title="English"
-            >EN</button>
-            <button
-              class="theme-toggle"
-              onclick={() => (theme = theme === "light" ? "dark" : "light")}
-              title={theme === "light" ? t("toolbar.darkMode") : t("toolbar.lightMode")}
-            >
-              {theme === "light" ? "🌙" : "☀️"}
-            </button>
-            <span
-              class="save-indicator"
-              class:saving={saveStatus === "saving"}
-              class:saved={saveStatus === "saved"}
-              class:unsaved={saveStatus === "unsaved"}
-            >
-              {saveStatus === "saving"
-                ? t("toolbar.saving")
-                : saveStatus === "saved"
-                  ? t("toolbar.saved")
-                  : saveStatus === "unsaved"
-                    ? t("toolbar.unsaved")
-                    : ""}
-            </span>
-          </div>
+          <span class="project-label" title={projectPath}>
+            {projectPath.split("/").pop() || projectPath}
+          </span>
+          <span class="toolbar-spacer"></span>
+          {#if activeChapter}
+            <span class="chapter-label">{activeChapter}</span>
+          {/if}
         </div>
 
         <div class="editor-body">
@@ -2022,12 +2027,11 @@
   .editor-toolbar {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 0.5rem 1rem;
+    padding: 0.4rem 1rem;
     border-bottom: 1px solid #e2e8f0;
     background: #f8fafc;
     flex-shrink: 0;
-    gap: 0.75rem;
+    min-height: 2.25rem;
   }
 
   :global(.dark) .editor-toolbar {
@@ -2035,12 +2039,10 @@
     border-bottom-color: #334155;
   }
 
-  .toolbar-left,
-  .toolbar-right {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
+  .toolbar-spacer {
+    flex: 1;
   }
+
 
   .project-label {
     font-size: 0.8125rem;
@@ -2056,16 +2058,6 @@
     color: #e2e8f0;
   }
 
-  .toolbar-sep {
-    color: #cbd5e1;
-    font-size: 0.75rem;
-    user-select: none;
-  }
-
-  :global(.dark) .toolbar-sep {
-    color: #475569;
-  }
-
   .chapter-label {
     font-size: 0.75rem;
     color: #64748b;
@@ -2077,58 +2069,6 @@
 
   :global(.dark) .chapter-label {
     color: #94a3b8;
-  }
-
-  .toolbar-btn {
-    padding: 0.25rem 0.625rem;
-    border: 1px solid #e2e8f0;
-    border-radius: 0.25rem;
-    background: #ffffff;
-    font-size: 0.75rem;
-    color: #3b82f6;
-    cursor: pointer;
-    transition: background 120ms, border-color 120ms;
-    white-space: nowrap;
-  }
-
-  .toolbar-btn:hover {
-    background: #eff6ff;
-    border-color: #3b82f6;
-  }
-
-  :global(.dark) .toolbar-btn {
-    background: #1e293b;
-    border-color: #334155;
-    color: #60a5fa;
-  }
-  :global(.dark) .toolbar-btn:hover {
-    background: #1e3a5f;
-  }
-
-  /* ── Theme toggle ─────────────────────────────────────────── */
-  .theme-toggle {
-    padding: 0.25rem 0.5rem;
-    border: 1px solid #e2e8f0;
-    border-radius: 0.25rem;
-    background: #ffffff;
-    font-size: 1rem;
-    cursor: pointer;
-    line-height: 1;
-    transition: background 120ms, border-color 120ms;
-  }
-
-  .theme-toggle:hover {
-    background: #f1f5f9;
-    border-color: #cbd5e1;
-  }
-
-  :global(.dark) .theme-toggle {
-    background: #1e293b;
-    border-color: #334155;
-  }
-  :global(.dark) .theme-toggle:hover {
-    background: #334155;
-    border-color: #475569;
   }
 
   /* ── Save indicator ────────────────────────────────────────── */
@@ -2594,89 +2534,6 @@
   @keyframes fadeIn {
     from { opacity: 0; transform: translateX(-4px); }
     to   { opacity: 1; transform: translateX(0); }
-  }
-
-  /* ── Help button ──────────────────────────────────────────── */
-  .help-btn {
-    width: 1.5rem;
-    height: 1.5rem;
-    padding: 0;
-    border: 1px solid #e2e8f0;
-    border-radius: 50%;
-    background: #ffffff;
-    font-size: 0.8125rem;
-    font-weight: 700;
-    color: #64748b;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 120ms, border-color 120ms, color 120ms;
-  }
-
-  .help-btn:hover {
-    background: #f1f5f9;
-    border-color: #94a3b8;
-    color: #1e293b;
-  }
-
-  :global(.dark) .help-btn {
-    background: #1e293b;
-    border-color: #334155;
-    color: #94a3b8;
-  }
-  :global(.dark) .help-btn:hover {
-    background: #334155;
-    border-color: #475569;
-    color: #e2e8f0;
-  }
-
-  /* ── Language switcher buttons ─────────────────────────────── */
-  .lang-btn {
-    min-width: 1.75rem;
-    height: 1.5rem;
-    padding: 0 0.3rem;
-    border: 1px solid transparent;
-    border-radius: 0.25rem;
-    background: transparent;
-    font-size: 0.6875rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 120ms, border-color 120ms;
-    opacity: 0.6;
-    color: #64748b;
-  }
-
-  .lang-btn:hover {
-    background: #f1f5f9;
-    border-color: #e2e8f0;
-    opacity: 1;
-  }
-
-  .lang-btn.active-lang {
-    opacity: 1;
-    border-color: #3b82f6;
-    background: #eff6ff;
-    color: #1e40af;
-  }
-
-  :global(.dark) .lang-btn {
-    color: #94a3b8;
-  }
-
-  :global(.dark) .lang-btn:hover {
-    background: #334155;
-    border-color: #475569;
-  }
-
-  :global(.dark) .lang-btn.active-lang {
-    border-color: #60a5fa;
-    background: #1e3a5f;
-    color: #93c5fd;
   }
 
   /* ── Help overlay ─────────────────────────────────────────── */
@@ -3271,5 +3128,101 @@
     color: #cbd5e1;
     background: #1e293b;
     border-color: #334155;
+  }
+
+  /* ── Sidebar footer (utility buttons + git, collapsible) ────── */
+  .sidebar-footer {
+    border-top: 1px solid #e2e8f0;
+    background: #f8fafc;
+    flex-shrink: 0;
+  }
+
+  :global(.dark) .sidebar-footer {
+    border-top-color: #334155;
+    background: #0f172a;
+  }
+
+  .footer-toggle {
+    width: 100%;
+    padding: 0.15rem 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 0.6rem;
+    color: #94a3b8;
+    transition: color 120ms;
+  }
+
+  .footer-toggle:hover {
+    color: #64748b;
+  }
+
+  :global(.dark) .footer-toggle:hover {
+    color: #cbd5e1;
+  }
+
+  .footer-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex-wrap: wrap;
+    padding: 0.3rem 0.5rem 0.45rem;
+  }
+
+  .footer-btn {
+    padding: 0.2rem 0.4rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.25rem;
+    background: transparent;
+    font-size: 0.7rem;
+    color: #64748b;
+    cursor: pointer;
+    transition: background 120ms, color 120ms;
+    line-height: 1;
+  }
+
+  .footer-btn:hover {
+    background: #e2e8f0;
+    color: #1e293b;
+  }
+
+  :global(.dark) .footer-btn {
+    border-color: #334155;
+    color: #94a3b8;
+  }
+
+  :global(.dark) .footer-btn:hover {
+    background: #334155;
+    color: #e2e8f0;
+  }
+
+  .footer-lang {
+    font-weight: 700;
+    font-size: 0.6rem;
+    letter-spacing: 0.05em;
+    min-width: 1.5rem;
+    text-align: center;
+  }
+
+  .footer-lang.active {
+    border-color: #3b82f6;
+    background: #eff6ff;
+    color: #1e40af;
+  }
+
+  :global(.dark) .footer-lang.active {
+    border-color: #60a5fa;
+    background: #1e3a5f;
+    color: #93c5fd;
+  }
+
+  .footer-sep {
+    width: 1px;
+    height: 1rem;
+    background: #e2e8f0;
+  }
+
+  :global(.dark) .footer-sep {
+    background: #334155;
   }
 </style>

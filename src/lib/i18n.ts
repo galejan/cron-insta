@@ -58,6 +58,8 @@ const translations: Record<Lang, Record<string, string>> = {
     "toolbar.unsaved": "Sin guardar",
     "toolbar.openProjectTitle": "Abrir otro proyecto (Ctrl+O)",
     "toolbar.closeProjectTitle": "Cerrar proyecto",
+    "toolbar.collapseFooter": "Colapsar panel de herramientas",
+    "toolbar.expandFooter": "Expandir panel de herramientas",
 
     // ── Git status ──────────────────────────────────────────
     "git.active": "Versionado activo",
@@ -262,6 +264,8 @@ const translations: Record<Lang, Record<string, string>> = {
     "toolbar.unsaved": "Unsaved",
     "toolbar.openProjectTitle": "Open another project (Ctrl+O)",
     "toolbar.closeProjectTitle": "Close project",
+    "toolbar.collapseFooter": "Collapse tools panel",
+    "toolbar.expandFooter": "Expand tools panel",
 
     // ── Git status ──────────────────────────────────────────
     "git.active": "Versioning active",
