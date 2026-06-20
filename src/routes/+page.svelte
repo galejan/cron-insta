@@ -404,6 +404,11 @@
 
   /** Open an existing project by loading its metadata.json. */
   async function abrirProyecto(): Promise<void> {
+    // Close current project first if one is open
+    if (projectPath) {
+      await cerrarProyecto();
+    }
+
     const docsDir = await documentDir();
     const selected = await open({
       directory: true,
@@ -440,6 +445,39 @@
       console.error("[cronista] Failed to open project:", e);
       alert(t("dialog.openProjectError") + `\n\n${e}`);
     }
+  }
+
+  /** Close the current project and return to the setup screen. */
+  async function cerrarProyecto(): Promise<void> {
+    if (!projectPath) return;
+
+    // Save current chapter before closing
+    if (activeChapter && editorContent) {
+      try {
+        await guardarCapitulo(projectPath, activeChapter, editorContent);
+      } catch { /* silent */ }
+    }
+
+    // Tell Rust to stop tracking this project
+    setActiveProject(null);
+
+    // Clear all frontend state
+    projectPath = "";
+    chapters = [];
+    activeChapter = "";
+    editorContent = "";
+    saveStatus = "";
+    personajes = [];
+    personajeExpandido = null;
+    personajeEditando = null;
+    notas = [];
+    activeNote = "";
+    timeline = [];
+    timelineVisible = false;
+    gitEnabled = false;
+
+    // Keep last project for auto-reopen on next launch
+    // (deliberately NOT removing from localStorage)
   }
 
   // ── Characters CRUD ─────────────────────────────────────────
@@ -836,16 +874,13 @@
       return;
     }
 
-    // Ctrl+Shift+N — new project (force re-setup)
+    // Ctrl+Shift+N — new project (close current, then new)
     if (e.ctrlKey && e.shiftKey && e.key === "N") {
       e.preventDefault();
-      projectPath = "";
-      setActiveProject(null);
-      chapters = [];
-      activeChapter = "";
-      editorContent = "";
-      localStorage.removeItem("cronista-last-project");
-      crearCapituloNuevo();
+      cerrarProyecto().then(() => {
+        localStorage.removeItem("cronista-last-project");
+        crearCapituloNuevo();
+      });
       return;
     }
 
@@ -1273,6 +1308,21 @@
             <span class="project-label" title={projectPath}>
               {projectPath.split("/").pop() || projectPath}
             </span>
+            <button
+              class="toolbar-btn"
+              onclick={() => abrirProyecto()}
+              title={t("toolbar.openProjectTitle")}
+            >
+              📂
+            </button>
+            <button
+              class="toolbar-btn"
+              onclick={() => cerrarProyecto()}
+              title={t("toolbar.closeProjectTitle")}
+            >
+              ✕
+            </button>
+            <span class="toolbar-sep">|</span>
             <button class="toolbar-btn" onclick={crearCapituloNuevo} title={t("toolbar.newChapterTitle")}>
               {t("toolbar.newChapter")}
             </button>
@@ -1690,6 +1740,16 @@
 
   :global(.dark) .project-label {
     color: #e2e8f0;
+  }
+
+  .toolbar-sep {
+    color: #cbd5e1;
+    font-size: 0.75rem;
+    user-select: none;
+  }
+
+  :global(.dark) .toolbar-sep {
+    color: #475569;
   }
 
   .chapter-label {

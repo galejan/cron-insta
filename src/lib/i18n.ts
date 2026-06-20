@@ -56,6 +56,8 @@ const translations: Record<Lang, Record<string, string>> = {
     "toolbar.saving": "Guardando…",
     "toolbar.saved": "Guardado",
     "toolbar.unsaved": "Sin guardar",
+    "toolbar.openProjectTitle": "Abrir otro proyecto (Ctrl+O)",
+    "toolbar.closeProjectTitle": "Cerrar proyecto",
 
     // ── Sidebar tabs ───────────────────────────────────────
     "tabs.chapters": "Capítulos",
@@ -212,6 +214,8 @@ const translations: Record<Lang, Record<string, string>> = {
     "toolbar.saving": "Saving…",
     "toolbar.saved": "Saved",
     "toolbar.unsaved": "Unsaved",
+    "toolbar.openProjectTitle": "Open another project (Ctrl+O)",
+    "toolbar.closeProjectTitle": "Close project",
 
     // ── Sidebar tabs ───────────────────────────────────────
     "tabs.chapters": "Chapters",
