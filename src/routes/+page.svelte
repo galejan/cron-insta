@@ -895,17 +895,20 @@
 
   // ── Keyboard shortcuts ──────────────────────────────────────
   function handleKeydown(e: KeyboardEvent) {
-    // Ctrl+B — toggle sidebar collapse
-    if (e.ctrlKey && !e.shiftKey && e.key === "b") {
+    // Ctrl+Shift+Left — collapse sidebar
+    if (e.ctrlKey && e.shiftKey && e.key === "ArrowLeft") {
       e.preventDefault();
-      if (sidebarCollapsed) {
-        sidebarPct = sidebarSaved;
-        sidebarCollapsed = false;
-      } else {
-        sidebarSaved = sidebarPct;
-        sidebarPct = 0;
-        sidebarCollapsed = true;
-      }
+      sidebarSaved = sidebarPct;
+      sidebarPct = 0;
+      sidebarCollapsed = true;
+      return;
+    }
+
+    // Ctrl+Shift+Right — restore sidebar
+    if (e.ctrlKey && e.shiftKey && e.key === "ArrowRight") {
+      e.preventDefault();
+      sidebarCollapsed = false;
+      sidebarPct = sidebarSaved || 40;
       return;
     }
 
@@ -974,6 +977,13 @@
     if (e.key === "F1") {
       e.preventDefault();
       helpMode = !helpMode;
+      return;
+    }
+
+    // Ctrl+P — toggle footer panel
+    if (e.ctrlKey && !e.shiftKey && e.key === "p") {
+      e.preventDefault();
+      footerExpanded = !footerExpanded;
       return;
     }
 
@@ -1548,8 +1558,10 @@
         <h3>{t("help.shortcutsTitle")}</h3>
         <table class="help-shortcuts">
           <tbody>
-          <tr><td><kbd>Ctrl+B</kbd></td><td>{t("help.shortcuts.toggleSidebar")}</td></tr>
+          <tr><td><kbd>Ctrl+Shift+←</kbd></td><td>{t("help.shortcuts.toggleSidebar")}</td></tr>
+          <tr><td><kbd>Ctrl+Shift+→</kbd></td><td>{t("help.shortcuts.restoreSidebar")}</td></tr>
           <tr><td><kbd>Ctrl+←</kbd> / <kbd>Ctrl+→</kbd></td><td>{t("help.shortcuts.resizeSidebar")}</td></tr>
+          <tr><td><kbd>Ctrl+P</kbd></td><td>{t("help.shortcuts.toggleFooter")}</td></tr>
           <tr><td><kbd>Ctrl+S</kbd></td><td>{t("help.shortcuts.saveNow")}</td></tr>
           <tr><td><kbd>Ctrl+N</kbd></td><td>{t("help.shortcuts.newChapter")}</td></tr>
           <tr><td><kbd>Ctrl+O</kbd></td><td>{t("help.shortcuts.openProject")}</td></tr>

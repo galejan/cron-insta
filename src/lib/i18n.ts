@@ -189,9 +189,11 @@ const translations: Record<Lang, Record<string, string>> = {
     "help.timelineDesc":
       "Línea temporal al final del panel lateral. Añadí eventos con fecha, descripción y vinculalos a personajes y capítulos.",
     "help.shortcutsTitle": "⌨️ Atajos de teclado",
-    "help.shortcuts.toggleSidebar": "Colapsar / restaurar panel lateral",
+    "help.shortcuts.toggleSidebar": "Colapsar panel lateral",
+    "help.shortcuts.restoreSidebar": "Restaurar panel lateral",
     "help.shortcuts.resizeSidebar":
       "Reducir / ampliar panel lateral (5 % por paso)",
+    "help.shortcuts.toggleFooter": "Mostrar / ocultar panel de herramientas",
     "help.shortcuts.saveNow": "Guardar ahora",
     "help.shortcuts.newChapter": "Nuevo capítulo",
     "help.shortcuts.openProject": "Abrir otro proyecto (cierra el actual)",
@@ -398,8 +400,10 @@ const translations: Record<Lang, Record<string, string>> = {
     "help.timelineDesc":
       "Timeline at the bottom of the sidebar. Add events with date, description, and link them to characters and chapters.",
     "help.shortcutsTitle": "⌨️ Keyboard Shortcuts",
-    "help.shortcuts.toggleSidebar": "Toggle sidebar collapse",
+    "help.shortcuts.toggleSidebar": "Collapse sidebar",
+    "help.shortcuts.restoreSidebar": "Restore sidebar",
     "help.shortcuts.resizeSidebar": "Shrink / grow sidebar (5% per step)",
+    "help.shortcuts.toggleFooter": "Show / hide tools panel",
     "help.shortcuts.saveNow": "Save now",
     "help.shortcuts.newChapter": "New chapter",
     "help.shortcuts.openProject": "Open another project (closes current)",
