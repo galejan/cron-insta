@@ -74,7 +74,7 @@ cronista/
 | Editor | [TipTap v3](https://tiptap.dev) (ProseMirror) |
 | Estilos | Tailwind CSS v4 (PostCSS) |
 | Lenguajes | Rust, TypeScript |
-| i18n | Sistema propio con Svelte writable stores (ES/EN) |
+| i18n | Sistema propio con Svelte 5 `$state` runes (ES/EN) |
 
 ---
 
@@ -82,14 +82,17 @@ cronista/
 
 | Atajo | Acción |
 |-------|--------|
-| <kbd>Ctrl</kbd> + <kbd>B</kbd> | Colapsar / restaurar panel lateral |
-| <kbd>Ctrl</kbd> + <kbd>←</kbd> | Reducir panel lateral (5 %) |
-| <kbd>Ctrl</kbd> + <kbd>→</kbd> | Ampliar panel lateral (5 %) |
+| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>←</kbd> | Colapsar panel lateral |
+| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>→</kbd> | Restaurar panel lateral |
+| <kbd>Ctrl</kbd> + <kbd>←</kbd> / <kbd>→</kbd> | Reducir / ampliar panel lateral (5 %) |
+| <kbd>Ctrl</kbd> + <kbd>P</kbd> | Mostrar / ocultar panel de herramientas |
 | <kbd>Ctrl</kbd> + <kbd>S</kbd> | Guardar ahora |
 | <kbd>Ctrl</kbd> + <kbd>N</kbd> | Nuevo capítulo |
 | <kbd>Ctrl</kbd> + <kbd>O</kbd> | Abrir otro proyecto (cierra el actual) |
 | <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>N</kbd> | Nuevo proyecto (cierra el actual) |
-| <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd> | Aplicar Título 1 / 2 / 3 al párrafo actual |
+| <kbd>Ctrl</kbd> + <kbd>↑</kbd> / <kbd>↓</kbd> | Subir / bajar nivel de título (H1 ↔ H2 ↔ normal) |
+| <kbd>Ctrl</kbd> + <kbd>D</kbd> | Insertar guion de diálogo (—) |
+| <kbd>Ctrl</kbd> + <kbd>=</kbd> / <kbd>-</kbd> | Aumentar / reducir tamaño de letra |
 | <kbd>F11</kbd> | Pantalla completa |
 | <kbd>F1</kbd> o <kbd>?</kbd> | Mostrar / ocultar panel de ayuda |
 
