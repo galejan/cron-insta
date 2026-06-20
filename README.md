@@ -13,8 +13,56 @@
 | **Local-First** | Todo en tu disco. `.md` para el texto, `.json` para índices y metadatos. |
 | **Git invisible** | Cada cierre de la aplicación crea un checkpoint automático. Historial completo sin intervención manual. |
 | **TipTap como motor** | Editor WYSIWYG con títulos semánticos (H1, H2). Limpio, sin distracciones de formato. |
-| **Exportación integrada** | Exportá el proyecto completo en `.zip` o compartí solo los capítulos en un único `.md`. |
-| **Accesibilidad** | Zoom de interfaz con `Ctrl+=` / `Ctrl+-`. Tres niveles para adaptarse a cada vista. |
+| **Exportación integrada** | Permite exportar el proyecto completo en `.zip` o compartir solo los capítulos en un único `.md`. |
+| **Accesibilidad** | Zoom de interfaz con `Ctrl++` / `Ctrl+-`. Tres niveles para adaptarse a cada vista. |
+
+---
+
+## Control de versiones con Git
+
+Cronista integra Git de forma transparente para proteger el trabajo. **No es obligatorio**, pero sí muy recomendable.
+
+### ¿Qué hace?
+
+Cada vez que se cierra la aplicación, se crea un checkpoint automático: un commit de Git que registra el estado completo del proyecto en ese momento, incluyendo el recuento de palabras.
+
+Los checkpoints son acumulativos: con el tiempo construyen un historial completo de la novela sin intervención manual.
+
+> **Nota:** El guardado automático (cada 20 segundos) y el guardado manual (`Ctrl+S`) escriben los cambios en el disco. Los checkpoints de Git solo se generan al cerrar la aplicación, como copia de seguridad del trabajo de la sesión.
+
+### ¿Qué pasa si no se tiene Git instalado?
+
+La aplicación funciona sin Git. Lo único que se pierde es el historial de versiones. Al crear un proyecto, Cronista avisa si no encuentra Git y permite continuar sin él. También se puede instalar Git más adelante y el historial comenzará desde ese momento.
+
+### Instalación de Git
+
+| Plataforma | Comando |
+|------------|---------|
+| Linux (Debian/Ubuntu) | `sudo apt install git` |
+| Linux (Arch) | `sudo pacman -S git` |
+| macOS | Ya viene incluido, o `brew install git` |
+| Windows | [git-scm.com](https://git-scm.com) |
+
+### Consultar el historial
+
+Dentro de la aplicación, el indicador `→` en el panel inferior abre una ventana con las últimas sesiones: fecha, recuento de palabras, archivos modificados y el hash del commit.
+
+---
+
+## Exportación y uso compartido
+
+Cronista ofrece dos formatos de exportación, accesibles desde los botones de la barra inferior.
+
+| Botón | Formato | Contenido |
+|-------|---------|-----------|
+| 🗜️ **Exportar** | `.zip` | Proyecto completo: capítulos, personajes, notas, configuración e historial de Git. Ideal para copias de seguridad o para trasladar el proyecto a otro equipo. |
+| 📄 **Compartir** | `.md` | Todos los capítulos concatenados en un solo archivo, en orden. Útil para enviar el texto a un lector beta o a un editor. |
+
+Los archivos se guardan dentro de la carpeta `exportaciones/` del proyecto, con la fecha en el nombre (ej. `Mi Novela_2026-06-20.zip`).
+
+### Detalles del formato `.md`
+
+El archivo generado incluye los capítulos en orden, separados por el título de cada uno. El contenido mantiene el formato enriquecido (HTML) tal como se ve en el editor, lo que permite abrirlo en un navegador o conservar los estilos al importarlo en otras herramientas.
 
 ---
 
@@ -67,6 +115,24 @@ cronista/
 └── static/               # Iconos y assets
 ```
 
+### Estructura de un proyecto de escritura
+
+Cada proyecto creado con Cronista es una carpeta en el disco con esta organización:
+
+```
+Mi Novela/
+├── capitulos/            # Archivos .md (HTML enriquecido de TipTap)
+│   ├── metadata.json     # Índice y orden de capítulos
+│   ├── Capítulo 1.md
+│   └── Capítulo 2.md
+├── personajes/           # Fichas de personaje en .json
+├── notas/                # Notas de investigación en .json
+├── timeline.json         # Eventos de la línea de tiempo
+├── .config/              # Configuración del proyecto (fuente, idioma)
+├── .git/                 # Repositorio Git (si está instalado)
+└── exportaciones/        # Archivos generados por Exportar y Compartir
+```
+
 ### Stack técnico
 
 | Capa | Tecnología |
@@ -94,7 +160,7 @@ cronista/
 | <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>N</kbd> | Nuevo proyecto (cierra el actual) |
 | <kbd>Ctrl</kbd> + <kbd>↑</kbd> / <kbd>↓</kbd> | Subir / bajar nivel de título |
 | <kbd>Ctrl</kbd> + <kbd>D</kbd> | Insertar guion de diálogo (`—`) |
-| <kbd>Ctrl</kbd> + <kbd>=</kbd> / <kbd>-</kbd> | Aumentar / reducir tamaño de letra |
+| <kbd>Ctrl</kbd> + <kbd>+</kbd> / <kbd>-</kbd> | Aumentar / reducir tamaño de letra |
 | <kbd>F11</kbd> | Pantalla completa |
 | <kbd>F1</kbd> o <kbd>?</kbd> | Mostrar / ocultar panel de ayuda |
 
