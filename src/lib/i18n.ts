@@ -99,6 +99,19 @@ const translations: Record<Lang, Record<string, string>> = {
     "git.sessionsClose": "Cerrar",
     "git.sessionsEmpty": "No hay sesiones guardadas todavía.",
 
+    // ── Export ──────────────────────────────────────────────
+    "export.export": "Exportar",
+    "export.title": "Exportar proyecto",
+    "export.desc":
+      "Elegí el formato de exportación. Los archivos se guardan en la carpeta exportaciones/ dentro del proyecto.",
+    "export.zipTitle": "Proyecto completo (.zip)",
+    "export.zipHint": "Incluye capítulos, personajes, notas, timeline y Git. Ideal para backup.",
+    "export.mdTitle": "Solo capítulos (.md)",
+    "export.mdHint": "Concatena todos los capítulos en un solo archivo Markdown. Ideal para compartir.",
+    "export.zipSuccess": "Proyecto exportado correctamente:",
+    "export.mdSuccess": "Capítulos exportados correctamente:",
+    "export.error": "Error al exportar:",
+
     // ── Sidebar tabs ───────────────────────────────────────
     "tabs.chapters": "Capítulos",
     "tabs.characters": "Personajes",
@@ -312,6 +325,19 @@ const translations: Record<Lang, Record<string, string>> = {
       "Each entry is an automatic save point created when closing the app. For detailed diffs, use a Git client like <a href='https://www.sourcetreeapp.com/'>Sourcetree</a> or <a href='https://desktop.github.com/'>GitHub Desktop</a>.",
     "git.sessionsClose": "Close",
     "git.sessionsEmpty": "No saved sessions yet.",
+
+    // ── Export ──────────────────────────────────────────────
+    "export.export": "Export",
+    "export.title": "Export project",
+    "export.desc":
+      "Choose export format. Files are saved in the exportaciones/ folder inside the project.",
+    "export.zipTitle": "Full project (.zip)",
+    "export.zipHint": "Includes chapters, characters, notes, timeline, and Git. Ideal for backup.",
+    "export.mdTitle": "Chapters only (.md)",
+    "export.mdHint": "Concatenates all chapters into a single Markdown file. Ideal for sharing.",
+    "export.zipSuccess": "Project exported successfully:",
+    "export.mdSuccess": "Chapters exported successfully:",
+    "export.error": "Error exporting:",
 
     // ── Sidebar tabs ───────────────────────────────────────
     "tabs.chapters": "Chapters",

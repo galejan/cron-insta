@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::process::Command;
 use std::sync::Mutex;
+use std::io::Write;
 use tauri::Manager;
 
 // ---------------------------------------------------------------------------
@@ -1451,6 +1452,131 @@ fn do_checkpoint(project_path: &str) -> Result<String, String> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Export — zip + single .md
+// ---------------------------------------------------------------------------
+
+/// Export the entire project as a .zip file.
+///
+/// Creates `exportaciones/` inside the project, then compresses all files
+/// (including .git) into `{project_name}_{YYYY-MM-DD}.zip`.
+#[tauri::command]
+fn exportar_proyecto_zip(proyecto_path: String) -> Result<String, String> {
+    use zip::write::FileOptions;
+
+    let base = Path::new(&proyecto_path);
+    let export_dir = base.join("exportaciones");
+    std::fs::create_dir_all(&export_dir)
+        .map_err(|e| format!("No se pudo crear exportaciones/: {}", e))?;
+
+    let metadata = read_metadata(base)?;
+    let project_name = metadata.project_name.replace(' ', "_");
+    let date = Local::now().format("%Y-%m-%d");
+    let zip_name = format!("{}_{}.zip", project_name, date);
+    let zip_path = export_dir.join(&zip_name);
+
+    let file = std::fs::File::create(&zip_path)
+        .map_err(|e| format!("Error al crear zip: {}", e))?;
+    let mut zip_writer = zip::ZipWriter::new(file);
+    let options = FileOptions::<()>::default()
+        .compression_method(zip::CompressionMethod::Deflated);
+
+    // Walk the project directory and add all files
+    add_dir_to_zip(base, base, &mut zip_writer, &options)
+        .map_err(|e| format!("Error al comprimir: {}", e))?;
+
+    zip_writer.finish()
+        .map_err(|e| format!("Error al finalizar zip: {}", e))?;
+
+    Ok(zip_path.display().to_string())
+}
+
+/// Recursively add directory contents to a zip writer.
+fn add_dir_to_zip(
+    base: &Path,
+    dir: &Path,
+    zip: &mut zip::ZipWriter<std::fs::File>,
+    options: &zip::write::FileOptions<()>,
+) -> Result<(), String> {
+    for entry in std::fs::read_dir(dir)
+        .map_err(|e| format!("Error al leer directorio: {}", e))?
+    {
+        let entry = entry.map_err(|e| format!("Error: {}", e))?;
+        let path = entry.path();
+
+        // Skip the exportaciones directory itself
+        if path.file_name().map(|n| n == "exportaciones").unwrap_or(false) {
+            continue;
+        }
+
+        let relative = path.strip_prefix(base)
+            .map_err(|e| format!("Error: {}", e))?;
+        let name = relative.to_string_lossy();
+
+        if path.is_dir() {
+            zip.add_directory(name, *options)
+                .map_err(|e| format!("Error al añadir directorio: {}", e))?;
+            add_dir_to_zip(base, &path, zip, options)?;
+        } else {
+            zip.start_file(name, *options)
+                .map_err(|e| format!("Error al iniciar archivo: {}", e))?;
+            let contents = std::fs::read(&path)
+                .map_err(|e| format!("Error al leer {}: {}", path.display(), e))?;
+            zip.write(&contents)
+                .map_err(|e| format!("Error al escribir en zip: {}", e))?;
+        }
+    }
+    Ok(())
+}
+
+/// Export all chapters as a single .md file.
+///
+/// Concatenates every chapter in the order stored in metadata,
+/// separated by a divider. Writes to `exportaciones/{project}_{date}.md`.
+#[tauri::command]
+fn exportar_proyecto_md(proyecto_path: String) -> Result<String, String> {
+    let base = Path::new(&proyecto_path);
+    let export_dir = base.join("exportaciones");
+    std::fs::create_dir_all(&export_dir)
+        .map_err(|e| format!("No se pudo crear exportaciones/: {}", e))?;
+
+    let metadata = read_metadata(base)?;
+    let project_name = metadata.project_name.replace(' ', "_");
+    let date = Local::now().format("%Y-%m-%d");
+    let md_name = format!("{}_{}.md", project_name, date);
+    let md_path = export_dir.join(&md_name);
+
+    let cap_dir = base.join("capitulos");
+    let mut output = String::new();
+
+    output.push_str(&format!("# {}\n\n", metadata.project_name));
+    output.push_str(&format!("*Exportado el {}*\n\n---\n\n", Local::now().format("%d/%m/%Y")));
+
+    for filename in &metadata.chapters_order {
+        let file_path = cap_dir.join(filename);
+        if let Ok(content) = std::fs::read_to_string(&file_path) {
+            let title = filename.trim_end_matches(".md").to_string();
+            output.push_str(&format!("## {}\n\n", title));
+            output.push_str(&content.trim());
+            output.push_str("\n\n---\n\n");
+        }
+    }
+
+    std::fs::write(&md_path, output)
+        .map_err(|e| format!("Error al escribir .md: {}", e))?;
+
+    Ok(md_path.display().to_string())
+}
+
+/// Helper: read project metadata.
+fn read_metadata(base: &Path) -> Result<Metadata, String> {
+    let meta_path = base.join(".config").join("metadata.json");
+    let raw = std::fs::read_to_string(&meta_path)
+        .map_err(|e| format!("Error al leer metadata: {}", e))?;
+    serde_json::from_str(&raw)
+        .map_err(|e| format!("Error al parsear metadata: {}", e))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -1489,6 +1615,8 @@ pub fn run() {
             agregar_evento_timeline,
             reordenar_timeline,
             eliminar_evento_timeline,
+            exportar_proyecto_zip,
+            exportar_proyecto_md,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {

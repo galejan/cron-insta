@@ -15,6 +15,18 @@ export async function marcarProyectoCronista(
   return invoke("marcar_proyecto_cronista", { path });
 }
 
+export async function exportarProyectoZip(
+  proyectoPath: string,
+): Promise<string> {
+  return invoke("exportar_proyecto_zip", { proyectoPath });
+}
+
+export async function exportarProyectoMd(
+  proyectoPath: string,
+): Promise<string> {
+  return invoke("exportar_proyecto_md", { proyectoPath });
+}
+
 export async function inicializarGit(path: string): Promise<string> {
   return invoke("inicializar_git", { path });
 }

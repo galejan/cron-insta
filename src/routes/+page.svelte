@@ -19,6 +19,8 @@
     detectarGit,
     eliminarCapitulo,
     eliminarEventoTimeline,
+    exportarProyectoMd,
+    exportarProyectoZip,
     eliminarNota,
     eliminarPersonaje,
     guardarCapitulo,
@@ -180,6 +182,7 @@
   let gitLogEntries = $state<GitLogEntry[]>([]);
   let footerExpanded = $state(true);
   let zoomLevel = $state(0); // 0=normal, 1=medium, 2=large
+  let exportModal = $state(false);
   let chapters = $state<string[]>([]);
   let pendingDelete = $state<string | null>(null);
   let activeChapter = $state("");
@@ -1227,7 +1230,57 @@
                             >×</button>
                           </div>
                         {/each}
-                      {/if}
+{/if}
+
+{#if exportModal}
+  <!-- Export modal -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="modal-overlay" role="dialog" tabindex="-1"
+    aria-label={t("export.title")}
+    onclick={() => (exportModal = false)}
+    onkeydown={(e) => e.key === "Escape" && (exportModal = false)}>
+    <div class="modal-panel" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
+      <h2>📦 {t("export.title")}</h2>
+      <p class="modal-desc">{t("export.desc")}</p>
+
+      <div class="export-options">
+        <button class="export-option" onclick={async () => {
+          try {
+            const result = await exportarProyectoZip(projectPath);
+            exportModal = false;
+            alert(t("export.zipSuccess") + "\n" + result);
+          } catch (e) {
+            alert(t("export.error") + " " + e);
+          }
+        }}>
+          <span class="export-option-icon">🗜️</span>
+          <span class="export-option-title">{t("export.zipTitle")}</span>
+          <span class="export-option-hint">{t("export.zipHint")}</span>
+        </button>
+
+        <button class="export-option" onclick={async () => {
+          try {
+            const result = await exportarProyectoMd(projectPath);
+            exportModal = false;
+            alert(t("export.mdSuccess") + "\n" + result);
+          } catch (e) {
+            alert(t("export.error") + " " + e);
+          }
+        }}>
+          <span class="export-option-icon">📄</span>
+          <span class="export-option-title">{t("export.mdTitle")}</span>
+          <span class="export-option-hint">{t("export.mdHint")}</span>
+        </button>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick={() => (exportModal = false)}>
+          {t("common.cancel")}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
                       <button class="btn-sm" onclick={agregarRelacionPersonaje}>
                         {t("characters.addRelationship")}
                       </button>
@@ -1475,6 +1528,10 @@
             </button>
             <button class="footer-btn" onclick={() => cerrarProyecto()} title={t("toolbar.closeProjectTitle")}>
               ✕ {t("toolbar.closeProject")}
+            </button>
+            <span class="footer-sep"></span>
+            <button class="footer-btn" onclick={() => (exportModal = true)} title={t("export.title")}>
+              📦 {t("export.export")}
             </button>
           </div>
 
@@ -3064,8 +3121,61 @@
     margin: 0;
   }
 
-  :global(.dark) .font-preview-text {
+  :global(.dark)   .font-preview-text {
     color: #94a3b8;
+  }
+
+  /* ── Export options ──────────────────────────────────────────── */
+  .export-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 0.5rem 0;
+  }
+
+  .export-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 0.75rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 120ms, background 120ms;
+  }
+
+  .export-option:hover {
+    border-color: #3b82f6;
+    background: #eff6ff;
+  }
+
+  :global(.dark) .export-option:hover {
+    border-color: #60a5fa;
+    background: #1e3a5f;
+  }
+
+  .export-option-icon {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+  }
+
+  .export-option-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #1e293b;
+  }
+
+  :global(.dark) .export-option-title {
+    color: #f1f5f9;
+  }
+
+  .export-option-hint {
+    font-size: 0.7rem;
+    color: #94a3b8;
+    margin-top: 0.15rem;
   }
 
   /* ── Git log sessions panel ──────────────────────────────────── */
