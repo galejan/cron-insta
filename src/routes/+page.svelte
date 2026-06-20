@@ -25,10 +25,12 @@
     inicializarGitConAutor,
     listarNotas,
     listarPersonajes,
+    obtenerGitLog,
     reordenarTimeline,
     setActiveProject,
     verificarGitInicializado,
   } from "$lib/tauri";
+  import type { GitLogEntry } from "$lib/tauri";
   import { documentDir } from "@tauri-apps/api/path";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { PhysicalSize, PhysicalPosition } from "@tauri-apps/api/dpi";
@@ -153,6 +155,8 @@
   let gitInitNombre = $state("");
   let gitInitEmail = $state("");
   let gitHelpModal = $state(false);
+  let gitLogVisible = $state(false);
+  let gitLogEntries = $state<GitLogEntry[]>([]);
   let chapters = $state<string[]>([]);
   let pendingDelete = $state<string | null>(null);
   let activeChapter = $state("");
@@ -506,6 +510,17 @@
       }
     } catch {
       gitStatus = "unknown";
+    }
+  }
+
+  /** Load git log for the sessions panel. */
+  async function cargarGitLog(): Promise<void> {
+    if (!projectPath || gitStatus !== "active") return;
+    try {
+      gitLogEntries = await obtenerGitLog(projectPath, 5);
+      gitLogVisible = true;
+    } catch (e) {
+      console.error("[cronista] Failed to load git log:", e);
     }
   }
 
@@ -1357,6 +1372,9 @@
               <span class="git-indicator git-active" title={t("git.activeTitle")}>
                 🟢 {t("git.active")}
               </span>
+              <button class="git-log-link" onclick={cargarGitLog}>
+                {t("git.viewSessions")} →
+              </button>
             {:else if gitStatus === "not-initialized"}
               <button
                 class="git-indicator git-warn"
@@ -1594,6 +1612,47 @@
       <div class="modal-actions">
         <button class="btn-primary" onclick={() => (gitHelpModal = false)}>
           {t("git.helpClose")}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+{#if gitLogVisible}
+  <!-- Git log sessions panel -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="modal-overlay"
+    role="dialog"
+    tabindex="-1"
+    aria-label={t("git.sessionsTitle")}
+    onclick={() => (gitLogVisible = false)}
+    onkeydown={(e) => e.key === "Escape" && (gitLogVisible = false)}
+  >
+    <div class="modal-panel git-log-panel" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
+      <h2>📜 {t("git.sessionsTitle")}</h2>
+      <p class="modal-desc">{@html t("git.sessionsDesc")}</p>
+
+      {#if gitLogEntries.length === 0}
+        <p class="git-log-empty">{t("git.sessionsEmpty")}</p>
+      {:else}
+        <div class="git-log-list">
+          {#each gitLogEntries as entry}
+            <div class="git-log-entry">
+              <div class="git-log-header">
+                <code class="git-log-hash">{entry.hash}</code>
+                <span class="git-log-words">{entry.words}</span>
+              </div>
+              <p class="git-log-message">{entry.message}</p>
+              <time class="git-log-date">{entry.date}</time>
+            </div>
+          {/each}
+        </div>
+      {/if}
+
+      <div class="modal-actions">
+        <button class="btn-primary" onclick={() => (gitLogVisible = false)}>
+          {t("git.sessionsClose")}
         </button>
       </div>
     </div>
@@ -2845,5 +2904,117 @@
     justify-content: flex-end;
     gap: 0.5rem;
     margin-top: 1.25rem;
+  }
+
+  /* ── Git log sessions panel ──────────────────────────────────── */
+  .git-log-link {
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: #3b82f6;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .git-log-link:hover {
+    color: #2563eb;
+  }
+
+  :global(.dark) .git-log-link {
+    color: #60a5fa;
+  }
+
+  :global(.dark) .git-log-link:hover {
+    color: #93bbfd;
+  }
+
+  .git-log-panel {
+    max-width: 480px;
+  }
+
+  .git-log-empty {
+    text-align: center;
+    color: #94a3b8;
+    font-size: 0.875rem;
+    padding: 1.5rem 0;
+  }
+
+  .git-log-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    max-height: 50vh;
+    overflow-y: auto;
+    margin-bottom: 0.5rem;
+  }
+
+  .git-log-entry {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+  }
+
+  :global(.dark) .git-log-entry {
+    background: #0f172a;
+    border-color: #334155;
+  }
+
+  .git-log-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.25rem;
+  }
+
+  .git-log-hash {
+    font-size: 0.6875rem;
+    font-family: "SF Mono", "Fira Code", monospace;
+    color: #64748b;
+    background: #e2e8f0;
+    padding: 0.1rem 0.35rem;
+    border-radius: 0.25rem;
+  }
+
+  :global(.dark) .git-log-hash {
+    color: #94a3b8;
+    background: #1e293b;
+  }
+
+  .git-log-words {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: #16a34a;
+    background: #dcfce7;
+    padding: 0.1rem 0.4rem;
+    border-radius: 0.25rem;
+  }
+
+  :global(.dark) .git-log-words {
+    color: #86efac;
+    background: #052e16;
+  }
+
+  .git-log-message {
+    margin: 0.25rem 0;
+    font-size: 0.8125rem;
+    color: #334155;
+    line-height: 1.4;
+  }
+
+  :global(.dark) .git-log-message {
+    color: #e2e8f0;
+  }
+
+  .git-log-date {
+    font-size: 0.6875rem;
+    color: #94a3b8;
+  }
+
+  :global(.dark) .git-log-date {
+    color: #64748b;
   }
 </style>

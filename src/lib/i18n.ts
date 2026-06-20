@@ -86,6 +86,12 @@ const translations: Record<Lang, Record<string, string>> = {
     "git.helpInstallDesc":
       "Git es gratuito y está disponible para Windows, macOS y Linux. Instalalo desde <a href='https://git-scm.com/downloads'>git-scm.com</a>. Una vez instalado, reiniciá Cronista y volvé a abrir tu proyecto.",
     "git.helpClose": "Entendido",
+    "git.viewSessions": "Ver últimas sesiones",
+    "git.sessionsTitle": "Últimas sesiones",
+    "git.sessionsDesc":
+      "Cada entrada representa un punto de guardado automático al cerrar la aplicación. Para ver cambios detallados, usá un gestor Git como <a href='https://www.sourcetreeapp.com/'>Sourcetree</a> o <a href='https://desktop.github.com/'>GitHub Desktop</a>.",
+    "git.sessionsClose": "Cerrar",
+    "git.sessionsEmpty": "No hay sesiones guardadas todavía.",
 
     // ── Sidebar tabs ───────────────────────────────────────
     "tabs.chapters": "Capítulos",
@@ -272,6 +278,12 @@ const translations: Record<Lang, Record<string, string>> = {
     "git.helpInstallDesc":
       "Git is free and available for Windows, macOS, and Linux. Install it from <a href='https://git-scm.com/downloads'>git-scm.com</a>. Once installed, restart Cronista and reopen your project.",
     "git.helpClose": "Got it",
+    "git.viewSessions": "View recent sessions",
+    "git.sessionsTitle": "Recent sessions",
+    "git.sessionsDesc":
+      "Each entry is an automatic save point created when closing the app. For detailed diffs, use a Git client like <a href='https://www.sourcetreeapp.com/'>Sourcetree</a> or <a href='https://desktop.github.com/'>GitHub Desktop</a>.",
+    "git.sessionsClose": "Close",
+    "git.sessionsEmpty": "No saved sessions yet.",
 
     // ── Sidebar tabs ───────────────────────────────────────
     "tabs.chapters": "Chapters",

@@ -25,6 +25,21 @@ export async function verificarGitInicializado(
   return invoke("verificar_git_inicializado", { path });
 }
 
+export interface GitLogEntry {
+  hash: string;
+  date: string;
+  message: string;
+  words: string;
+}
+
+export async function obtenerGitLog(
+  path: string,
+  limit: number,
+): Promise<GitLogEntry[]> {
+  const raw: string = await invoke("obtener_git_log", { path, limit });
+  return JSON.parse(raw);
+}
+
 export async function detectarGit(): Promise<boolean> {
   return invoke("detectar_git");
 }

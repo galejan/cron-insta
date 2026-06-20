@@ -334,6 +334,64 @@ fn verificar_git_inicializado(path: String) -> Result<bool, String> {
     Ok(Path::new(&path).join(".git").exists())
 }
 
+/// Return the last N git log entries for the project.
+///
+/// Each entry is a JSON object: { hash, date, message, words }.
+/// Words are extracted from the commit message's "— N palabras" suffix
+/// when present, otherwise shown as "—".
+#[tauri::command]
+fn obtener_git_log(path: String, limit: usize) -> Result<String, String> {
+    let project_path = Path::new(&path);
+    let git_path = find_git()?;
+
+    let output = Command::new(&git_path)
+        .arg("log")
+        .arg(format!("--format=%H|%ai|%s"))
+        .arg(format!("-{}", limit.max(1).min(20)))
+        .current_dir(project_path)
+        .output()
+        .map_err(|e| format!("Error al leer el historial: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Error en git log: {}", stderr.trim()));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let entries: Vec<serde_json::Value> = stdout
+        .lines()
+        .filter(|l| !l.is_empty())
+        .map(|line| {
+            let parts: Vec<&str> = line.splitn(3, '|').collect();
+            let hash = parts.first().map(|s| &s[..s.len().min(7)]).unwrap_or("—");
+            let date = parts.get(1).unwrap_or(&"—").to_string();
+            let raw_msg = parts.get(2).unwrap_or(&"—");
+
+            // Extract word count from the commit message suffix
+            let (message, words) = if let Some(pos) = raw_msg.rfind("—") {
+                let suffix = raw_msg[pos..].trim();
+                if suffix.contains("palabras") || suffix.contains("words") {
+                    (raw_msg[..pos].trim().to_string(), suffix.to_string())
+                } else {
+                    (raw_msg.to_string(), "—".to_string())
+                }
+            } else {
+                (raw_msg.to_string(), "—".to_string())
+            };
+
+            serde_json::json!({
+                "hash": hash,
+                "date": date,
+                "message": message,
+                "words": words,
+            })
+        })
+        .collect();
+
+    serde_json::to_string(&entries)
+        .map_err(|e| format!("Error al serializar el historial: {}", e))
+}
+
 /// Detect whether Git is installed on the system.
 ///
 /// Returns `true` when `find_git()` locates a valid Git binary.
@@ -1294,6 +1352,7 @@ pub fn run() {
             inicializar_git,
             inicializar_git_con_autor,
             verificar_git_inicializado,
+            obtener_git_log,
             detectar_git,
             set_active_project,
             guardar_capitulo,
