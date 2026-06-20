@@ -13,21 +13,21 @@
 
 export type Lang = "es" | "en";
 
-/** Reactive language state. Changes to this trigger template re-renders. */
-export let lang = $state<Lang>(
-  (typeof localStorage !== "undefined"
+/** Reactive language state. Mutate .current to trigger re-renders. */
+export const lang = $state<{ current: Lang }>({
+  current: (typeof localStorage !== "undefined"
     ? (localStorage.getItem("cronista-lang") as Lang | null)
     : null) ?? "es",
-);
+});
 
 /** Translate a key to the current language. Reactive in templates. */
 export function t(key: string): string {
-  return translations[lang]?.[key] ?? key;
+  return translations[lang.current]?.[key] ?? key;
 }
 
 /** Change the active language and persist the choice. */
 export function setLang(l: Lang): void {
-  lang = l;
+  lang.current = l;
   if (typeof localStorage !== "undefined") {
     localStorage.setItem("cronista-lang", l);
   }

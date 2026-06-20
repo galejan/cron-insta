@@ -1499,13 +1499,13 @@
           <div class="footer-row">
             <button
               class="footer-btn footer-lang"
-              class:active={lang === "es"}
+              class:active={lang.current === "es"}
               onclick={() => setLang("es")}
               title="Español"
             >ES</button>
             <button
               class="footer-btn footer-lang"
-              class:active={lang === "en"}
+              class:active={lang.current === "en"}
               onclick={() => setLang("en")}
               title="English"
             >EN</button>
