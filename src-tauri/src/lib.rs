@@ -3,7 +3,7 @@
 // Phase 2: Rust backend commands for project management and git abstraction.
 // All five Tauri commands + find_git() helper live here per the single-module design.
 
-use chrono::Utc;
+use chrono::Local;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::process::Command;
@@ -179,7 +179,7 @@ fn crear_proyecto(path: String, nombre: String) -> Result<String, String> {
     // Write metadata.json
     let metadata = Metadata {
         project_name: nombre.clone(),
-        last_modified: Utc::now().to_rfc3339(),
+        last_modified: Local::now().to_rfc3339(),
         chapters_order: vec![],
         characters_index: vec![],
     };
@@ -506,7 +506,7 @@ fn crear_checkpoint(proyecto_path: String) -> Result<String, String> {
 
     // Count words in chapter files for the commit message
     let word_count = count_words_in_chapters(project_path);
-    let date = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let date = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let commit_msg = format!(
         "Progreso automático: {} - {} palabras",
         date, word_count
@@ -657,7 +657,7 @@ fn crear_capitulo(
         .map_err(|e| format!("Error al parsear metadata.json: {}", e))?;
 
     metadata.chapters_order.push(filename.clone());
-    metadata.last_modified = Utc::now().to_rfc3339();
+    metadata.last_modified = Local::now().to_rfc3339();
 
     let updated_json = serde_json::to_string_pretty(&metadata)
         .map_err(|e| format!("Error al serializar metadata.json: {}", e))?;
@@ -707,7 +707,7 @@ fn eliminar_capitulo(proyecto_path: String, filename: String) -> Result<String, 
         .map_err(|e| format!("Error al parsear metadata.json: {}", e))?;
 
     metadata.chapters_order.retain(|ch| ch != &filename);
-    metadata.last_modified = Utc::now().to_rfc3339();
+    metadata.last_modified = Local::now().to_rfc3339();
 
     let updated_json = serde_json::to_string_pretty(&metadata)
         .map_err(|e| format!("Error al serializar metadata.json: {}", e))?;
@@ -1152,7 +1152,7 @@ fn agregar_evento_timeline(proyecto_path: String, evento_json: String) -> Result
 
     // Generate ID if missing
     if event.id.trim().is_empty() {
-        event.id = format!("evt-{}", Utc::now().timestamp_millis());
+        event.id = format!("evt-{}", Local::now().timestamp_millis());
     }
 
     if event.date.trim().is_empty() {
@@ -1329,7 +1329,7 @@ fn do_checkpoint(project_path: &str) -> Result<String, String> {
     }
 
     let word_count = count_words_in_chapters(project_path);
-    let date = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let date = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let commit_msg = format!(
         "Progreso automático: {} - {} palabras",
         date, word_count
