@@ -13,12 +13,14 @@
       const href = anchor.getAttribute("href");
       if (href && (href.startsWith("http://") || href.startsWith("https://"))) {
         e.preventDefault();
+        e.stopPropagation();
         openUrl(href);
       }
     }
 
-    document.addEventListener("click", handleClick);
-    return () => document.removeEventListener("click", handleClick);
+    // Capture phase — fires before Tauri's webview navigation handler
+    document.addEventListener("click", handleClick, true);
+    return () => document.removeEventListener("click", handleClick, true);
   });
 </script>
 
