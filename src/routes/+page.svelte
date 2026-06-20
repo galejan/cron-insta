@@ -1514,7 +1514,7 @@
               ✕ {t("toolbar.closeProject")}
             </button>
             <span class="footer-sep"></span>
-            <button class="footer-btn" onclick={abrirExportModal} title={t("export.title")}>
+            <button class="footer-btn" onclick={() => { console.log("[cronista] Export button clicked"); abrirExportModal(); }} title={t("export.title")}>
               📦 {t("export.export")}
             </button>
           </div>
