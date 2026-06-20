@@ -48,13 +48,13 @@ Chain strategy: stacked-to-main
 
 ## Phase 4: Frontend — GitIdentityDialog Component
 
-- [ ] 4.1 Create `src/lib/components/GitIdentityDialog.svelte` — identity inputs (pre-filled), collapsible remote section with SSH validation, Save/Skip buttons
-- [ ] 4.2 Add TypeScript wrappers in `src/lib/tauri.ts` — 6 new functions matching backend command names
-- [ ] 4.3 Wire dialog: mount → `cargarIdentidadGit`, save → `guardarIdentidadGit` + optional remote config/push
+- [x] 4.1 Create `src/lib/components/GitIdentityDialog.svelte` — identity inputs (pre-filled), collapsible remote section with SSH validation, Save/Skip buttons
+- [x] 4.2 Add TypeScript wrappers in `src/lib/tauri.ts` — 6 new functions matching backend command names
+- [x] 4.3 Wire dialog: mount → `cargarIdentidadGit`, save → `guardarIdentidadGit` + optional remote config/push
 
 ## Phase 5: Frontend — Toolbar & Integration
 
-- [ ] 5.1 Replace `inicializar_git_con_autor()` call in `+page.svelte` with `<GitIdentityDialog>` triggered on project creation
-- [ ] 5.2 Add ⚠️ toolbar indicator — show when `push_enabled=false` AND remote was configured; retry/reconfigure mini-dialog
-- [ ] 5.3 Wire `crear_checkpoint` push-failure warnings to toast notification
-- [ ] 5.4 Add ~12 i18n keys in `src/lib/i18n.svelte.ts` — `git.identity*`, `git.remote*`, `git.push*`, `git.toolbar*` in ES and EN
+- [x] 5.1 Replace `inicializar_git_con_autor()` call in `+page.svelte` with `<GitIdentityDialog>` triggered on project creation
+- [x] 5.2 Add ⚠️ toolbar indicator — show when `push_enabled=false` AND remote was configured; retry/reconfigure mini-dialog
+- [x] 5.3 Wire `crear_checkpoint` push-failure warnings to toast notification
+- [x] 5.4 Add ~12 i18n keys in `src/lib/i18n.svelte.ts` — `git.identity*`, `git.remote*`, `git.push*`, `git.toolbar*` in ES and EN

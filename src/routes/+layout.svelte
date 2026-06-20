@@ -1,13 +1,11 @@
 <script lang="ts">
   import "../app.css";
+  import { onMount } from "svelte";
   import { openUrl } from "@tauri-apps/plugin-opener";
 
   const { children } = $props();
 
-  // Intercept external links and open them in the system browser
-  // instead of the app webview. Applies to all <a href="http..."> tags,
-  // including those rendered via {@html}.
-  $effect(() => {
+  onMount(() => {
     function handleClick(e: MouseEvent) {
       const anchor = (e.target as HTMLElement).closest("a");
       if (!anchor) return;

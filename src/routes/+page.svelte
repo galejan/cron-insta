@@ -3152,43 +3152,6 @@
     color: #94a3b8;
   }
 
-  .modal-field {
-    display: block;
-    margin-bottom: 0.75rem;
-    font-size: 0.8125rem;
-    font-weight: 500;
-    color: #475569;
-  }
-
-  :global(.dark) .modal-field {
-    color: #cbd5e1;
-  }
-
-  .modal-input {
-    display: block;
-    width: 100%;
-    margin-top: 0.25rem;
-    padding: 0.5rem 0.75rem;
-    font-size: 0.875rem;
-    border: 1px solid #e2e8f0;
-    border-radius: 0.375rem;
-    background: #ffffff;
-    color: #1e293b;
-    box-sizing: border-box;
-  }
-
-  :global(.dark) .modal-input {
-    background: #0f172a;
-    border-color: #334155;
-    color: #f1f5f9;
-  }
-
-  .modal-input:focus {
-    outline: none;
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-  }
-
   .modal-actions {
     display: flex;
     justify-content: flex-end;
