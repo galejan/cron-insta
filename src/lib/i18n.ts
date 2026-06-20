@@ -189,27 +189,36 @@ const translations: Record<Lang, Record<string, string>> = {
     "help.createdBy": "creado por",
     "help.editorTitle": "📖 Editor",
     "help.editorDesc":
-      "Escribí en la zona central. El texto se guarda automáticamente tras 2 segundos de inactividad. Usá el menú flotante para dar formato al seleccionar texto.",
+      "El texto se guarda automáticamente cada 20 segundos. El tipo de letra se elige al crear el proyecto y se aplica a todo el texto. Con Ctrl+↑ y Ctrl+↓ se cambia el nivel de título.",
     "help.chaptersTitle": "📂 Capítulos",
     "help.chaptersDesc":
-      "Creá, cargá y eliminá capítulos desde la pestaña Capítulos o con el botón + Nuevo capítulo. Doble clic en × para eliminar con confirmación.",
+      "Creá capítulos desde el botón «+ Nuevo capítulo» en la pestaña Capítulos. El nombre del archivo se convierte en el título H1 del editor. Para eliminar, pulsá × y luego confirmá.",
     "help.charactersTitle": "👤 Personajes",
     "help.charactersDesc":
       "Fichas con descripción física, personalidad, traumas y relaciones. Las relaciones pueden ser unilaterales (ej.: A está enamorado de B, pero no al revés).",
     "help.notesTitle": "📝 Notas",
     "help.notesDesc":
-      "Ideas, recordatorios y análisis. Al hacer clic en una nota, su contenido se carga en el editor principal para trabajar con formato.",
+      "Ideas, recordatorios y análisis. Al hacer clic en una nota, su contenido se carga en el editor principal.",
     "help.timelineTitle": "⏳ Línea de tiempo",
     "help.timelineDesc":
       "Línea temporal al final del panel lateral. Añadí eventos con fecha, descripción y vinculalos a personajes y capítulos.",
+    "help.versioningTitle": "🟢 Versionado",
+    "help.versioningDesc":
+      "Cronista usa Git para mantener un historial de cambios. Al cerrar la aplicación se crea un checkpoint automático. El indicador en el panel lateral muestra el estado: verde (activo), naranja (sin inicializar), rojo (Git no instalado).",
+    "help.exportTitle": "📦 Exportar y compartir",
+    "help.exportDesc":
+      "Desde el panel de herramientas podés exportar el proyecto completo en .zip (incluye personajes, notas y Git) o compartir solo los capítulos en un archivo .md. Ambos se guardan en la carpeta exportaciones/ dentro del proyecto.",
+    "help.dialogDashTitle": "💬 Guion de diálogo",
+    "help.dialogDashDesc":
+      "Con Ctrl+D se inserta un par de guiones largos (—) y el cursor queda en el medio, listo para escribir el diálogo.",
     "help.shortcutsTitle": "⌨️ Atajos de teclado",
     "help.shortcuts.toggleSidebar": "Colapsar panel lateral",
     "help.shortcuts.restoreSidebar": "Restaurar panel lateral",
-    "help.shortcuts.resizeSidebar":
-      "Reducir / ampliar panel lateral (5 % por paso)",
+    "help.shortcuts.resizeSidebar": "Reducir / ampliar panel lateral (5 % por paso)",
     "help.shortcuts.toggleFooter": "Mostrar / ocultar panel de herramientas",
     "help.shortcuts.zoomIn": "Aumentar tamaño de letra",
     "help.shortcuts.zoomOut": "Reducir tamaño de letra",
+    "help.shortcuts.dialogDash": "Insertar guion de diálogo",
     "help.shortcuts.saveNow": "Guardar ahora",
     "help.shortcuts.newChapter": "Nuevo capítulo",
     "help.shortcuts.openProject": "Abrir otro proyecto (cierra el actual)",
@@ -416,19 +425,28 @@ const translations: Record<Lang, Record<string, string>> = {
     "help.createdBy": "created by",
     "help.editorTitle": "📖 Editor",
     "help.editorDesc":
-      "Write in the central area. Text is auto-saved after 2 seconds of inactivity. Use the floating menu to format selected text.",
+      "Text is auto-saved every 20 seconds. The font is chosen when creating the project and applied to all text. Use Ctrl+↑ and Ctrl+↓ to change heading levels.",
     "help.chaptersTitle": "📂 Chapters",
     "help.chaptersDesc":
-      "Create, load, and delete chapters from the Chapters tab or using the + New Chapter button. Double-click × to delete with confirmation.",
+      "Create chapters from the «+ New Chapter» button in the Chapters tab. The filename becomes the H1 title in the editor. To delete, click × then confirm.",
     "help.charactersTitle": "👤 Characters",
     "help.charactersDesc":
       "Character sheets with physical description, personality, traumas, and relationships. Relationships can be one-sided (e.g., A loves B, but not the other way around).",
     "help.notesTitle": "📝 Notes",
     "help.notesDesc":
-      "Ideas, reminders, and analysis. Clicking a note loads its content into the main editor so you can work with formatting.",
+      "Ideas, reminders, and analysis. Clicking a note loads its content into the main editor.",
     "help.timelineTitle": "⏳ Timeline",
     "help.timelineDesc":
       "Timeline at the bottom of the sidebar. Add events with date, description, and link them to characters and chapters.",
+    "help.versioningTitle": "🟢 Versioning",
+    "help.versioningDesc":
+      "Cronista uses Git to keep a change history. An automatic checkpoint is created when closing the app. The indicator in the sidebar shows status: green (active), orange (not initialized), red (Git not installed).",
+    "help.exportTitle": "📦 Export & share",
+    "help.exportDesc":
+      "From the tools panel you can export the full project as .zip (includes characters, notes, and Git) or share just the chapters as a single .md file. Both are saved in the exportaciones/ folder inside the project.",
+    "help.dialogDashTitle": "💬 Dialogue dash",
+    "help.dialogDashDesc":
+      "Ctrl+D inserts a pair of em dashes (—) with the cursor in the middle, ready to type dialogue.",
     "help.shortcutsTitle": "⌨️ Keyboard Shortcuts",
     "help.shortcuts.toggleSidebar": "Collapse sidebar",
     "help.shortcuts.restoreSidebar": "Restore sidebar",
@@ -436,6 +454,7 @@ const translations: Record<Lang, Record<string, string>> = {
     "help.shortcuts.toggleFooter": "Show / hide tools panel",
     "help.shortcuts.zoomIn": "Increase font size",
     "help.shortcuts.zoomOut": "Decrease font size",
+    "help.shortcuts.dialogDash": "Insert dialogue dash",
     "help.shortcuts.saveNow": "Save now",
     "help.shortcuts.newChapter": "New chapter",
     "help.shortcuts.openProject": "Open another project (closes current)",
