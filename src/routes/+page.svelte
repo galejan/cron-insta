@@ -2423,13 +2423,15 @@
     gap: 0.4rem;
     flex-wrap: wrap;
     padding: 0.5rem 0.75rem;
+    margin: 0 -1rem -1rem;
     border-top: 1px solid #e2e8f0;
-    margin-top: auto;
     font-size: 0.7rem;
+    background: #f8fafc;
   }
 
   :global(.dark) .sidebar-git-footer {
     border-top-color: #334155;
+    background: #0f172a;
   }
 
   .event-date {
