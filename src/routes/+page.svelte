@@ -1644,6 +1644,13 @@
                 <span class="git-log-words">{entry.words}</span>
               </div>
               <p class="git-log-message">{entry.message}</p>
+              {#if entry.files.length > 0}
+                <div class="git-log-files">
+                  {#each entry.files as file}
+                    <span class="git-log-file-badge">📄 {file}</span>
+                  {/each}
+                </div>
+              {/if}
               <time class="git-log-date">{entry.date}</time>
             </div>
           {/each}
@@ -3016,5 +3023,27 @@
 
   :global(.dark) .git-log-date {
     color: #64748b;
+  }
+
+  .git-log-files {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin: 0.4rem 0;
+  }
+
+  .git-log-file-badge {
+    font-size: 0.65rem;
+    color: #475569;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.25rem;
+    padding: 0.1rem 0.35rem;
+  }
+
+  :global(.dark) .git-log-file-badge {
+    color: #cbd5e1;
+    background: #1e293b;
+    border-color: #334155;
   }
 </style>

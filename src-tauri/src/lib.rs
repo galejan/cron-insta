@@ -334,6 +334,38 @@ fn verificar_git_inicializado(path: String) -> Result<bool, String> {
     Ok(Path::new(&path).join(".git").exists())
 }
 
+/// Return the list of .md files changed in a given commit.
+fn get_changed_md_files(
+    project_path: &Path,
+    git_path: &str,
+    hash: &str,
+) -> Vec<String> {
+    let output = Command::new(git_path)
+        .arg("show")
+        .arg("--name-only")
+        .arg("--format=")
+        .arg(hash)
+        .current_dir(project_path)
+        .output();
+
+    match output {
+        Ok(out) if out.status.success() => {
+            String::from_utf8_lossy(&out.stdout)
+                .lines()
+                .filter(|l| !l.is_empty() && l.ends_with(".md"))
+                .map(|l| {
+                    // Show just the filename, not the full path
+                    Path::new(l)
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_else(|| l.to_string())
+                })
+                .collect()
+        }
+        _ => vec![],
+    }
+}
+
 /// Return the last N git log entries for the project.
 ///
 /// Each entry is a JSON object: { hash, date, message, words }.
@@ -363,7 +395,8 @@ fn obtener_git_log(path: String, limit: usize) -> Result<String, String> {
         .filter(|l| !l.is_empty())
         .map(|line| {
             let parts: Vec<&str> = line.splitn(3, '|').collect();
-            let hash = parts.first().map(|s| &s[..s.len().min(7)]).unwrap_or("—");
+            let hash_full = parts.first().map(|s| s.to_string()).unwrap_or_default();
+            let hash = hash_full.chars().take(7).collect::<String>();
             let date = parts.get(1).unwrap_or(&"—").to_string();
             let raw_msg = parts.get(2).unwrap_or(&"—");
 
@@ -379,11 +412,15 @@ fn obtener_git_log(path: String, limit: usize) -> Result<String, String> {
                 (raw_msg.to_string(), "—".to_string())
             };
 
+            // Get changed .md files for this commit
+            let files = get_changed_md_files(project_path, &git_path, &hash_full);
+
             serde_json::json!({
                 "hash": hash,
                 "date": date,
                 "message": message,
                 "words": words,
+                "files": files,
             })
         })
         .collect();

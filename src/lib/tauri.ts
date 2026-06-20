@@ -30,6 +30,7 @@ export interface GitLogEntry {
   date: string;
   message: string;
   words: string;
+  files: string[];
 }
 
 export async function obtenerGitLog(
