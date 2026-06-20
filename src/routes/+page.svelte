@@ -1,16 +1,19 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import Editor from "$lib/components/Editor.svelte";
+  import GitIdentityDialog from "$lib/components/GitIdentityDialog.svelte";
   import { debounce } from "$lib/debounce";
   import { t, setLang, lang } from "$lib/i18n.svelte";
   import {
     actualizarPersonaje,
     agregarEventoTimeline,
     cargarCapitulo,
+    cargarConfigRemoto,
     cargarIndice,
     cargarNota,
     cargarPersonaje,
     cargarTimeline,
+    configurarRemoto,
     crearCapitulo,
     crearCheckpoint,
     crearNota,
@@ -24,11 +27,13 @@
     eliminarNota,
     eliminarPersonaje,
     guardarCapitulo,
+    inicializarGit,
     inicializarGitConAutor,
     listarNotas,
     listarPersonajes,
     marcarProyectoCronista,
     obtenerGitLog,
+    reintentarPush,
     reordenarTimeline,
     setActiveProject,
     verificarGitInicializado,
@@ -195,6 +200,17 @@
   let gitHelpModal = $state(false);
   let gitLogVisible = $state(false);
   let gitLogEntries = $state<GitLogEntry[]>([]);
+
+  // ── Git Identity & Remote dialog ─────────────────────────────
+  let identityDialogOpen = $state(false);
+  let identityDialogPath = $state("");
+  let identityDialogResolve = $state<((ctx: {remoteConfigured: boolean, remoteUrl: string}) => void) | null>(null);
+  let remoteWarningVisible = $state(false);
+  let remoteWarningDialog = $state(false);
+
+  // ── Toast notifications ─────────────────────────────────────
+  let toast = $state<{message: string, type: "warning" | "error"} | null>(null);
+
   let footerExpanded = $state(true);
   let zoomLevel = $state(0); // 0=normal, 1=medium, 2=large
   let exportModal = $state(false);
@@ -329,6 +345,19 @@
         await guardarCapitulo(projectPath, activeChapter, editorContent);
         saveStatus = "saved";
         console.log("[cronista] Save OK:", activeChapter);
+
+        // Trigger checkpoint for auto-push (best-effort, non-blocking)
+        try {
+          const ckResult = await crearCheckpoint(projectPath);
+          if (ckResult.includes("⚠️")) {
+            const warnPart = ckResult.split("⚠️")[1]?.trim() || "";
+            showToast(warnPart || t("git.pushFailed"), "warning");
+            // Refresh remote status to update the toolbar indicator
+            actualizarGitStatus(projectPath);
+          }
+        } catch {
+          // Silently ignore checkpoint errors during save
+        }
       } catch (e) {
         console.error("[cronista] Save failed:", e);
         saveStatus = "unsaved";
@@ -398,6 +427,23 @@
     }
   }
 
+  /** Show GitIdentityDialog and return the result as a promise. */
+  function showIdentityDialog(path: string): Promise<{remoteConfigured: boolean, remoteUrl: string}> {
+    return new Promise((resolve) => {
+      identityDialogPath = path;
+      identityDialogOpen = true;
+      identityDialogResolve = resolve;
+    });
+  }
+
+  /** Dismiss the toast after a delay. */
+  function showToast(message: string, type: "warning" | "error" = "warning") {
+    toast = { message, type };
+    setTimeout(() => {
+      if (toast?.message === message) toast = null;
+    }, 5_000);
+  }
+
   async function crearCapituloNuevo(): Promise<void> {
     // ── Initial project setup (only when no project is loaded) ─
     if (!projectPath) {
@@ -429,6 +475,20 @@
 
       const path = `${selected}/${name.trim()}`;
 
+      // If Git is available, show identity dialog BEFORE project creation
+      // so identity is saved before git init reads it from global config.
+      let remoteConfigured = false;
+      let remoteUrl = "";
+      if (gitDisponible) {
+        try {
+          const result = await showIdentityDialog(path);
+          remoteConfigured = result.remoteConfigured;
+          remoteUrl = result.remoteUrl;
+        } catch {
+          // User closed dialog — proceed without identity save
+        }
+      }
+
       console.log("[cronista] Creating project:", { path, name });
       try {
         const msg = await crearProyecto(path, name.trim(), fontFamily);
@@ -436,6 +496,18 @@
         projectPath = path;
         setActiveProject(path);
         marcarProyectoCronista(path); // fire-and-forget: set folder icon
+
+        // If remote was configured, set it up
+        if (remoteConfigured && remoteUrl) {
+          try {
+            await configurarRemoto(path, remoteUrl);
+            console.log("[cronista] Remote configured:", remoteUrl);
+          } catch (e) {
+            console.error("[cronista] Remote config failed:", e);
+            showToast(String(e), "error");
+          }
+        }
+
         await actualizarGitStatus(path);
         await refreshChapters();
       } catch (e) {
@@ -567,9 +639,23 @@
       if (initialized) {
         gitStatus = "active";
         gitEnabled = true;
+
+        // Check remote config for push-failure warning
+        try {
+          const remote = await cargarConfigRemoto();
+          const wasDisabled = remoteWarningVisible;
+          remoteWarningVisible = !!(remote && !remote.push_enabled && remote.url);
+          // Show toast when push was just disabled
+          if (!wasDisabled && remoteWarningVisible) {
+            showToast(t("git.pushDisabled"), "warning");
+          }
+        } catch {
+          remoteWarningVisible = false;
+        }
       } else {
         gitStatus = "not-initialized";
         gitEnabled = true; // Binary exists, just needs init
+        remoteWarningVisible = false;
       }
     } catch {
       gitStatus = "unknown";
@@ -1581,9 +1667,31 @@
               {#if gitStatus === "active"}
                 <span class="git-indicator git-active" title={t("git.activeTitle")}>🟢 {t("git.active")}</span>
                 <button class="git-log-link" onclick={cargarGitLog}>{t("git.viewSessions")} →</button>
+                {#if remoteWarningVisible}
+                  <span class="remote-warning-icon">⚠️</span>
+                  <button
+                    class="remote-warning-btn"
+                    onclick={() => (remoteWarningDialog = true)}
+                    title={t("git.pushDisabled")}
+                  >
+                    {t("git.toolbarRetry")}
+                  </button>
+                {/if}
               {:else if gitStatus === "not-initialized"}
                 <button class="git-indicator git-warn"
-                  onclick={() => { gitInitNombre = t("git.defaultName"); gitInitEmail = t("git.defaultEmail"); gitInitModal = true; }}
+                  onclick={async () => {
+                    try {
+                      const result = await showIdentityDialog(projectPath);
+                      await inicializarGit(projectPath);
+                      if (result.remoteConfigured && result.remoteUrl) {
+                        await configurarRemoto(projectPath, result.remoteUrl);
+                      }
+                      await actualizarGitStatus(projectPath);
+                    } catch (e) {
+                      console.error("[cronista] Git init failed:", e);
+                      alert(t("git.initError") + " " + e);
+                    }
+                  }}
                   title={t("git.notInitTitle")}>🟠 {t("git.notInit")}</button>
               {:else if gitStatus === "unavailable"}
                 <button class="git-indicator git-off"
@@ -1740,59 +1848,79 @@
   </div>
 {/if}
 
-{#if gitInitModal}
-  <!-- Git init modal — configure author and initialize -->
+<!-- Git Identity dialog (replaces old git init modal) -->
+<GitIdentityDialog
+  bind:open={identityDialogOpen}
+  projectPath={identityDialogPath}
+  onComplete={(ctx: {remoteConfigured: boolean, remoteUrl: string}) => {
+    identityDialogResolve?.(ctx);
+    identityDialogResolve = null;
+  }}
+/>
+
+<!-- Remote sync warning mini-dialog -->
+{#if remoteWarningDialog}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="modal-overlay"
     role="dialog"
     tabindex="-1"
-    aria-label={t("git.initModalTitle")}
-    onkeydown={(e) => e.key === "Escape" && (gitInitModal = false)}
+    aria-label={t("git.pushDisabled")}
+    onclick={() => (remoteWarningDialog = false)}
+    onkeydown={(e) => e.key === "Escape" && (remoteWarningDialog = false)}
   >
     <div class="modal-panel" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
-      <h2>{t("git.initModalTitle")}</h2>
-      <p class="modal-desc">{t("git.initModalDesc")}</p>
-
-      <label class="modal-field">
-        {t("git.initModalName")}
-        <input
-          type="text"
-          bind:value={gitInitNombre}
-          class="modal-input"
-        />
-      </label>
-
-      <label class="modal-field">
-        {t("git.initModalEmail")}
-        <input
-          type="email"
-          bind:value={gitInitEmail}
-          class="modal-input"
-        />
-      </label>
-
+      <h2>{t("git.pushDisabled")}</h2>
+      <p class="modal-desc">{t("git.pushFailed")}</p>
       <div class="modal-actions">
-        <button class="btn-secondary" onclick={() => (gitInitModal = false)}>
+        <button
+          class="btn-secondary"
+          onclick={() => (remoteWarningDialog = false)}
+        >
           {t("common.cancel")}
+        </button>
+        <button
+          class="btn-secondary"
+          onclick={async () => {
+            remoteWarningDialog = false;
+            try {
+              const result = await showIdentityDialog(projectPath);
+              if (result.remoteConfigured && result.remoteUrl) {
+                await configurarRemoto(projectPath, result.remoteUrl);
+              }
+              await actualizarGitStatus(projectPath);
+            } catch (e) {
+              showToast(String(e), "error");
+            }
+          }}
+        >
+          {t("git.toolbarReconfigure")}
         </button>
         <button
           class="btn-primary"
           onclick={async () => {
+            remoteWarningDialog = false;
             try {
-              await inicializarGitConAutor(projectPath, gitInitNombre, gitInitEmail);
+              await reintentarPush(projectPath);
+              showToast("✅ Push completado", "warning");
               await actualizarGitStatus(projectPath);
-              gitInitModal = false;
-              alert(t("git.initSuccess"));
             } catch (e) {
-              alert(t("git.initError") + " " + e);
+              showToast(String(e), "error");
             }
           }}
         >
-          {t("git.initButton")}
+          {t("git.toolbarRetry")}
         </button>
       </div>
     </div>
+  </div>
+{/if}
+
+<!-- Toast notification -->
+{#if toast}
+  <div class="toast" class:toast-error={toast.type === "error"}>
+    {toast.message}
+    <button class="toast-close" onclick={() => (toast = null)}>×</button>
   </div>
 {/if}
 
@@ -3446,5 +3574,77 @@
 
   :global(.dark) .footer-sep {
     background: #334155;
+  }
+
+  /* ── Remote sync warning indicator ──────────────────────────── */
+  .remote-warning-icon {
+    font-size: 0.8rem;
+    margin-left: 0.25rem;
+    cursor: default;
+  }
+
+  .remote-warning-btn {
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: #d97706;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .remote-warning-btn:hover {
+    color: #b45309;
+  }
+
+  :global(.dark) .remote-warning-btn {
+    color: #fbbf24;
+  }
+
+  :global(.dark) .remote-warning-btn:hover {
+    color: #f59e0b;
+  }
+
+  /* ── Toast notification ─────────────────────────────────────── */
+  .toast {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 300;
+    padding: 0.75rem 1.25rem;
+    border-radius: 0.5rem;
+    background: #334155;
+    color: #f1f5f9;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    max-width: 90vw;
+    animation: fadeIn 200ms ease;
+  }
+
+  .toast-error {
+    background: #dc2626;
+    color: #ffffff;
+  }
+
+  .toast-close {
+    background: none;
+    border: none;
+    color: inherit;
+    font-size: 1.1rem;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    opacity: 0.7;
+  }
+
+  .toast-close:hover {
+    opacity: 1;
   }
 </style>
