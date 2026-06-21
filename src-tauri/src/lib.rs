@@ -373,92 +373,35 @@ fn inicializar_git(app: tauri::AppHandle, path: String) -> Result<String, String
             .current_dir(project_path)
             .output();
 
-        Ok("Repositorio Git inicializado correctamente.".to_string())
+        // First commit — "Primera piedra"
+        let _ = system_command(&git_path)
+            .arg("add")
+            .arg(".")
+            .current_dir(project_path)
+            .output();
+
+        let commit_msg = "Primera piedra ✍️";
+        let commit_output = system_command(&git_path)
+            .arg("commit")
+            .arg("-m")
+            .arg(commit_msg)
+            .current_dir(project_path)
+            .output()
+            .map_err(|e| format!("Error en primer commit: {}", e))?;
+
+        if commit_output.status.success() {
+            Ok("Repositorio Git inicializado y primer commit creado.".to_string())
+        } else {
+            let stderr = String::from_utf8_lossy(&commit_output.stderr);
+            if stderr.contains("nothing to commit") || stderr.contains("nothing added") {
+                Ok("Repositorio Git inicializado (sin archivos para commit aún).".to_string())
+            } else {
+                Err(format!("Error en primer commit: {}", stderr.trim()))
+            }
+        }
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
         Err(format!("Error al inicializar Git: {}", stderr.trim()))
-    }
-}
-
-/// Initialize git with custom author and create the first commit.
-///
-/// Stores author info in `.config/git-config.json` for future reference.
-/// After `git init` + user config, stages everything and creates an
-/// initial commit: "Primera piedra — {project_name}".
-#[tauri::command]
-fn inicializar_git_con_autor(
-    path: String,
-    nombre: String,
-    email: String,
-) -> Result<String, String> {
-    let project_path = Path::new(&path);
-
-    if project_path.join(".git").exists() {
-        return Ok("El repositorio ya estaba inicializado.".to_string());
-    }
-
-    let git_path = find_git()?;
-
-    // git init
-    let output = system_command(&git_path)
-        .arg("init")
-        .current_dir(project_path)
-        .output()
-        .map_err(|e| format!("Error al ejecutar git init: {}", e))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("Error al inicializar Git: {}", stderr.trim()));
-    }
-
-    // Configure author
-    let _ = system_command(&git_path)
-        .arg("config")
-        .arg("user.name")
-        .arg(&nombre)
-        .current_dir(project_path)
-        .output();
-    let _ = system_command(&git_path)
-        .arg("config")
-        .arg("user.email")
-        .arg(&email)
-        .current_dir(project_path)
-        .output();
-
-    // Save config for future reference
-    let config = serde_json::json!({ "name": nombre, "email": email });
-    let config_json = serde_json::to_string_pretty(&config).unwrap_or_default();
-    let _ = std::fs::write(
-        project_path.join(".config/git-config.json"),
-        config_json,
-    );
-
-    // First commit — "Primera piedra"
-    let _ = system_command(&git_path)
-        .arg("add")
-        .arg(".")
-        .current_dir(project_path)
-        .output();
-
-    let commit_msg = "Primera piedra ✍️";
-    let commit_output = system_command(&git_path)
-        .arg("commit")
-        .arg("-m")
-        .arg(commit_msg)
-        .current_dir(project_path)
-        .output()
-        .map_err(|e| format!("Error en primer commit: {}", e))?;
-
-    if commit_output.status.success() {
-        Ok("Repositorio Git inicializado y primer commit creado.".to_string())
-    } else {
-        // "nothing to commit" is fine — project might be empty
-        let stderr = String::from_utf8_lossy(&commit_output.stderr);
-        if stderr.contains("nothing to commit") || stderr.contains("nothing added") {
-            Ok("Repositorio Git inicializado (sin archivos para commit aún).".to_string())
-        } else {
-            Err(format!("Error en primer commit: {}", stderr.trim()))
-        }
     }
 }
 
@@ -630,23 +573,12 @@ fn guardar_capitulo(
 /// or a descriptive status when there is nothing to commit (still
 /// `Ok` — not an error).
 #[tauri::command]
-fn crear_checkpoint(app: tauri::AppHandle, proyecto_path: String) -> Result<String, String> {
+fn crear_checkpoint(_app: tauri::AppHandle, proyecto_path: String) -> Result<String, String> {
     let project_path = Path::new(&proyecto_path);
 
     let commit_result = perform_commit(project_path)?;
 
-    // If nothing to commit, return early — no push attempt
-    if commit_result == "Sin cambios para guardar." {
-        return Ok(commit_result);
-    }
-
-    // Auto-push if remote is configured and push_enabled is true
-    if let Ok(push_result) = sincronizar_checkpoint(&app, &proyecto_path) {
-        if !push_result.is_empty() {
-            return Ok(format!("{}\n⚠️ {}", commit_result, push_result));
-        }
-    }
-
+    // No auto-push here — only do_checkpoint (close handler) syncs.
     Ok(commit_result)
 }
 
@@ -1526,6 +1458,8 @@ fn sincronizar_checkpoint(app: &tauri::AppHandle, path: &str) -> Result<String, 
         .output()
         .map_err(|e| format!("Error al ejecutar git push: {}", e))?;
 
+    eprintln!("git push output (sincronizar_checkpoint): {:?}", push_output);
+
     let mut remote_config = remote;
 
     if push_output.status.success() {
@@ -1958,11 +1892,13 @@ fn configurar_remoto(_app: tauri::AppHandle, path: String, url: String) -> Resul
         .output()
         .map_err(|e| format!("Error al ejecutar git push: {}", e))?;
 
+    eprintln!("git push -u origin main output: {:?}", push_output);
+
     if push_output.status.success() {
         Ok("Repositorio remoto configurado y sincronizado correctamente.".to_string())
     } else {
-        // Push failed — the commit stays local, warn the user
-        Ok("Commit local guardado. No se pudo sincronizar con el remoto. ¿Sin conexión? El repositorio remoto podría no estar accesible. Configuralo y usa 'Reintentar' para sincronizar.".to_string())
+        let stderr = String::from_utf8_lossy(&push_output.stderr);
+        Err(format!("Error al sincronizar con remoto: {}", stderr.trim()))
     }
 }
 
@@ -2049,7 +1985,6 @@ pub fn run() {
             crear_proyecto,
             marcar_proyecto_cronista,
             inicializar_git,
-            inicializar_git_con_autor,
             verificar_git_inicializado,
             obtener_git_log,
             detectar_git,
