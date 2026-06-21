@@ -204,6 +204,7 @@
   // ── Git Identity & Remote dialog ─────────────────────────────
   let identityDialogOpen = $state(false);
   let identityDialogPath = $state("");
+  let identityDialogProjectName = $state("");
   let identityDialogResolve = $state<((ctx: {remoteConfigured: boolean, remoteUrl: string}) => void) | null>(null);
   let remoteWarningVisible = $state(false);
   let remoteWarningDialog = $state(false);
@@ -428,9 +429,10 @@
   }
 
   /** Show GitIdentityDialog and return the result as a promise. */
-  function showIdentityDialog(path: string): Promise<{remoteConfigured: boolean, remoteUrl: string}> {
+  function showIdentityDialog(path: string, projectName?: string): Promise<{remoteConfigured: boolean, remoteUrl: string}> {
     return new Promise((resolve) => {
       identityDialogPath = path;
+      identityDialogProjectName = projectName || "";
       identityDialogOpen = true;
       identityDialogResolve = resolve;
     });
@@ -481,7 +483,7 @@
       let remoteUrl = "";
       if (gitDisponible) {
         try {
-          const result = await showIdentityDialog(path);
+          const result = await showIdentityDialog(path, name.trim());
           remoteConfigured = result.remoteConfigured;
           remoteUrl = result.remoteUrl;
         } catch {
@@ -1852,6 +1854,7 @@
 <GitIdentityDialog
   bind:open={identityDialogOpen}
   projectPath={identityDialogPath}
+  projectName={identityDialogProjectName}
   onComplete={(ctx: {remoteConfigured: boolean, remoteUrl: string}) => {
     identityDialogResolve?.(ctx);
     identityDialogResolve = null;

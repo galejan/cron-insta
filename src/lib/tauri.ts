@@ -215,14 +215,14 @@ export async function reordenarTimeline(
 
 // ── Git Identity & Remote ─────────────────────────────────────
 
-export async function cargarIdentidadGit(): Promise<{name: string, email: string} | null> {
+export async function cargarIdentidadGit(): Promise<{name: string, email: string, github_user?: string} | null> {
   const result = await invoke<string>("cargar_identidad_git");
   if (result === "null") return null;
   return JSON.parse(result);
 }
 
-export async function guardarIdentidadGit(name: string, email: string): Promise<string> {
-  return invoke("guardar_identidad_git", { name, email });
+export async function guardarIdentidadGit(name: string, email: string, githubUser?: string): Promise<string> {
+  return invoke("guardar_identidad_git", { name, email, githubUser });
 }
 
 export async function cargarConfigRemoto(): Promise<{url: string, push_enabled: boolean, consecutive_failures: number} | null> {

@@ -124,6 +124,9 @@ struct TimelineEvent {
 struct GitIdentity {
     name: String,
     email: String,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    github_user: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -1715,6 +1718,7 @@ fn guardar_identidad_git(
     app: tauri::AppHandle,
     name: String,
     email: String,
+    github_user: Option<String>,
 ) -> Result<String, String> {
     let config_path = match get_config_path(&app) {
         Some(p) => p,
@@ -1727,7 +1731,7 @@ fn guardar_identidad_git(
             .map_err(|e| format!("Error creating config directory: {}", e))?;
     }
 
-    let identity = GitIdentity { name, email };
+    let identity = GitIdentity { name, email, github_user };
 
     // Read-modify-write: preserve any existing remote config
     let mut config = if config_path.exists() {
@@ -3442,6 +3446,7 @@ mod tests {
         let identity = GitIdentity {
             name: "Ada Lovelace".to_string(),
             email: "ada@code.dev".to_string(),
+            github_user: None,
         };
         let json = serde_json::to_string(&identity).expect("serialize identity");
         let parsed: GitIdentity = serde_json::from_str(&json).expect("deserialize identity");
@@ -3480,6 +3485,7 @@ mod tests {
             identity: Some(GitIdentity {
                 name: "Cervantes".to_string(),
                 email: "cervantes@lit.es".to_string(),
+                github_user: None,
             }),
             remote: Some(GitRemoteConfig {
                 url: "git@github.com:user/repo.git".to_string(),
@@ -3518,6 +3524,7 @@ mod tests {
             identity: Some(GitIdentity {
                 name: "Ada Lovelace".to_string(),
                 email: "ada@code.dev".to_string(),
+                github_user: None,
             }),
             remote: None,
         };
@@ -3612,6 +3619,7 @@ mod tests {
         config.identity = Some(GitIdentity {
             name: "Ada".to_string(),
             email: "ada@code.dev".to_string(),
+            github_user: None,
         });
         fs::write(&config_path, serde_json::to_string_pretty(&config).unwrap()).unwrap();
 
@@ -3638,6 +3646,7 @@ mod tests {
             identity: Some(GitIdentity {
                 name: "Cervantes".to_string(),
                 email: "cervantes@lit.es".to_string(),
+                github_user: None,
             }),
             remote: None,
         };
@@ -3675,6 +3684,7 @@ mod tests {
             identity: Some(GitIdentity {
                 name: "José María García López".to_string(),
                 email: "josé@español.es".to_string(),
+                github_user: None,
             }),
             remote: None,
         };
@@ -3833,6 +3843,7 @@ mod tests {
             identity: Some(GitIdentity {
                 name: "Ada".to_string(),
                 email: "ada@code.dev".to_string(),
+                github_user: None,
             }),
             remote: Some(GitRemoteConfig {
                 url: "git@host:repo.git".to_string(),

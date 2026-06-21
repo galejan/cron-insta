@@ -279,6 +279,8 @@ const translations: Record<Lang, Record<string, string>> = {
     "git.toolbarRetry": "Reintentar",
     "git.toolbarReconfigure": "Reconfigurar",
     "git.processing": "Procesando...",
+    "git.githubUserLabel": "Usuario GitHub",
+    "git.githubUserPlaceholder": "Tu nombre de usuario en GitHub (opcional)",
 
     // ── Formatting toolbar (Editor.svelte) ──────────────────
     "editor.heading1": "Título 1 (Ctrl+Alt+1)",
@@ -534,6 +536,8 @@ const translations: Record<Lang, Record<string, string>> = {
     "git.toolbarRetry": "Retry",
     "git.toolbarReconfigure": "Reconfigure",
     "git.processing": "Processing...",
+    "git.githubUserLabel": "GitHub Username",
+    "git.githubUserPlaceholder": "Your GitHub username (optional)",
 
     // ── Formatting toolbar (Editor.svelte) ──────────────────
     "editor.heading1": "Heading 1 (Ctrl+Alt+1)",

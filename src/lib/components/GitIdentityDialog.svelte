@@ -11,12 +11,14 @@
   let {
     open = $bindable(false),
     projectPath = "",
+    projectName = "",
     onComplete = (_ctx: { remoteConfigured: boolean; remoteUrl: string }) => {},
   } = $props();
 
   // Form state
   let name = $state("");
   let email = $state("");
+  let githubUser = $state("");
   let wantsRemote = $state(false);
   let remoteUrl = $state("");
   let loading = $state(false);
@@ -38,6 +40,7 @@
       if (identity) {
         name = identity.name;
         email = identity.email;
+        githubUser = identity.github_user || "";
       } else {
         // Pre-fill with language-aware presets
         if (lang.current === "es") {
@@ -65,7 +68,7 @@
     loading = true;
     error = "";
     try {
-      await guardarIdentidadGit(name, email);
+      await guardarIdentidadGit(name, email, githubUser || undefined);
       step = "remote";
     } catch (e) {
       error = String(e);
@@ -78,7 +81,7 @@
     loading = true;
     error = "";
     try {
-      await guardarIdentidadGit(name, email);
+      await guardarIdentidadGit(name, email, githubUser || undefined);
       // Explicitly set no remote
       await guardarConfigRemoto("", false);
       close({ remoteConfigured: false, remoteUrl: "" });
@@ -93,7 +96,7 @@
     loading = true;
     error = "";
     try {
-      await guardarIdentidadGit(name, email);
+      await guardarIdentidadGit(name, email, githubUser || undefined);
       if (wantsRemote && remoteUrl.trim()) {
         await guardarConfigRemoto(remoteUrl.trim(), true);
         // configurar_remoto needs the project to have git initialized.
@@ -129,11 +132,27 @@
       error = "";
       wantsRemote = false;
       remoteUrl = "";
+      githubUser = "";
     }
   }
 
   $effect(() => {
     resetOnClose();
+  });
+
+  // Auto-fill remote URL from githubUser + projectName when entering step 2
+  $effect(() => {
+    if (step === "remote" && githubUser && !remoteUrl && projectName) {
+      const slug = projectName
+        .toLowerCase()
+        .replace(/\s+/g, "-")
+        .replace(/[^a-z0-9-]/g, "")
+        .replace(/-+/g, "-")
+        .replace(/^-+|-+$/g, "");
+      if (slug) {
+        remoteUrl = "git@github.com:" + githubUser + "/" + slug + ".git";
+      }
+    }
   });
 </script>
 
@@ -173,6 +192,17 @@
             type="email"
             bind:value={email}
             class="modal-input"
+            disabled={loading}
+          />
+        </label>
+
+        <label class="modal-field">
+          {t("git.githubUserLabel")}
+          <input
+            type="text"
+            bind:value={githubUser}
+            class="modal-input"
+            placeholder={t("git.githubUserPlaceholder")}
             disabled={loading}
           />
         </label>
