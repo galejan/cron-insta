@@ -28,7 +28,6 @@
     eliminarPersonaje,
     guardarCapitulo,
     inicializarGit,
-    inicializarGitConAutor,
     listarNotas,
     listarPersonajes,
     marcarProyectoCronista,
