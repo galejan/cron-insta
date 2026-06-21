@@ -393,6 +393,13 @@ fn inicializar_git(app: tauri::AppHandle, path: String) -> Result<String, String
             .map_err(|e| format!("Error en primer commit: {}", e))?;
 
         if commit_output.status.success() {
+            // Ensure the branch is named "main" (git may default to "master")
+            let _ = system_command(&git_path)
+                .arg("branch")
+                .arg("-M")
+                .arg("main")
+                .current_dir(project_path)
+                .output();
             Ok("Repositorio Git inicializado y primer commit creado.".to_string())
         } else {
             let stderr = String::from_utf8_lossy(&commit_output.stderr);
