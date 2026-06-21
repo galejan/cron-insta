@@ -242,7 +242,3 @@ export async function configurarRemoto(path: string, url: string): Promise<strin
 export async function reintentarPush(path: string): Promise<string> {
   return invoke("reintentar_push", { path });
 }
-
-export async function sincronizarDesdeRemoto(path: string): Promise<string> {
-  return invoke("sincronizar_desde_remoto", { path });
-}

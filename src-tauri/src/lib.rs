@@ -1893,26 +1893,7 @@ fn configurar_remoto(_app: tauri::AppHandle, path: String, url: String) -> Resul
         return Err(format!("Error al configurar el remoto: {}", stderr.trim()));
     }
 
-    // 2) Check if remote has existing commits before pushing
-    let ls_result = system_command(&git_path)
-        .arg("ls-remote")
-        .arg("origin")
-        .current_dir(project_path)
-        .output();
-
-    if let Ok(ls_output) = ls_result {
-        let ls_stdout = String::from_utf8_lossy(&ls_output.stdout);
-        let remote_has_commits = ls_stdout.contains("refs/heads/main")
-            || ls_stdout.contains("refs/heads/master");
-        if remote_has_commits {
-            return Err(
-                "REMOTE_HAS_COMMITS:El proyecto ya tiene sesiones previas en GitHub. ¿Querés sincronizarlo en este ordenador?".to_string(),
-            );
-        }
-    }
-    // If ls-remote fails (network, etc.), continue to push — the push will fail with its own error.
-
-    // 3) git push -u origin main
+    // 2) git push -u origin main
     let push_output = system_command(&git_path)
         .arg("push")
         .arg("-u")
@@ -2006,33 +1987,6 @@ fn reintentar_push(app: tauri::AppHandle, path: String) -> Result<String, String
     }
 }
 
-/// Pull from the remote repository for an existing project that was synced
-/// from another computer. Uses `--allow-unrelated-histories` to merge
-/// independent histories.
-#[tauri::command]
-fn sincronizar_desde_remoto(path: String) -> Result<String, String> {
-    let project_path = Path::new(&path);
-    let git_path = find_git()?;
-
-    // git pull origin main --allow-unrelated-histories
-    let output = system_command(&git_path)
-        .arg("pull")
-        .arg("origin")
-        .arg("main")
-        .arg("--allow-unrelated-histories")
-        .arg("--no-edit")
-        .current_dir(project_path)
-        .output()
-        .map_err(|e| format!("Error al sincronizar: {}", e))?;
-
-    if output.status.success() {
-        Ok("Sincronizado correctamente con el repositorio remoto.".to_string())
-    } else {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        Err(format!("Error al sincronizar: {}", stderr.trim()))
-    }
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -2078,7 +2032,6 @@ pub fn run() {
             guardar_config_remoto,
             configurar_remoto,
             reintentar_push,
-            sincronizar_desde_remoto,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
