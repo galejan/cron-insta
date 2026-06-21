@@ -36,6 +36,7 @@
     reintentarPush,
     reordenarTimeline,
     setActiveProject,
+    sincronizarDesdeRemoto,
     verificarGitInicializado,
   } from "$lib/tauri";
   import type { GitLogEntry } from "$lib/tauri";
@@ -526,6 +527,18 @@
                   ? { label: t("git.createOnGithub"), onClick: () => openUrl(`https://github.com/new?name=${repoName}`) }
                   : undefined,
               );
+            } else if (msg.startsWith("REMOTE_HAS_COMMITS:")) {
+              const displayMsg = msg.replace("REMOTE_HAS_COMMITS:", "");
+              const shouldSync = confirm(displayMsg);
+              if (shouldSync) {
+                try {
+                  await sincronizarDesdeRemoto(path);
+                  showToast(t("git.syncSuccess"), "warning");
+                  await actualizarGitStatus(path);
+                } catch (syncErr) {
+                  showToast(String(syncErr), "error");
+                }
+              }
             } else {
               showToast(msg, "error");
             }
@@ -1716,7 +1729,19 @@
                     } catch (e) {
                       console.error("[cronista] Git init failed:", e);
                       const msg = String(e);
-                      if (msg.startsWith("REPO_NOT_FOUND:")) {
+                      if (msg.startsWith("REMOTE_HAS_COMMITS:")) {
+                        const displayMsg = msg.replace("REMOTE_HAS_COMMITS:", "");
+                        const shouldSync = confirm(displayMsg);
+                        if (shouldSync) {
+                          try {
+                            await sincronizarDesdeRemoto(projectPath);
+                            showToast(t("git.syncSuccess"), "warning");
+                            await actualizarGitStatus(projectPath);
+                          } catch (syncErr) {
+                            showToast(String(syncErr), "error");
+                          }
+                        }
+                      } else if (msg.startsWith("REPO_NOT_FOUND:")) {
                         const repoName = initRemoteUrl ? extractRepoName(initRemoteUrl) : null;
                         showToast(
                           t("git.repoNotFound"),
@@ -1932,7 +1957,19 @@
               await actualizarGitStatus(projectPath);
             } catch (e) {
               const msg = String(e);
-              if (msg.startsWith("REPO_NOT_FOUND:")) {
+              if (msg.startsWith("REMOTE_HAS_COMMITS:")) {
+                const displayMsg = msg.replace("REMOTE_HAS_COMMITS:", "");
+                const shouldSync = confirm(displayMsg);
+                if (shouldSync) {
+                  try {
+                    await sincronizarDesdeRemoto(projectPath);
+                    showToast(t("git.syncSuccess"), "warning");
+                    await actualizarGitStatus(projectPath);
+                  } catch (syncErr) {
+                    showToast(String(syncErr), "error");
+                  }
+                }
+              } else if (msg.startsWith("REPO_NOT_FOUND:")) {
                 const repoName = reconfRemoteUrl ? extractRepoName(reconfRemoteUrl) : null;
                 showToast(
                   t("git.repoNotFound"),
