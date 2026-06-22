@@ -1929,7 +1929,7 @@
     <div class="help-panel" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
       <div class="help-header">
         <h2>Cronista</h2>
-        <span class="help-version">v0.1.1</span>
+        <span class="help-version">v0.1.3</span>
         <button class="help-close" onclick={() => (helpMode = false)}>✕</button>
       </div>
 
@@ -2257,7 +2257,7 @@
     <div class="closing-panel">
       <div class="closing-spinner"></div>
       <p class="closing-message">{closeStep}</p>
-      <p class="closing-sub">Cronista v0.1.1</p>
+      <p class="closing-sub">Cronista v0.1.3</p>
     </div>
   </div>
 {/if}
