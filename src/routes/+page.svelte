@@ -1496,118 +1496,118 @@
           </button>
         </div>
       {/if}
+    </div>
 
-      <!-- ═══ Timeline — collapsible section at bottom ═══ -->
-      <div class="timeline-section">
-        <button
-          class="timeline-toggle"
-          onclick={() => { timelineVisible = !timelineVisible; if (timelineVisible) refreshTimeline(); }}
-        >
-          {timelineVisible ? "▼" : "▶"} {t("timeline.title")}
-          {#if timeline.length > 0}
-            <span class="timeline-badge">{timeline.length}</span>
-          {/if}
-        </button>
-
-        {#if timelineVisible}
-          <div class="timeline-content">
-            {#if timeline.length > 0}
-              <ul class="timeline-list">
-                {#each timeline as evt}
-                  <li
-                    class="timeline-event"
-                    draggable="true"
-                    ondragstart={(e) => handleDragStart(e, evt.id)}
-                    ondragend={(e) => handleDragEnd(e)}
-                    ondragover={(e) => handleDragOver(e)}
-                    ondragleave={(e) => handleDragLeave(e)}
-                    ondrop={(e) => handleDrop(e, evt.id)}
-                  >
-                    <span class="event-date">{evt.date}</span>
-                    <span class="event-title">{evt.title}</span>
-                    <button
-                      class="item-delete"
-                      title={t("timeline.deleteTitle")}
-                      onclick={() => eliminarEventoHandler(evt.id)}
-                    >×</button>
-                  </li>
-                {/each}
-              </ul>
-            {:else}
-              <p class="empty-hint">{t("timeline.empty")}</p>
-            {/if}
-
-            {#if eventoFormVisible}
-              <div class="inline-form">
-                <label class="field-label" for="evt-date">{t("timeline.date")}</label>
-                <input
-                  id="evt-date"
-                  class="field-input"
-                  type="date"
-                  bind:value={nuevoEventoFecha}
-                />
-                <label class="field-label" for="evt-title">{t("timeline.eventTitle")}</label>
-                <input
-                  id="evt-title"
-                  class="field-input"
-                  type="text"
-                  bind:value={nuevoEventoTitulo}
-                  placeholder={t("timeline.titlePlaceholder")}
-                />
-                <label class="field-label" for="evt-desc">{t("timeline.description")}</label>
-                <textarea
-                  id="evt-desc"
-                  class="field-textarea"
-                  bind:value={nuevoEventoDescripcion}
-                  rows="2"
-                  placeholder={t("timeline.descriptionPlaceholder")}
-                ></textarea>
-
-                {#if personajes.length > 0}
-                  <span class="field-label">{t("timeline.relatedCharacters")}</span>
-                  <div class="checkbox-group">
-                    {#each personajes as p}
-                      <label class="checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={nuevoEventoPersonajes.includes(p.id)}
-                          onchange={() => nuevoEventoPersonajes = togglePersonajeCapitulo(nuevoEventoPersonajes, p.id)}
-                        />
-                        {p.name}
-                      </label>
-                    {/each}
-                  </div>
-                {/if}
-
-                {#if chapters.length > 0}
-                  <span class="field-label">{t("timeline.relatedChapters")}</span>
-                  <div class="checkbox-group">
-                    {#each chapters as ch}
-                      <label class="checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={nuevoEventoCapitulos.includes(ch)}
-                          onchange={() => nuevoEventoCapitulos = togglePersonajeCapitulo(nuevoEventoCapitulos, ch)}
-                        />
-                        {ch}
-                      </label>
-                    {/each}
-                  </div>
-                {/if}
-
-                <div class="form-actions">
-                  <button class="btn-sm btn-primary" onclick={agregarEventoHandler}>{t("timeline.add")}</button>
-                  <button class="btn-sm" onclick={() => eventoFormVisible = false}>{t("common.cancel")}</button>
-                </div>
-              </div>
-            {:else}
-              <button class="btn-add" onclick={() => eventoFormVisible = true}>
-                {t("timeline.newEvent")}
-              </button>
-            {/if}
-          </div>
+    <!-- ═══ Timeline — between content and footer, expands upward ═══ -->
+    <div class="timeline-section">
+      <button
+        class="timeline-toggle"
+        onclick={() => { timelineVisible = !timelineVisible; if (timelineVisible) refreshTimeline(); }}
+      >
+        {timelineVisible ? "▼" : "▶"} {t("timeline.title")}
+        {#if timeline.length > 0}
+          <span class="timeline-badge">{timeline.length}</span>
         {/if}
-      </div>
+      </button>
+
+      {#if timelineVisible}
+        <div class="timeline-content">
+          {#if timeline.length > 0}
+            <ul class="timeline-list">
+              {#each timeline as evt}
+                <li
+                  class="timeline-event"
+                  draggable="true"
+                  ondragstart={(e) => handleDragStart(e, evt.id)}
+                  ondragend={(e) => handleDragEnd(e)}
+                  ondragover={(e) => handleDragOver(e)}
+                  ondragleave={(e) => handleDragLeave(e)}
+                  ondrop={(e) => handleDrop(e, evt.id)}
+                >
+                  <span class="event-date">{evt.date}</span>
+                  <span class="event-title">{evt.title}</span>
+                  <button
+                    class="item-delete"
+                    title={t("timeline.deleteTitle")}
+                    onclick={() => eliminarEventoHandler(evt.id)}
+                  >×</button>
+                </li>
+              {/each}
+            </ul>
+          {:else}
+            <p class="empty-hint">{t("timeline.empty")}</p>
+          {/if}
+
+          {#if eventoFormVisible}
+            <div class="inline-form">
+              <label class="field-label" for="evt-date">{t("timeline.date")}</label>
+              <input
+                id="evt-date"
+                class="field-input"
+                type="date"
+                bind:value={nuevoEventoFecha}
+              />
+              <label class="field-label" for="evt-title">{t("timeline.eventTitle")}</label>
+              <input
+                id="evt-title"
+                class="field-input"
+                type="text"
+                bind:value={nuevoEventoTitulo}
+                placeholder={t("timeline.titlePlaceholder")}
+              />
+              <label class="field-label" for="evt-desc">{t("timeline.description")}</label>
+              <textarea
+                id="evt-desc"
+                class="field-textarea"
+                bind:value={nuevoEventoDescripcion}
+                rows="2"
+                placeholder={t("timeline.descriptionPlaceholder")}
+              ></textarea>
+
+              {#if personajes.length > 0}
+                <span class="field-label">{t("timeline.relatedCharacters")}</span>
+                <div class="checkbox-group">
+                  {#each personajes as p}
+                    <label class="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={nuevoEventoPersonajes.includes(p.id)}
+                        onchange={() => nuevoEventoPersonajes = togglePersonajeCapitulo(nuevoEventoPersonajes, p.id)}
+                      />
+                      {p.name}
+                    </label>
+                  {/each}
+                </div>
+              {/if}
+
+              {#if chapters.length > 0}
+                <span class="field-label">{t("timeline.relatedChapters")}</span>
+                <div class="checkbox-group">
+                  {#each chapters as ch}
+                    <label class="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={nuevoEventoCapitulos.includes(ch)}
+                        onchange={() => nuevoEventoCapitulos = togglePersonajeCapitulo(nuevoEventoCapitulos, ch)}
+                      />
+                      {ch}
+                    </label>
+                  {/each}
+                </div>
+              {/if}
+
+              <div class="form-actions">
+                <button class="btn-sm btn-primary" onclick={agregarEventoHandler}>{t("timeline.add")}</button>
+                <button class="btn-sm" onclick={() => eventoFormVisible = false}>{t("common.cancel")}</button>
+              </div>
+            </div>
+          {:else}
+            <button class="btn-add" onclick={() => eventoFormVisible = true}>
+              {t("timeline.newEvent")}
+            </button>
+          {/if}
+        </div>
+      {/if}
     </div>
 
     <!-- Sidebar footer — tools + git, collapsible -->
@@ -2321,6 +2321,7 @@
     flex-direction: column;
     min-width: 0;
     overflow: hidden;
+    position: relative;
   }
 
   /* ── Setup prompt (no project yet) ─────────────────────────── */
@@ -2787,10 +2788,11 @@
 
   /* ── Timeline section ──────────────────────────────────────── */
   .timeline-section {
-    margin-top: auto;
     border-top: 1px solid #e2e8f0;
-    padding-top: 0.75rem;
+    padding: 0.75rem 1rem;
     flex-shrink: 0;
+    overflow-y: auto;
+    max-height: 40vh;
   }
 
   :global(.dark) .timeline-section {
@@ -2839,7 +2841,7 @@
   }
 
   .timeline-content {
-    padding: 0.25rem 0 0.5rem 0.5rem;
+    padding: 0.25rem 0 0.5rem 0;
   }
 
   .timeline-list {
