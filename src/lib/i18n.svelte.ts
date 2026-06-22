@@ -283,6 +283,9 @@ const translations: Record<Lang, Record<string, string>> = {
     "git.githubUserPlaceholder": "Tu nombre de usuario en GitHub (opcional)",
     "git.repoNotFound": "El repositorio no existe en GitHub.",
     "git.createOnGithub": "Crear en GitHub",
+    "git.remoteHasCommits": "Repositorio remoto existente",
+    "git.syncSuccess": "Historial remoto sincronizado correctamente.",
+    "git.syncConflict": "Conflicto de sincronización",
 
     // ── Formatting toolbar (Editor.svelte) ──────────────────
     "editor.heading1": "Título 1 (Ctrl+Alt+1)",
@@ -542,6 +545,9 @@ const translations: Record<Lang, Record<string, string>> = {
     "git.githubUserPlaceholder": "Your GitHub username (optional)",
     "git.repoNotFound": "Repository not found on GitHub.",
     "git.createOnGithub": "Create on GitHub",
+    "git.remoteHasCommits": "Existing remote repository",
+    "git.syncSuccess": "Remote history synchronized successfully.",
+    "git.syncConflict": "Synchronization conflict",
 
     // ── Formatting toolbar (Editor.svelte) ──────────────────
     "editor.heading1": "Heading 1 (Ctrl+Alt+1)",
