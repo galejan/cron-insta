@@ -112,7 +112,7 @@ const translations: Record<Lang, Record<string, string>> = {
     "export.error": "Error al exportar:",
 
     // ── Import ──────────────────────────────────────────────
-    "import.button": "📥 Importar",
+    "import.button": "Importar",
     "import.title": "Importar proyecto desde ZIP",
     "import.selectZip": "Seleccionar archivo ZIP del proyecto",
     "import.selectDest": "Seleccionar carpeta de destino",
@@ -391,7 +391,7 @@ const translations: Record<Lang, Record<string, string>> = {
     "export.error": "Error exporting:",
 
     // ── Import ──────────────────────────────────────────────
-    "import.button": "📥 Import",
+    "import.button": "Import",
     "import.title": "Import project from ZIP",
     "import.selectZip": "Select project ZIP file",
     "import.selectDest": "Select destination folder",

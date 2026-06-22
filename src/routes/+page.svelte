@@ -101,8 +101,13 @@
 
   // ── Apply dark class to <html> whenever theme changes ──────────
   $effect(() => {
-    document.documentElement.classList.toggle("dark", theme === "dark");
-    localStorage.setItem("cronista-theme", theme);
+    const isDark = theme === "dark";
+    document.documentElement.classList.toggle("dark", isDark);
+    document.documentElement.style.colorScheme = isDark ? "dark" : "light";
+    // Sync Tauri window theme (affects title bar on Windows)
+    try {
+      getCurrentWindow().setTheme(isDark ? "dark" : "light");
+    } catch { /* not in Tauri */ }
   });
 
   // ── Window state persistence (Tauri only, fails silently elsewhere) ──
@@ -1963,7 +1968,7 @@
       <div class="editor-pane">
         <div class="editor-toolbar">
           <span class="project-label" title={projectPath}>
-            {projectPath.split("/").pop() || projectPath}
+            {projectPath.replace(/\\/g, "/").split("/").pop() || projectPath}
           </span>
           {#if activeChapter}
             <span class="chapter-label">{activeChapter}</span>
@@ -2385,6 +2390,11 @@
     overflow: hidden;
     overscroll-behavior: none;
     height: 100%;
+  }
+
+  /* Force dark scrollbars on Windows when dark theme is active */
+  :global(.dark) {
+    scrollbar-color: #334155 #1e293b;
   }
 
   /* ── Layout ────────────────────────────────────────────────── */
