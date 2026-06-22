@@ -1186,11 +1186,13 @@
       return;
     }
 
-    // ? — help toggle (without shift, plain key)
+    // ? — help toggle (without shift, plain key, only when not typing)
     if (!e.ctrlKey && !e.altKey && !e.metaKey && e.key === "?") {
-      e.preventDefault();
-      helpMode = !helpMode;
-      return;
+      if (!editorRef?.isFocused()) {
+        e.preventDefault();
+        helpMode = !helpMode;
+        return;
+      }
     }
 
     // Ctrl+Up — increase heading level (paragraph → H2 → H1)
