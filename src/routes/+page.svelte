@@ -35,6 +35,7 @@
     reintentarPush,
     reordenarTimeline,
     setActiveProject,
+    sincronizarRemoto,
     verificarGitInicializado,
   } from "$lib/tauri";
   import type { GitLogEntry } from "$lib/tauri";
@@ -531,6 +532,17 @@
                   ? { label: t("git.createOnGithub"), onClick: () => openUrl(`https://github.com/new?name=${repoName}`) }
                   : undefined,
               );
+            } else if (msg.startsWith("REMOTE_HAS_COMMITS:")) {
+              const desc = msg.replace("REMOTE_HAS_COMMITS:", "");
+              const shouldSync = confirm(desc);
+              if (shouldSync) {
+                try {
+                  const syncMsg = await sincronizarRemoto(path);
+                  showToast(syncMsg || "✅ " + t("git.syncSuccess"), "warning");
+                } catch (syncErr) {
+                  showToast(String(syncErr), "error");
+                }
+              }
             } else {
               showToast(msg, "error");
             }
@@ -1730,6 +1742,17 @@
                             ? { label: t("git.createOnGithub"), onClick: () => openUrl(`https://github.com/new?name=${repoName}`) }
                             : undefined,
                         );
+                      } else if (msg.startsWith("REMOTE_HAS_COMMITS:")) {
+                        const desc = msg.replace("REMOTE_HAS_COMMITS:", "");
+                        const shouldSync = confirm(desc);
+                        if (shouldSync) {
+                          try {
+                            const syncMsg = await sincronizarRemoto(projectPath);
+                            showToast(syncMsg || "✅ " + t("git.syncSuccess"), "warning");
+                          } catch (syncErr) {
+                            showToast(String(syncErr), "error");
+                          }
+                        }
                       } else {
                         alert(t("git.initError") + " " + e);
                       }
@@ -1946,6 +1969,17 @@
                     ? { label: t("git.createOnGithub"), onClick: () => openUrl(`https://github.com/new?name=${repoName}`) }
                     : undefined,
                 );
+              } else if (msg.startsWith("REMOTE_HAS_COMMITS:")) {
+                const desc = msg.replace("REMOTE_HAS_COMMITS:", "");
+                const shouldSync = confirm(desc);
+                if (shouldSync) {
+                  try {
+                    const syncMsg = await sincronizarRemoto(projectPath);
+                    showToast(syncMsg || "✅ " + t("git.syncSuccess"), "warning");
+                  } catch (syncErr) {
+                    showToast(String(syncErr), "error");
+                  }
+                }
               } else {
                 showToast(msg, "error");
               }
