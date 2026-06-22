@@ -1215,8 +1215,7 @@
       activeTab = order[(idx + 1) % order.length];
       // Focus first item in the new tab so arrow keys work immediately
       setTimeout(() => {
-        const panel = document.querySelector<HTMLElement>(".sidebar-content .tab-panel:not([style*='display: none'])");
-        const firstBtn = panel?.querySelector<HTMLElement>("button.chapter-link, button.btn-add");
+        const firstBtn = document.querySelector<HTMLElement>(".sidebar-content button.chapter-link");
         firstBtn?.focus();
       }, 0);
       return;
@@ -1318,9 +1317,6 @@
       <!-- ═══ Capítulos tab ═══ -->
       {#if activeTab === "capitulos"}
         <div class="tab-panel">
-          <button class="btn-add" onclick={() => crearCapituloNuevo()}>
-            {t("toolbar.newChapter")}
-          </button>
           {#if chapters.length > 0}
             <p class="chapter-list-label">{t("chapters.label")}</p>
             <ul class="chapter-list" onkeydown={handleListKeydown}>
@@ -1722,6 +1718,10 @@
 
           <!-- Row 2: project management -->
           <div class="footer-row">
+            <button class="footer-btn" onclick={() => crearCapituloNuevo()} title={t("toolbar.newChapterTitle")}>
+              📝 {t("toolbar.newChapter")}
+            </button>
+            <span class="footer-sep"></span>
             <button class="footer-btn" onclick={nuevoProyectoHandler} title={t("toolbar.newProjectTitle")}>
               ✨ {t("toolbar.newProject")}
             </button>
