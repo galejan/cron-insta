@@ -1878,20 +1878,66 @@ fn configurar_remoto(_app: tauri::AppHandle, path: String, url: String) -> Resul
     let project_path = Path::new(&path);
     let git_path = find_git()?;
 
-    // 1) git remote add origin <url>
-    let add_output = system_command(&git_path)
+    // 1a) Check if remote "origin" already exists
+    let remote_exists = system_command(&git_path)
         .arg("remote")
-        .arg("add")
+        .arg("get-url")
         .arg("origin")
-        .arg(&url)
         .current_dir(project_path)
         .output()
-        .map_err(|e| format!("Error al ejecutar git remote add: {}", e))?;
+        .map(|out| out.status.success() && !out.stdout.is_empty())
+        .unwrap_or(false);
 
-    if !add_output.status.success() {
-        let stderr = String::from_utf8_lossy(&add_output.stderr);
-        return Err(format!("Error al configurar el remoto: {}", stderr.trim()));
+    // 1b) Add or set remote URL
+    if remote_exists {
+        let set_output = system_command(&git_path)
+            .arg("remote")
+            .arg("set-url")
+            .arg("origin")
+            .arg(&url)
+            .current_dir(project_path)
+            .output()
+            .map_err(|e| format!("Error al ejecutar git remote set-url: {}", e))?;
+
+        if !set_output.status.success() {
+            let stderr = String::from_utf8_lossy(&set_output.stderr);
+            return Err(format!("Error al configurar el remoto: {}", stderr.trim()));
+        }
+    } else {
+        let add_output = system_command(&git_path)
+            .arg("remote")
+            .arg("add")
+            .arg("origin")
+            .arg(&url)
+            .current_dir(project_path)
+            .output()
+            .map_err(|e| format!("Error al ejecutar git remote add: {}", e))?;
+
+        if !add_output.status.success() {
+            let stderr = String::from_utf8_lossy(&add_output.stderr);
+            return Err(format!("Error al configurar el remoto: {}", stderr.trim()));
+        }
     }
+
+    // 1c) Check if remote already has commits
+    let ls_output = system_command(&git_path)
+        .arg("ls-remote")
+        .arg("origin")
+        .current_dir(project_path)
+        .output()
+        .map_err(|e| format!("Error al ejecutar git ls-remote: {}", e))?;
+
+    if ls_output.status.success() {
+        let ls_stdout = String::from_utf8_lossy(&ls_output.stdout);
+        if ls_stdout.contains("refs/heads/main") || ls_stdout.contains("refs/heads/master") {
+            // Remote has history — offer sync instead of failing on push
+            return Err(format!(
+                "REMOTE_HAS_COMMITS:El repositorio remoto ya contiene un historial previo. ¿Querés sincronizarlo con el proyecto local?"
+            ));
+        }
+    }
+    // If ls-remote fails (e.g. repo doesn't exist), we'll fall through to push
+    // and let the push error handler deal with it
 
     // 2) git push -u origin main
     let push_output = system_command(&git_path)
@@ -1916,6 +1962,100 @@ fn configurar_remoto(_app: tauri::AppHandle, path: String, url: String) -> Resul
             Err(format!("Error al sincronizar con remoto: {}", stderr.trim()))
         }
     }
+}
+
+/// Sync an existing remote repository that already has commits.
+///
+/// Called when `configurar_remoto` detects that the remote already has
+/// a history (e.g. from another machine). Fetches the remote branch and
+/// merges with `--allow-unrelated-histories --no-edit`.
+///
+/// On success: pushes the merged result to origin. On merge conflict:
+/// aborts the merge and returns an error with the list of conflicted files.
+#[tauri::command]
+fn sincronizar_remoto(path: String) -> Result<String, String> {
+    let project_path = Path::new(&path);
+    let git_path = find_git()?;
+
+    // 1) git fetch origin
+    let fetch_output = system_command(&git_path)
+        .arg("fetch")
+        .arg("origin")
+        .current_dir(project_path)
+        .output()
+        .map_err(|e| format!("Error al ejecutar git fetch: {}", e))?;
+
+    if !fetch_output.status.success() {
+        let stderr = String::from_utf8_lossy(&fetch_output.stderr);
+        return Err(format!(
+            "Error al obtener el historial remoto: {}",
+            stderr.trim()
+        ));
+    }
+
+    // 2) Determine the default branch on the remote
+    let branch = "main"; // we always push to main
+
+    // 3) git merge --allow-unrelated-histories --no-edit origin/main
+    let merge_output = system_command(&git_path)
+        .arg("merge")
+        .arg("--allow-unrelated-histories")
+        .arg("--no-edit")
+        .arg(format!("origin/{}", branch))
+        .current_dir(project_path)
+        .output()
+        .map_err(|e| format!("Error al ejecutar git merge: {}", e))?;
+
+    if !merge_output.status.success() {
+        // Conflict or other merge failure — abort
+        let _ = system_command(&git_path)
+            .arg("merge")
+            .arg("--abort")
+            .current_dir(project_path)
+            .output();
+
+        // Try to list conflicted files for a helpful message
+        let conflict_info = if let Ok(diff) = system_command(&git_path)
+            .arg("diff")
+            .arg("--name-only")
+            .arg("--diff-filter=U")
+            .current_dir(project_path)
+            .output()
+        {
+            let files = String::from_utf8_lossy(&diff.stdout);
+            if !files.trim().is_empty() {
+                format!("\nArchivos con diferencias:\n{}", files.trim())
+            } else {
+                String::new()
+            }
+        } else {
+            String::new()
+        };
+
+        return Err(format!(
+            "No se pudo sincronizar automáticamente. Hay diferencias entre el historial local y el remoto que requieren resolución manual.{}",
+            conflict_info
+        ));
+    }
+
+    // 4) git push origin main
+    let push_output = system_command(&git_path)
+        .arg("push")
+        .arg("origin")
+        .arg(branch)
+        .current_dir(project_path)
+        .output()
+        .map_err(|e| format!("Error al ejecutar git push: {}", e))?;
+
+    if !push_output.status.success() {
+        let stderr = String::from_utf8_lossy(&push_output.stderr);
+        return Err(format!(
+            "Sincronización local completada, pero el push falló: {}",
+            stderr.trim()
+        ));
+    }
+
+    Ok("Historial remoto sincronizado correctamente.".to_string())
 }
 
 /// Retry a push to the configured remote after previous failures.
@@ -2031,6 +2171,7 @@ pub fn run() {
             cargar_config_remoto,
             guardar_config_remoto,
             configurar_remoto,
+            sincronizar_remoto,
             reintentar_push,
         ])
         .on_window_event(|window, event| {
