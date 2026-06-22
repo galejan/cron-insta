@@ -239,6 +239,7 @@ const translations: Record<Lang, Record<string, string>> = {
     "help.shortcuts.toggleTimeline": "Mostrar/ocultar línea de tiempo",
     "help.shortcuts.fullSidebar": "Panel lateral a pantalla completa (referencia)",
     "help.shortcuts.dockCharacter": "Anclar/desanclar ficha del personaje",
+    "help.shortcuts.importProject": "Importar proyecto desde ZIP",
 
     // ── Dialogs (prompts and confirmations) ────────────────
     "dialog.selectCreateFolder":
@@ -516,6 +517,7 @@ const translations: Record<Lang, Record<string, string>> = {
     "help.shortcuts.toggleTimeline": "Toggle timeline",
     "help.shortcuts.fullSidebar": "Full-width sidebar (reference mode)",
     "help.shortcuts.dockCharacter": "Dock/undock character card",
+    "help.shortcuts.importProject": "Import project from ZIP",
 
     // ── Dialogs (prompts and confirmations) ────────────────
     "dialog.selectCreateFolder":

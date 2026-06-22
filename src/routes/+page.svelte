@@ -1317,6 +1317,13 @@
       }
     }
 
+    // Ctrl+I — import project from ZIP
+    if (e.ctrlKey && !e.shiftKey && (e.key === "i" || e.key === "I")) {
+      e.preventDefault();
+      importarProyectoHandler();
+      return;
+    }
+
     // ── Editor inserts ─────────────────────────────────────────
     // Ctrl+D → dialogue dash pair: —|— (cursor between dashes)
     if (e.ctrlKey && !e.shiftKey && (e.key === "d" || e.key === "D")) {
@@ -2098,6 +2105,7 @@
           <tr><td><kbd>Ctrl+T</kbd></td><td>{t("help.shortcuts.cycleTabs")}</td></tr>
           <tr><td><kbd>Ctrl+L</kbd></td><td>{t("help.shortcuts.toggleTimeline")}</td></tr>
           <tr><td><kbd>Ctrl+Enter</kbd></td><td>{t("help.shortcuts.dockCharacter")}</td></tr>
+          <tr><td><kbd>Ctrl+I</kbd></td><td>{t("help.shortcuts.importProject")}</td></tr>
           <tr><td><kbd>Ctrl+↑</kbd> / <kbd>Ctrl+↓</kbd></td><td>{t("help.shortcuts.applyHeading")}</td></tr>
           <tr><td><kbd>Ctrl+D</kbd></td><td>{t("help.shortcuts.dialogDash")}</td></tr>
           <tr><td><kbd>Ctrl++</kbd> / <kbd>Ctrl+-</kbd></td><td>{t("help.shortcuts.zoomIn")} / {t("help.shortcuts.zoomOut")}</td></tr>

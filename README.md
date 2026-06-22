@@ -76,6 +76,19 @@ Los archivos se guardan dentro de la carpeta `exportaciones/` del proyecto, con 
 
 El archivo generado incluye los capítulos en orden, separados por el título de cada uno. El contenido mantiene el formato enriquecido (HTML) tal como se ve en el editor, lo que permite abrirlo en un navegador o conservar los estilos al importarlo en otras herramientas.
 
+### Importar un proyecto
+
+Cronista permite importar un proyecto desde un archivo `.zip` (generado con la función Exportar). Esto permite compartir proyectos entre usuarios o migrar el trabajo a otro equipo.
+
+El botón **📥 Importar** (`Ctrl+I`) está disponible en la barra de herramientas y en la pantalla de inicio. El flujo es:
+
+1. Seleccionar el archivo `.zip` del proyecto.
+2. Elegir la carpeta de destino (por defecto en Documentos).
+3. Cronista extrae el contenido y verifica que sea un proyecto válido.
+4. Si el proyecto incluye historial de Git, pregunta si se quiere **conservar** el historial del autor original o **empezar uno limpio** desde el momento de la importación.
+
+Si hay problemas de permisos al escribir en la carpeta de destino, se muestra un mensaje específico.
+
 ---
 
 ## Instalación
@@ -168,6 +181,7 @@ Mi Novela/
 | <kbd>Ctrl</kbd> + <kbd>T</kbd> | Navegar pestañas (capítulos → personajes → notas) |
 | <kbd>Ctrl</kbd> + <kbd>L</kbd> | Mostrar / ocultar línea de tiempo |
 | <kbd>Ctrl</kbd> + <kbd>Enter</kbd> | Anclar / desanclar ficha del personaje seleccionado |
+| <kbd>Ctrl</kbd> + <kbd>I</kbd> | Importar proyecto desde ZIP |
 | <kbd>↑</kbd> / <kbd>↓</kbd> / <kbd>Inicio</kbd> / <kbd>Fin</kbd> | Navegar listas del panel lateral |
 | <kbd>Ctrl</kbd> + <kbd>P</kbd> | Mostrar / ocultar panel de herramientas |
 | <kbd>Ctrl</kbd> + <kbd>S</kbd> | Guardar ahora |
@@ -191,7 +205,7 @@ El backend Rust expone los siguientes comandos Tauri:
 - **Personajes**: `listar_personajes`, `crear_personaje`, `cargar_personaje`, `actualizar_personaje`, `eliminar_personaje`
 - **Notas**: `listar_notas`, `crear_nota`, `cargar_nota`, `eliminar_nota`
 - **Timeline**: `cargar_timeline`, `agregar_evento_timeline`, `reordenar_timeline`, `eliminar_evento_timeline`
-- **Exportación**: `exportar_proyecto_zip`, `exportar_proyecto_md`
+- **Exportación**: `exportar_proyecto_zip`, `exportar_proyecto_md`, `importar_proyecto`, `eliminar_directorio_git`
 
 ---
 
