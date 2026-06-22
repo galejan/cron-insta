@@ -316,6 +316,11 @@
   let personajeNuevoNombre = $state("");
   let personajeExpandido = $state<string | null>(null);
   let personajeEditando = $state<Record<string, any> | null>(null);
+  let characterDocked = $state<{
+    id: string; name: string; physicalDescription: string;
+    personality: string; traumas: string;
+    relationships: Array<{targetName: string; type: string; notes: string}>;
+  } | null>(null);
 
   // ── Notes state ─────────────────────────────────────────────
   let notas = $state<{ id: string; title: string }[]>([]);
@@ -660,6 +665,7 @@
     activeNote = "";
     timeline = [];
     timelineVisible = false;
+    characterDocked = null;
     gitEnabled = false;
     gitStatus = "unknown";
 
@@ -1079,11 +1085,12 @@
       return;
     }
 
-    // Ctrl+Shift+Right — restore sidebar
+    // Ctrl+Shift+Right — expand sidebar to full width (reference mode)
     if (e.ctrlKey && e.shiftKey && e.key === "ArrowRight") {
       e.preventDefault();
+      sidebarSaved = sidebarPct;
       sidebarCollapsed = false;
-      sidebarPct = sidebarSaved || 40;
+      sidebarPct = 100;
       return;
     }
 
@@ -1096,11 +1103,11 @@
       return;
     }
 
-    // Ctrl+Right — grow sidebar by 5 % (max 60 %)
+    // Ctrl+Right — grow sidebar by 5 % (max 100 %)
     if (e.ctrlKey && !e.shiftKey && e.key === "ArrowRight") {
       e.preventDefault();
       sidebarCollapsed = false;
-      sidebarPct = Math.min(60, sidebarPct + 5);
+      sidebarPct = Math.min(100, sidebarPct + 5);
       sidebarSaved = sidebarPct;
       return;
     }
@@ -1197,6 +1204,43 @@
       e.preventDefault();
       editorRef?.decreaseHeading();
       return;
+    }
+
+    // Ctrl+T — cycle sidebar tabs: capítulos → personajes → notas → capítulos
+    if (e.ctrlKey && !e.shiftKey && (e.key === "t" || e.key === "T")) {
+      e.preventDefault();
+      const order: Array<"capitulos" | "personajes" | "notas"> = ["capitulos", "personajes", "notas"];
+      const idx = order.indexOf(activeTab);
+      activeTab = order[(idx + 1) % order.length];
+      return;
+    }
+
+    // Ctrl+L — toggle timeline visibility
+    if (e.ctrlKey && !e.shiftKey && (e.key === "l" || e.key === "L")) {
+      e.preventDefault();
+      timelineVisible = !timelineVisible;
+      if (timelineVisible) refreshTimeline();
+      return;
+    }
+
+    // Ctrl+Enter — dock/undock selected character to editor panel
+    if (e.ctrlKey && !e.shiftKey && e.key === "Enter") {
+      if (characterDocked) {
+        characterDocked = null;
+        return;
+      }
+      if (personajeEditando && personajeExpandido) {
+        e.preventDefault();
+        characterDocked = {
+          id: personajeExpandido,
+          name: personajeEditando.name,
+          physicalDescription: personajeEditando.physicalDescription,
+          personality: personajeEditando.personality,
+          traumas: personajeEditando.traumas,
+          relationships: personajeEditando.relationships || [],
+        };
+        return;
+      }
     }
 
     // ── Editor inserts ─────────────────────────────────────────
