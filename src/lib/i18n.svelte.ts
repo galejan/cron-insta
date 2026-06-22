@@ -111,6 +111,16 @@ const translations: Record<Lang, Record<string, string>> = {
     "export.mdSuccess": "Capítulos exportados correctamente:",
     "export.error": "Error al exportar:",
 
+    // ── Import ──────────────────────────────────────────────
+    "import.button": "📥 Importar",
+    "import.title": "Importar proyecto desde ZIP",
+    "import.selectZip": "Seleccionar archivo ZIP del proyecto",
+    "import.selectDest": "Seleccionar carpeta de destino",
+    "import.destNotEmpty": "La carpeta de destino no está vacía. ¿Sobrescribir?",
+    "import.gitQuestion": "El proyecto importado incluye historial de Git del autor original.\n\n¿Querés conservar el historial completo o empezar uno limpio desde este momento?\n\n• Aceptar = Conservar historial\n• Cancelar = Empezar historial limpio",
+    "import.success": "Proyecto importado correctamente.",
+    "import.error": "Error al importar el proyecto:",
+
     // ── Sidebar tabs ───────────────────────────────────────
     "tabs.chapters": "Capítulos",
     "tabs.characters": "Personajes",
@@ -378,6 +388,16 @@ const translations: Record<Lang, Record<string, string>> = {
     "export.zipSuccess": "Project exported successfully:",
     "export.mdSuccess": "Chapters exported successfully:",
     "export.error": "Error exporting:",
+
+    // ── Import ──────────────────────────────────────────────
+    "import.button": "📥 Import",
+    "import.title": "Import project from ZIP",
+    "import.selectZip": "Select project ZIP file",
+    "import.selectDest": "Select destination folder",
+    "import.destNotEmpty": "Destination folder is not empty. Overwrite?",
+    "import.gitQuestion": "The imported project includes Git history from the original author.\n\nKeep the full history or start fresh from this moment?\n\n• OK = Keep history\n• Cancel = Start fresh",
+    "import.success": "Project imported successfully.",
+    "import.error": "Error importing project:",
 
     // ── Sidebar tabs ───────────────────────────────────────
     "tabs.chapters": "Chapters",
