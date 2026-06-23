@@ -3,6 +3,7 @@
   import type { Component } from "svelte";
   import { fly } from "svelte/transition";
   import Editor from "$lib/components/Editor.svelte";
+  import EditorContextMenu from "$lib/components/EditorContextMenu.svelte";
   import GitIdentityDialog from "$lib/components/GitIdentityDialog.svelte";
   import ProjectSettingsDialog from "$lib/components/ProjectSettingsDialog.svelte";
   import { debounce } from "$lib/debounce";
@@ -74,6 +75,7 @@
   import Gear from "phosphor-svelte/lib/Gear";
   import GitBranch from "phosphor-svelte/lib/GitBranch";
   import Keyboard from "phosphor-svelte/lib/Keyboard";
+  import Moon from "phosphor-svelte/lib/Moon";
   import Note from "phosphor-svelte/lib/Note";
   import Notebook from "phosphor-svelte/lib/Notebook";
   import NotePencil from "phosphor-svelte/lib/NotePencil";
@@ -84,6 +86,7 @@
   import Question from "phosphor-svelte/lib/Question";
   import Scroll from "phosphor-svelte/lib/Scroll";
   import Sparkle from "phosphor-svelte/lib/Sparkle";
+  import Sun from "phosphor-svelte/lib/Sun";
   import User from "phosphor-svelte/lib/User";
   import UserPlus from "phosphor-svelte/lib/UserPlus";
   import Users from "phosphor-svelte/lib/Users";
@@ -284,6 +287,9 @@
   let fontPickerResolve = $state<((v: string) => void) | null>(null);
   let saveStatus = $state<"" | "saved" | "unsaved" | "saving">("");
 
+  // ── Context menu state ──────────────────────────────────────
+  let contextMenu = $state({ open: false, x: 0, y: 0, selectedText: "" });
+
   // ── Auto-commit on close (Tauri window event) ─────────────────
   // The Rust backend (on_window_event) handles the git checkpoint.
   // JS only shows the closing overlay and calls destroy().
@@ -364,6 +370,8 @@
     insertText(text: string): void;
     isFocused(): boolean;
     scrollToTop(): void;
+    getSelectedText(): string;
+    deleteSelection(): string;
   }>();
 
   // ── Sidebar tab state ───────────────────────────────────────
@@ -501,6 +509,129 @@
       pendingDelete = filename;
       // Auto-reset after 3 seconds
       setTimeout(() => { pendingDelete = null; }, 3_000);
+    }
+  }
+
+  // ── Context menu action handlers ──────────────────────────
+
+  async function handleSaveAsNote(): Promise<void> {
+    if (!projectPath) return;
+    const text = contextMenu.selectedText;
+    if (!text.trim()) return;
+
+    const title = prompt(t("context.noteTitlePrompt"), text.trim().slice(0, 60));
+    if (!title?.trim()) return;
+
+    const id = "note-" + Date.now();
+    try {
+      await crearNota(projectPath, id, title.trim(), text);
+      await refreshNotas();
+    } catch (e) {
+      console.error("[cronista] Save note from context failed:", e);
+      alert(`${t("notes.createError")} ${e}`);
+    }
+  }
+
+  async function handleSaveAsTrait(): Promise<void> {
+    if (!projectPath) return;
+    const text = contextMenu.selectedText;
+    if (!text.trim()) return;
+
+    // Prompt for character name
+    const name = prompt(t("context.characterPrompt"));
+    if (!name?.trim()) return;
+
+    // Load characters list and find match
+    try {
+      const raw = await listarPersonajes(projectPath);
+      const chars: { id: string; name: string }[] = JSON.parse(raw);
+      const found = chars.find((c) => c.name === name.trim());
+      if (!found) {
+        alert(t("context.characterNotFound").replace("{name}", name.trim()));
+        return;
+      }
+
+      // Prompt for where to append
+      const field = prompt("¿Dónde? (personalidad / traumas)", "personalidad");
+      if (!field) return;
+
+      // Load character
+      const charRaw = await cargarPersonaje(projectPath, found.id);
+      const char = JSON.parse(charRaw);
+
+      // Append to field
+      if (field.toLowerCase().includes("personalidad")) {
+        char.personality = (char.personality || "") + "\n" + text;
+      } else if (field.toLowerCase().includes("trauma")) {
+        char.traumas = (char.traumas || "") + "\n" + text;
+      } else {
+        // Default: personality
+        char.personality = (char.personality || "") + "\n" + text;
+      }
+
+      await actualizarPersonaje(projectPath, found.id, JSON.stringify(char));
+      await refreshPersonajes();
+      showToast(t("context.traitSaved").replace("{name}", found.name), "warning", undefined, CheckCircle);
+    } catch (e) {
+      console.error("[cronista] Save trait from context failed:", e);
+      alert(`${t("characters.saveError")} ${e}`);
+    }
+  }
+
+  async function handleNewChapterFromContext(): Promise<void> {
+    if (!projectPath) return;
+    const text = contextMenu.selectedText;
+    if (!text.trim()) return;
+
+    const filename = prompt(t("context.chapterNamePrompt"));
+    if (!filename?.trim()) return;
+
+    const sanitized = filename
+      .trim()
+      .replace(/\s+/g, "-")
+      .replace(/\.md$/i, "")
+      + ".md";
+
+    // Create a simple HTML document with the selected text
+    const titulo = filename.trim().replace(/\.md$/i, "")
+      .replace(/^[\d_]+/, "")
+      .replace(/_/g, " ")
+      .trim() || t("chapters.untitled");
+    const html = `<h1>${titulo}</h1><p>${text.replace(/\n/g, "</p><p>")}</p>`;
+
+    try {
+      await crearCapitulo(projectPath, sanitized, html);
+      await refreshChapters();
+      // Optionally switch to the new chapter
+      await cargarCapituloActual(sanitized);
+    } catch (e) {
+      console.error("[cronista] New chapter from context failed:", e);
+      alert(`${t("chapters.createError")} ${e}`);
+    }
+  }
+
+  async function handleAddAsEventFromContext(): Promise<void> {
+    if (!projectPath) return;
+    const text = contextMenu.selectedText;
+    if (!text.trim()) return;
+
+    const title = prompt(t("context.eventTitlePrompt"), text.trim().slice(0, 60));
+    if (!title?.trim()) return;
+
+    const evento = {
+      date: "",
+      title: title.trim(),
+      description: text,
+      relatedCharacters: [] as string[],
+      relatedChapters: [] as string[],
+    };
+
+    try {
+      await agregarEventoTimeline(projectPath, JSON.stringify(evento));
+      await refreshTimeline();
+    } catch (e) {
+      console.error("[cronista] Add event from context failed:", e);
+      alert(`${t("timeline.addError")} ${e}`);
     }
   }
 
@@ -1545,6 +1676,10 @@
           {:else}
             <p class="empty-hint">{t("chapters.empty")}</p>
           {/if}
+
+          <button class="btn-add" onclick={() => crearCapituloNuevo()}>
+            <Notebook size={16} weight="light" color="currentColor" /> {t("toolbar.newChapter")}
+          </button>
         </div>
       {/if}
 
@@ -1971,15 +2106,11 @@
               class="footer-btn"
               onclick={() => (theme = theme === "light" ? "dark" : "light")}
               title={theme === "light" ? t("toolbar.darkMode") : t("toolbar.lightMode")}
-            >{theme === "light" ? "🌙" : "☀️"}</button>
+            >{#if theme === "light"}<Moon size={16} weight="light" color="currentColor" />{:else}<Sun size={16} weight="light" color="currentColor" />{/if}</button>
           </div>
 
-          <!-- Row 2: project management -->
+          <!-- Row 2: project management (general) -->
           <div class="footer-row">
-            <button class="footer-btn" onclick={() => crearCapituloNuevo()} title={t("toolbar.newChapterTitle")}>
-              <NotePencil size={18} weight="light" color="currentColor" /> {t("toolbar.newChapter")}
-            </button>
-            <span class="footer-sep"></span>
             <button class="footer-btn" onclick={nuevoProyectoHandler} title={t("toolbar.newProjectTitle")}>
               <Sparkle size={18} weight="light" color="currentColor" /> {t("toolbar.newProject")}
             </button>
@@ -1988,6 +2119,13 @@
             </button>
             <button class="footer-btn" onclick={importarProyectoHandler} title={t("import.title")}>
               <DownloadSimple size={18} weight="light" color="currentColor" /> {t("import.button")}
+            </button>
+          </div>
+
+          <!-- Row 3: current project actions -->
+          <div class="footer-row">
+            <button class="footer-btn" onclick={() => (settingsOpen = true)} title={t("settings.settings")}>
+              <Gear size={18} weight="light" color="currentColor" /> {t("settings.settings")}
             </button>
             <span class="footer-sep"></span>
             <button class="footer-btn" onclick={async () => {
@@ -2017,7 +2155,7 @@
             </button>
           </div>
 
-          <!-- Row 3: save -->
+          <!-- Row 4: save -->
           <div class="footer-row">
             <button
               class="footer-btn"
@@ -2039,7 +2177,7 @@
             </span>
           </div>
 
-          <!-- Row 4: versioning -->
+          <!-- Row 5: versioning -->
           {#if gitStatus !== "unknown"}
             <div class="footer-row">
               {#if gitStatus === "active"}
@@ -2158,14 +2296,20 @@
             onclick={() => (helpMode = !helpMode)}
             title={t("toolbar.helpTitle")}
           ><Question size={16} weight="light" color="currentColor" /></button>
-          <button
-            class="help-btn"
-            onclick={() => (settingsOpen = true)}
-            title={t("settings.settings")}
-          ><Gear size={16} weight="light" color="currentColor" /></button>
         </div>
 
-        <div class="editor-body">
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div
+          class="editor-body"
+          role="textbox"
+          aria-multiline="true"
+          tabindex="0"
+          oncontextmenu={(e) => {
+            e.preventDefault();
+            const text = editorRef?.getSelectedText() || "";
+            contextMenu = { open: true, x: e.clientX, y: e.clientY, selectedText: text };
+          }}
+        >
           <Editor
             bind:this={editorRef}
             content={editorContent}
@@ -2296,6 +2440,11 @@
       </div>
 
       <div class="help-section">
+        <h3><Gear size={16} weight="light" color="currentColor" aria-hidden="true" /> {t("help.settingsTitle")}</h3>
+        <p>{t("help.settingsDesc")}</p>
+      </div>
+
+      <div class="help-section">
         <h3><Package size={16} weight="light" color="currentColor" aria-hidden="true" /> {t("help.exportTitle")}</h3>
         <p>{t("help.exportDesc")}</p>
       </div>
@@ -2351,6 +2500,20 @@
   projectPath={projectPath}
   currentFontFamily={fontFamily}
   onFontSaved={(font: string) => { fontFamily = font; }}
+/>
+
+<!-- Editor context menu -->
+<EditorContextMenu
+  x={contextMenu.x}
+  y={contextMenu.y}
+  bind:open={contextMenu.open}
+  selectedText={contextMenu.selectedText}
+  onClose={() => { contextMenu.open = false; }}
+  onCut={() => { editorRef?.deleteSelection(); }}
+  onSaveAsNote={handleSaveAsNote}
+  onSaveAsTrait={handleSaveAsTrait}
+  onNewChapter={handleNewChapterFromContext}
+  onAddAsEvent={handleAddAsEventFromContext}
 />
 
 <!-- Remote sync warning mini-dialog -->

@@ -14,6 +14,15 @@ export default defineConfig(async () => ({
   // 2. desktop app — large SPA chunks are expected, not a problem
   build: {
     chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (id.includes("phosphor-svelte")) {
+            return "phosphor-icons";
+          }
+        },
+      },
+    },
   },
   // 2. tauri expects a fixed port, fail if that port is not available
   server: {

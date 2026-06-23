@@ -207,7 +207,7 @@ const translations: Record<Lang, Record<string, string>> = {
     "help.createdBy": "creado por",
     "help.editorTitle": "Editor",
     "help.editorDesc":
-      "El texto se guarda automáticamente cada 20 segundos. El tipo de letra se elige al crear el proyecto y se aplica a todo el texto. Con Ctrl+↑ y Ctrl+↓ se cambia el nivel de título.",
+      "El texto se guarda automáticamente cada 20 segundos. El tipo de letra se elige al crear el proyecto, pero puede cambiarse después desde el botón ⚙️ Configuración. Con Ctrl+↑ y Ctrl+↓ se cambia el nivel de título.",
     "help.chaptersTitle": "Capítulos",
     "help.chaptersDesc":
       "Creá capítulos desde el botón «+ Nuevo capítulo» en la pestaña Capítulos. El nombre del archivo se convierte en el título H1 del editor. Para eliminar, pulsá × y luego confirmá.",
@@ -222,7 +222,10 @@ const translations: Record<Lang, Record<string, string>> = {
       "Línea temporal al final del panel lateral. Añadí eventos con fecha, descripción y vinculalos a personajes y capítulos.",
     "help.versioningTitle": "Versionado",
     "help.versioningDesc":
-      "Cronista usa Git para mantener un historial de cambios. Al cerrar la aplicación se crea un checkpoint automático. El indicador en el panel lateral muestra el estado: verde (activo), naranja (sin inicializar), rojo (Git no instalado).",
+      "Cronista usa Git para mantener un historial de cambios. Al cerrar la aplicación se crea un checkpoint automático. El indicador en el panel lateral muestra el estado: verde (activo), naranja (sin inicializar), rojo (Git no instalado). La identidad Git y el repositorio remoto pueden editarse desde ⚙️ Configuración.",
+    "help.settingsTitle": "Configuración",
+    "help.settingsDesc":
+      "El botón ⚙️ del panel de herramientas abre la configuración del proyecto. Desde ahí podés cambiar la tipografía, la identidad Git y la URL del repositorio remoto en cualquier momento, sin necesidad de crear un proyecto nuevo.",
     "help.exportTitle": "Exportar y compartir",
     "help.exportDesc":
       "Desde el panel de herramientas podés exportar el proyecto completo en .zip (incluye personajes, notas y Git) o compartir solo los capítulos en un archivo .md. Ambos se guardan en la carpeta exportaciones/ dentro del proyecto.",
@@ -340,7 +343,22 @@ const translations: Record<Lang, Record<string, string>> = {
     "editor.fontDefault": "Por defecto",
     "editor.fontSerif": "Serif",
     "editor.fontSans": "Sans-serif",
-    "editor.fontMono": "Monospace",
+    "editor.fontMono": "Monoespaciada",
+
+    // ── Context menu ────────────────────────────────────────
+    "context.copy": "Copiar",
+    "context.cut": "Cortar",
+    "context.paste": "Pegar",
+    "context.saveAsNote": "Guardar como nota",
+    "context.saveAsTrait": "Guardar como rasgo de personaje",
+    "context.newChapter": "Nuevo capítulo",
+    "context.addAsEvent": "Añadir como evento",
+    "context.noteTitlePrompt": "Título de la nota:",
+    "context.chapterNamePrompt": "Nombre del capítulo (sin .md):",
+    "context.eventTitlePrompt": "Título del evento:",
+    "context.characterPrompt": "¿A qué personaje? (nombre exacto)",
+    "context.traitSaved": "Rasgo guardado en {name}",
+    "context.characterNotFound": "Personaje \"{name}\" no encontrado",
   },
 
   en: {
@@ -513,7 +531,7 @@ const translations: Record<Lang, Record<string, string>> = {
     "help.createdBy": "created by",
     "help.editorTitle": "Editor",
     "help.editorDesc":
-      "Text is auto-saved every 20 seconds. The font is chosen when creating the project and applied to all text. Use Ctrl+↑ and Ctrl+↓ to change heading levels.",
+      "Text is auto-saved every 20 seconds. The font is chosen when creating the project, but can be changed later from the ⚙️ Settings button. Use Ctrl+↑ and Ctrl+↓ to change heading levels.",
     "help.chaptersTitle": "Chapters",
     "help.chaptersDesc":
       "Create chapters from the «+ New Chapter» button in the Chapters tab. The filename becomes the H1 title in the editor. To delete, click × then confirm.",
@@ -528,7 +546,10 @@ const translations: Record<Lang, Record<string, string>> = {
       "Timeline at the bottom of the sidebar. Add events with date, description, and link them to characters and chapters.",
     "help.versioningTitle": "Versioning",
     "help.versioningDesc":
-      "Cronista uses Git to keep a change history. An automatic checkpoint is created when closing the app. The indicator in the sidebar shows status: green (active), orange (not initialized), red (Git not installed).",
+      "Cronista uses Git to keep a change history. An automatic checkpoint is created when closing the app. The indicator in the sidebar shows status: green (active), orange (not initialized), red (Git not installed). Git identity and remote repo can be edited from ⚙️ Settings.",
+    "help.settingsTitle": "Settings",
+    "help.settingsDesc":
+      "The ⚙️ button in the tools panel opens the project settings. From there you can change the font, Git identity, and remote repository URL at any time — no need to create a new project.",
     "help.exportTitle": "Export & share",
     "help.exportDesc":
       "From the tools panel you can export the full project as .zip (includes characters, notes, and Git) or share just the chapters as a single .md file. Both are saved in the exportaciones/ folder inside the project.",
@@ -647,6 +668,21 @@ const translations: Record<Lang, Record<string, string>> = {
     "editor.fontSerif": "Serif",
     "editor.fontSans": "Sans-serif",
     "editor.fontMono": "Monospace",
+
+    // ── Context menu ────────────────────────────────────────
+    "context.copy": "Copy",
+    "context.cut": "Cut",
+    "context.paste": "Paste",
+    "context.saveAsNote": "Save as note",
+    "context.saveAsTrait": "Save as character trait",
+    "context.newChapter": "New chapter",
+    "context.addAsEvent": "Add as timeline event",
+    "context.noteTitlePrompt": "Note title:",
+    "context.chapterNamePrompt": "Chapter name (without .md):",
+    "context.eventTitlePrompt": "Event title:",
+    "context.characterPrompt": "Which character? (exact name)",
+    "context.traitSaved": "Trait saved to {name}",
+    "context.characterNotFound": "Character \"{name}\" not found",
   },
 };
 
