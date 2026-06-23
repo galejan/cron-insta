@@ -1,11 +1,14 @@
 <script lang="ts">
   import { untrack } from "svelte";
+  import type { Component } from "svelte";
   import { fly } from "svelte/transition";
   import Editor from "$lib/components/Editor.svelte";
   import GitIdentityDialog from "$lib/components/GitIdentityDialog.svelte";
+  import ProjectSettingsDialog from "$lib/components/ProjectSettingsDialog.svelte";
   import { debounce } from "$lib/debounce";
   import { t, setLang, lang } from "$lib/i18n.svelte";
   import {
+    actualizarFuenteProyecto,
     actualizarPersonaje,
     actualizarEventoTimeline,
     agregarEventoTimeline,
@@ -50,6 +53,44 @@
   import { openUrl } from "@tauri-apps/plugin-opener";
   import pkg from "../../package.json";
   const APP_VERSION = pkg.version;
+
+  // ── Phosphor Icons (direct-path imports for tree-shaking) ─────
+  import Article from "phosphor-svelte/lib/Article";
+  import ArrowRight from "phosphor-svelte/lib/ArrowRight";
+  import BookOpen from "phosphor-svelte/lib/BookOpen";
+  import CaretDown from "phosphor-svelte/lib/CaretDown";
+  import CaretLeft from "phosphor-svelte/lib/CaretLeft";
+  import CaretRight from "phosphor-svelte/lib/CaretRight";
+  import CaretUp from "phosphor-svelte/lib/CaretUp";
+  import ChatText from "phosphor-svelte/lib/ChatText";
+  import CheckCircle from "phosphor-svelte/lib/CheckCircle";
+  import Clock from "phosphor-svelte/lib/Clock";
+  import DownloadSimple from "phosphor-svelte/lib/DownloadSimple";
+  import Export from "phosphor-svelte/lib/Export";
+  import FileText from "phosphor-svelte/lib/FileText";
+
+  import FloppyDisk from "phosphor-svelte/lib/FloppyDisk";
+  import FolderOpen from "phosphor-svelte/lib/FolderOpen";
+  import Gear from "phosphor-svelte/lib/Gear";
+  import GitBranch from "phosphor-svelte/lib/GitBranch";
+  import Keyboard from "phosphor-svelte/lib/Keyboard";
+  import Note from "phosphor-svelte/lib/Note";
+  import Notebook from "phosphor-svelte/lib/Notebook";
+  import NotePencil from "phosphor-svelte/lib/NotePencil";
+  import Package from "phosphor-svelte/lib/Package";
+  import PencilSimple from "phosphor-svelte/lib/PencilSimple";
+  import Plus from "phosphor-svelte/lib/Plus";
+  import PushPin from "phosphor-svelte/lib/PushPin";
+  import Question from "phosphor-svelte/lib/Question";
+  import Scroll from "phosphor-svelte/lib/Scroll";
+  import Sparkle from "phosphor-svelte/lib/Sparkle";
+  import User from "phosphor-svelte/lib/User";
+  import UserPlus from "phosphor-svelte/lib/UserPlus";
+  import Users from "phosphor-svelte/lib/Users";
+  import Warning from "phosphor-svelte/lib/Warning";
+
+  import X from "phosphor-svelte/lib/X";
+  import XCircle from "phosphor-svelte/lib/XCircle";
 
   let sidebarPct = $state(40);          // current sidebar width in %
   let sidebarSaved = $state(40);        // width to restore on un-collapse
@@ -224,8 +265,11 @@
   let remoteWarningVisible = $state(false);
   let remoteWarningDialog = $state(false);
 
+  // ── Project Settings dialog ──────────────────────────────────
+  let settingsOpen = $state(false);
+
   // ── Toast notifications ─────────────────────────────────────
-  let toast = $state<{message: string, type: "warning" | "error", action?: {label: string, onClick: () => void}} | null>(null);
+  let toast = $state<{message: string, type: "warning" | "error", action?: {label: string, onClick: () => void}, icon?: Component} | null>(null);
 
   let footerExpanded = $state(true);
   let zoomLevel = $state(0); // 0=normal, 1=medium, 2=large
@@ -495,8 +539,8 @@
   }
 
   /** Dismiss the toast after a delay. */
-  function showToast(message: string, type: "warning" | "error" = "warning", action?: {label: string, onClick: () => void}) {
-    toast = { message, type, action };
+  function showToast(message: string, type: "warning" | "error" = "warning", action?: {label: string, onClick: () => void}, icon?: Component) {
+    toast = { message, type, action, icon };
     setTimeout(() => {
       if (toast?.message === message) toast = null;
     }, 5_000);
@@ -578,7 +622,7 @@
               if (shouldSync) {
                 try {
                   const syncMsg = await sincronizarRemoto(path);
-                  showToast(syncMsg || "✅ " + t("git.syncSuccess"), "warning");
+                  showToast(syncMsg || t("git.syncSuccess"), "warning", undefined, CheckCircle);
                 } catch (syncErr) {
                   showToast(String(syncErr), "error");
                 }
@@ -765,7 +809,7 @@
         await cargarCapituloActual(chapters[0]);
       }
       console.log("[cronista] Imported project opened:", meta.project_name, chapters);
-      showToast("✅ " + t("import.success"), "warning");
+      showToast(t("import.success"), "warning", undefined, CheckCircle);
     } catch (e) {
       console.error("[cronista] Import failed:", e);
       alert(t("import.error") + "\n\n" + String(e));
@@ -1453,17 +1497,17 @@
         class="tab"
         class:active={activeTab === "capitulos"}
         onclick={() => { pendingDelete = null; activeTab = "capitulos"; activeNote = ""; }}
-      >{t("tabs.chapters")}</button>
+      ><Article size={18} weight="light" color="currentColor" /> {t("tabs.chapters")}</button>
       <button
         class="tab"
         class:active={activeTab === "personajes"}
         onclick={() => { pendingDelete = null; activeTab = "personajes"; }}
-      >{t("tabs.characters")}</button>
+      ><Users size={18} weight="light" color="currentColor" /> {t("tabs.characters")}</button>
       <button
         class="tab"
         class:active={activeTab === "notas"}
         onclick={() => { pendingDelete = null; activeTab = "notas"; }}
-      >{t("tabs.notes")}</button>
+      ><Note size={18} weight="light" color="currentColor" /> {t("tabs.notes")}</button>
     </nav>
 
     <div class="sidebar-content">
@@ -1493,7 +1537,7 @@
                       class="item-delete"
                       title={t("chapters.deleteTitle")}
                       onclick={() => eliminarCapituloHandler(ch)}
-                    >×</button>
+                    ><X size={16} weight="light" color="currentColor" /></button>
                   {/if}
                 </li>
               {/each}
@@ -1578,7 +1622,7 @@
                             <button
                               class="btn-sm btn-danger"
                               onclick={() => eliminarRelacionPersonaje(ri)}
-                            >×</button>
+                            ><X size={16} weight="light" color="currentColor" /></button>
                           </div>
                         {/each}
 {/if}
@@ -1591,7 +1635,7 @@
     onclick={() => { exportModal = false; }}
     onkeydown={(e) => { if (e.key === "Escape") exportModal = false; }}>
     <div class="modal-panel" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
-      <h2>📦 {t("export.title")}</h2>
+      <h2><Package size={16} weight="light" color="currentColor" aria-hidden="true" /> {t("export.title")}</h2>
       <p class="modal-desc">{t("export.desc")}</p>
 
       <div class="export-options">
@@ -1604,7 +1648,7 @@
             alert(t("export.error") + " " + e);
           }
         }}>
-          <span class="export-option-icon">🗜️</span>
+          <span class="export-option-icon"><Export size={16} weight="light" color="currentColor" /></span>
           <span class="export-option-title">{t("export.zipTitle")}</span>
           <span class="export-option-hint">{t("export.zipHint")}</span>
         </button>
@@ -1618,7 +1662,7 @@
             alert(t("export.error") + " " + e);
           }
         }}>
-          <span class="export-option-icon">📄</span>
+          <span class="export-option-icon"><FileText size={16} weight="light" color="currentColor" /></span>
           <span class="export-option-title">{t("export.mdTitle")}</span>
           <span class="export-option-hint">{t("export.mdHint")}</span>
         </button>
@@ -1665,7 +1709,7 @@
             </div>
           {:else}
             <button class="btn-add" onclick={() => personajeFormVisible = true}>
-              {t("characters.new")}
+              <UserPlus size={16} weight="light" color="currentColor" /> {t("characters.new")}
             </button>
           {/if}
         </div>
@@ -1689,7 +1733,7 @@
                     class="item-delete"
                     title={t("notes.deleteTitle")}
                     onclick={() => eliminarNotaHandler(n.id)}
-                  >×</button>
+                  ><X size={16} weight="light" color="currentColor" /></button>
                 </li>
               {/each}
             </ul>
@@ -1717,7 +1761,7 @@
           {/if}
 
           <button class="btn-add" onclick={() => crearNotaHandler()}>
-            {t("notes.new")}
+            <NotePencil size={16} weight="light" color="currentColor" /> {t("notes.new")}
           </button>
         </div>
       {/if}
@@ -1729,7 +1773,12 @@
         class="timeline-toggle"
         onclick={() => { timelineVisible = !timelineVisible; if (timelineVisible) refreshTimeline(); }}
       >
-        {timelineVisible ? "▼" : "▶"} {t("timeline.title")}
+        {#if timelineVisible}
+          <CaretDown size={16} weight="light" color="currentColor" />
+        {:else}
+          <CaretRight size={16} weight="light" color="currentColor" />
+        {/if}
+        {t("timeline.title")}
         {#if timeline.length > 0}
           <span class="timeline-badge">{timeline.length}</span>
         {/if}
@@ -1761,17 +1810,23 @@
                       <span class="event-moment">{evt.date}</span>
                     {/if}
                     <span class="event-title">{evt.title}</span>
-                    <span class="event-expand-icon">{eventoExpandido === evt.id ? "▼" : "▶"}</span>
+                    <span class="event-expand-icon">
+                      {#if eventoExpandido === evt.id}
+                        <CaretDown size={16} weight="light" color="currentColor" />
+                      {:else}
+                        <CaretRight size={16} weight="light" color="currentColor" />
+                      {/if}
+                    </span>
                     <button
                       class="item-edit"
                       title={t("timeline.editTitle")}
                       onclick={(e) => { e.stopPropagation(); editarEvento(evt); }}
-                    >✎</button>
+                    ><PencilSimple size={16} weight="light" color="currentColor" /></button>
                     <button
                       class="item-delete"
                       title={t("timeline.deleteTitle")}
                       onclick={(e) => { e.stopPropagation(); eliminarEventoHandler(evt.id); }}
-                    >×</button>
+                    ><X size={16} weight="light" color="currentColor" /></button>
                   </div>
                   {#if eventoExpandido === evt.id}
                     <div class="event-details">
@@ -1874,7 +1929,7 @@
             </div>
           {:else}
             <button class="btn-add" onclick={() => { cancelarEdicion(); eventoFormVisible = true; }}>
-              {t("timeline.newEvent")}
+              <Plus size={16} weight="light" color="currentColor" /> {t("timeline.newEvent")}
             </button>
           {/if}
         </div>
@@ -1888,7 +1943,11 @@
         onclick={() => (footerExpanded = !footerExpanded)}
         title={footerExpanded ? t("toolbar.collapseFooter") : t("toolbar.expandFooter")}
       >
-        {footerExpanded ? "▼" : "▲"}
+        {#if footerExpanded}
+          <CaretDown size={16} weight="light" color="currentColor" />
+        {:else}
+          <CaretUp size={16} weight="light" color="currentColor" />
+        {/if}
       </button>
 
       {#if footerExpanded}
@@ -1918,17 +1977,17 @@
           <!-- Row 2: project management -->
           <div class="footer-row">
             <button class="footer-btn" onclick={() => crearCapituloNuevo()} title={t("toolbar.newChapterTitle")}>
-              📝 {t("toolbar.newChapter")}
+              <NotePencil size={18} weight="light" color="currentColor" /> {t("toolbar.newChapter")}
             </button>
             <span class="footer-sep"></span>
             <button class="footer-btn" onclick={nuevoProyectoHandler} title={t("toolbar.newProjectTitle")}>
-              ✨ {t("toolbar.newProject")}
+              <Sparkle size={18} weight="light" color="currentColor" /> {t("toolbar.newProject")}
             </button>
             <button class="footer-btn" onclick={() => abrirProyecto()} title={t("toolbar.openProjectTitle")}>
-              📂 {t("toolbar.openProject")}
+              <FolderOpen size={18} weight="light" color="currentColor" /> {t("toolbar.openProject")}
             </button>
             <button class="footer-btn" onclick={importarProyectoHandler} title={t("import.title")}>
-              📥 {t("import.button")}
+              <DownloadSimple size={18} weight="light" color="currentColor" /> {t("import.button")}
             </button>
             <span class="footer-sep"></span>
             <button class="footer-btn" onclick={async () => {
@@ -1940,7 +1999,7 @@
                 alert(t("export.error") + " " + e);
               }
             }} title={t("export.zipTitle")}>
-              🗜️ {t("export.export")}
+              <Export size={18} weight="light" color="currentColor" /> {t("export.export")}
             </button>
             <button class="footer-btn" onclick={async () => {
               try {
@@ -1950,11 +2009,11 @@
                 alert(t("export.error") + " " + e);
               }
             }} title={t("export.mdTitle")}>
-              📄 {t("export.share")}
+              <FileText size={18} weight="light" color="currentColor" /> {t("export.share")}
             </button>
             <span class="footer-sep"></span>
             <button class="footer-btn" onclick={() => cerrarProyecto()} title={t("toolbar.closeProjectTitle")}>
-              ✕ {t("toolbar.closeProject")}
+              <XCircle size={18} weight="light" color="currentColor" /> {t("toolbar.closeProject")}
             </button>
           </div>
 
@@ -1964,7 +2023,7 @@
               class="footer-btn"
               onclick={() => { saveStatus = "saving"; save.trigger(); }}
               title={t("toolbar.saveTitle")}
-            >💾 {t("toolbar.save")}</button>
+            ><FloppyDisk size={18} weight="light" color="currentColor" /> {t("toolbar.save")}</button>
             <span class="save-indicator"
               class:saving={saveStatus === "saving"}
               class:saved={saveStatus === "saved"}
@@ -1985,9 +2044,9 @@
             <div class="footer-row">
               {#if gitStatus === "active"}
                 <span class="git-indicator git-active" title={t("git.activeTitle")}>🟢 {t("git.active")}</span>
-                <button class="git-log-link" onclick={cargarGitLog}>{t("git.viewSessions")} →</button>
+                <button class="git-log-link" onclick={cargarGitLog}>{t("git.viewSessions")} <ArrowRight size={16} weight="light" color="currentColor" /></button>
                 {#if remoteWarningVisible}
-                  <span class="remote-warning-icon">⚠️</span>
+                  <span class="remote-warning-icon"><Warning size={16} weight="light" color="currentColor" /></span>
                   <button
                     class="remote-warning-btn"
                     onclick={() => (remoteWarningDialog = true)}
@@ -2026,7 +2085,7 @@
                         if (shouldSync) {
                           try {
                             const syncMsg = await sincronizarRemoto(projectPath);
-                            showToast(syncMsg || "✅ " + t("git.syncSuccess"), "warning");
+                  showToast(syncMsg || t("git.syncSuccess"), "warning", undefined, CheckCircle);
                           } catch (syncErr) {
                             showToast(String(syncErr), "error");
                           }
@@ -2098,7 +2157,12 @@
             class="help-btn"
             onclick={() => (helpMode = !helpMode)}
             title={t("toolbar.helpTitle")}
-          >?</button>
+          ><Question size={16} weight="light" color="currentColor" /></button>
+          <button
+            class="help-btn"
+            onclick={() => (settingsOpen = true)}
+            title={t("settings.settings")}
+          ><Gear size={16} weight="light" color="currentColor" /></button>
         </div>
 
         <div class="editor-body">
@@ -2119,20 +2183,20 @@
               disabled={idx <= 0}
               onclick={capituloAnterior}
               title={t("chapterNav.prev")}
-            >←</button>
+            ><CaretLeft size={16} weight="light" color="currentColor" aria-hidden="true" /></button>
             <span class="nav-position">{idx + 1} / {chapters.length}</span>
             {#if idx < chapters.length - 1}
               <button
                 class="nav-btn"
                 onclick={capituloSiguiente}
                 title={t("chapterNav.next")}
-              >→</button>
+              ><CaretRight size={16} weight="light" color="currentColor" aria-hidden="true" /></button>
             {:else}
               <button
                 class="nav-btn nav-btn-new"
                 onclick={capituloSiguiente}
                 title={t("chapterNav.newChapter")}
-              >+</button>
+              ><Notebook size={16} weight="light" color="currentColor" aria-hidden="true" /></button>
             {/if}
           </div>
         {/if}
@@ -2140,9 +2204,9 @@
         {#if characterDocked}
           <div class="character-dock" transition:fly={{ x: 300, duration: 200 }}>
             <div class="character-dock-header">
-              <h3>📌 {characterDocked.name}</h3>
+              <h3><PushPin size={16} weight="light" color="currentColor" aria-hidden="true" /> {characterDocked.name}</h3>
               <button class="character-dock-close" onclick={() => characterDocked = null}
-                title={t("characters.undock")}>✕</button>
+                title={t("characters.undock")}><XCircle size={16} weight="light" color="currentColor" /></button>
             </div>
             <div class="character-dock-body">
               {#if characterDocked.physicalDescription}
@@ -2196,53 +2260,53 @@
       <div class="help-header">
         <h2>Cronista</h2>
         <span class="help-version">v{APP_VERSION}</span>
-        <button class="help-close" onclick={() => (helpMode = false)}>✕</button>
+        <button class="help-close" onclick={() => (helpMode = false)} title={t("common.cancel")}><X size={16} weight="light" color="currentColor" /></button>
       </div>
 
       <p class="help-creator">{t("help.createdBy")} <a href="mailto:galejan@gmail.com">galejan@gmail.com</a></p>
 
       <div class="help-section">
-        <h3>{t("help.editorTitle")}</h3>
+        <h3><BookOpen size={16} weight="light" color="currentColor" aria-hidden="true" /> {t("help.editorTitle")}</h3>
         <p>{t("help.editorDesc")}</p>
       </div>
 
       <div class="help-section">
-        <h3>{t("help.chaptersTitle")}</h3>
+        <h3><FolderOpen size={16} weight="light" color="currentColor" aria-hidden="true" /> {t("help.chaptersTitle")}</h3>
         <p>{@html t("help.chaptersDesc")}</p>
       </div>
 
       <div class="help-section">
-        <h3>{t("help.charactersTitle")}</h3>
+        <h3><User size={16} weight="light" color="currentColor" aria-hidden="true" /> {t("help.charactersTitle")}</h3>
         <p>{t("help.charactersDesc")}</p>
       </div>
 
       <div class="help-section">
-        <h3>{t("help.notesTitle")}</h3>
+        <h3><NotePencil size={16} weight="light" color="currentColor" aria-hidden="true" /> {t("help.notesTitle")}</h3>
         <p>{t("help.notesDesc")}</p>
       </div>
 
       <div class="help-section">
-        <h3>{t("help.timelineTitle")}</h3>
+        <h3><Clock size={16} weight="light" color="currentColor" aria-hidden="true" /> {t("help.timelineTitle")}</h3>
         <p>{t("help.timelineDesc")}</p>
       </div>
 
       <div class="help-section">
-        <h3>{t("help.versioningTitle")}</h3>
+        <h3><GitBranch size={16} weight="light" color="currentColor" aria-hidden="true" /> {t("help.versioningTitle")}</h3>
         <p>{t("help.versioningDesc")}</p>
       </div>
 
       <div class="help-section">
-        <h3>{t("help.exportTitle")}</h3>
+        <h3><Package size={16} weight="light" color="currentColor" aria-hidden="true" /> {t("help.exportTitle")}</h3>
         <p>{t("help.exportDesc")}</p>
       </div>
 
       <div class="help-section">
-        <h3>{t("help.dialogDashTitle")}</h3>
+        <h3><ChatText size={16} weight="light" color="currentColor" aria-hidden="true" /> {t("help.dialogDashTitle")}</h3>
         <p>{t("help.dialogDashDesc")}</p>
       </div>
 
       <div class="help-section">
-        <h3>{t("help.shortcutsTitle")}</h3>
+        <h3><Keyboard size={16} weight="light" color="currentColor" aria-hidden="true" /> {t("help.shortcutsTitle")}</h3>
         <table class="help-shortcuts">
           <tbody>
           <tr><td><kbd>Ctrl+Shift+←</kbd></td><td>{t("help.shortcuts.toggleSidebar")}</td></tr>
@@ -2279,6 +2343,14 @@
     identityDialogResolve?.(ctx);
     identityDialogResolve = null;
   }}
+/>
+
+<!-- Project Settings dialog -->
+<ProjectSettingsDialog
+  bind:open={settingsOpen}
+  projectPath={projectPath}
+  currentFontFamily={fontFamily}
+  onFontSaved={(font: string) => { fontFamily = font; }}
 />
 
 <!-- Remote sync warning mini-dialog -->
@@ -2331,7 +2403,7 @@
                 if (shouldSync) {
                   try {
                     const syncMsg = await sincronizarRemoto(projectPath);
-                    showToast(syncMsg || "✅ " + t("git.syncSuccess"), "warning");
+                    showToast(syncMsg || t("git.syncSuccess"), "warning", undefined, CheckCircle);
                   } catch (syncErr) {
                     showToast(String(syncErr), "error");
                   }
@@ -2350,7 +2422,7 @@
             remoteWarningDialog = false;
             try {
               await reintentarPush(projectPath);
-              showToast("✅ Push completado", "warning");
+              showToast("Push completado", "warning", undefined, CheckCircle);
               await actualizarGitStatus(projectPath);
             } catch (e) {
               showToast(String(e), "error");
@@ -2367,11 +2439,17 @@
 <!-- Toast notification -->
 {#if toast}
   <div class="toast" class:toast-error={toast.type === "error"}>
+    {#if toast.icon}
+      {@const IconComponent = toast.icon}
+      <IconComponent size={16} weight="light" color="currentColor" />
+    {/if}
     {toast.message}
     {#if toast.action}
       <button class="toast-action" onclick={toast.action.onClick}>{toast.action.label}</button>
     {/if}
-    <button class="toast-close" onclick={() => (toast = null)}>×</button>
+    <button class="toast-close" onclick={() => (toast = null)} title={t("common.cancel")}>
+      <X size={16} weight="light" color="currentColor" />
+    </button>
   </div>
 {/if}
 
@@ -2483,7 +2561,7 @@
     onkeydown={(e) => e.key === "Escape" && (gitLogVisible = false)}
   >
     <div class="modal-panel git-log-panel" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
-      <h2>📜 {t("git.sessionsTitle")}</h2>
+      <h2><Scroll size={16} weight="light" color="currentColor" aria-hidden="true" /> {t("git.sessionsTitle")}</h2>
       <p class="modal-desc">{@html t("git.sessionsDesc")}</p>
 
       {#if gitLogEntries.length === 0}
@@ -2500,7 +2578,7 @@
               {#if entry.files.length > 0}
                 <div class="git-log-files">
                   {#each entry.files as file}
-                    <span class="git-log-file-badge">📄 {file}</span>
+                    <span class="git-log-file-badge"><FileText size={16} weight="light" color="currentColor" aria-hidden="true" /> {file}</span>
                   {/each}
                 </div>
               {/if}
@@ -3232,6 +3310,9 @@
     width: 100%;
     text-align: left;
     margin-top: 0.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
   }
 
   .btn-add:hover {
@@ -4120,6 +4201,9 @@
     cursor: pointer;
     transition: background 120ms, color 120ms;
     line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
   }
 
   .footer-btn:hover {
