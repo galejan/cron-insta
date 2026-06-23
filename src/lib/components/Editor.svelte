@@ -56,6 +56,23 @@
     editor?.chain().setTextSelection(0).run();
   }
 
+  /** Return the currently selected text in the editor, or empty string. */
+  export function getSelectedText(): string {
+    if (!editor) return "";
+    const { from, to } = editor.state.selection;
+    return editor.state.doc.textBetween(from, to) || "";
+  }
+
+  /** Delete the currently selected text and return the deleted content. */
+  export function deleteSelection(): string {
+    if (!editor) return "";
+    const { from, to } = editor.state.selection;
+    if (from === to) return "";
+    const deleted = editor.state.doc.textBetween(from, to);
+    editor.chain().focus().deleteSelection().run();
+    return deleted;
+  }
+
   onMount(() => {
     const ed = new Editor({
       element: editorContainer,
