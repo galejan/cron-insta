@@ -7,6 +7,7 @@
   import { t, setLang, lang } from "$lib/i18n.svelte";
   import {
     actualizarPersonaje,
+    actualizarEventoTimeline,
     agregarEventoTimeline,
     cargarCapitulo,
     cargarConfigRemoto,
@@ -47,6 +48,8 @@
   import { PhysicalSize, PhysicalPosition } from "@tauri-apps/api/dpi";
   import { open } from "@tauri-apps/plugin-dialog";
   import { openUrl } from "@tauri-apps/plugin-opener";
+  import pkg from "../../package.json";
+  const APP_VERSION = pkg.version;
 
   let sidebarPct = $state(40);          // current sidebar width in %
   let sidebarSaved = $state(40);        // width to restore on un-collapse
@@ -316,6 +319,7 @@
     insertPair(open: string, close: string): void;
     insertText(text: string): void;
     isFocused(): boolean;
+    scrollToTop(): void;
   }>();
 
   // ── Sidebar tab state ───────────────────────────────────────
@@ -342,11 +346,13 @@
   let timeline = $state<Record<string, any>[]>([]);
   let timelineVisible = $state(false);
   let eventoFormVisible = $state(false);
+  let eventoExpandido = $state<string | null>(null);
   let nuevoEventoFecha = $state("");
   let nuevoEventoTitulo = $state("");
   let nuevoEventoDescripcion = $state("");
   let nuevoEventoPersonajes = $state<string[]>([]);
   let nuevoEventoCapitulos = $state<string[]>([]);
+  let eventoEditando = $state<string | null>(null); // event ID being edited, or null for new
 
   // ── Debounced auto-save (2 s after last keystroke) ──────────
   const save = debounce(async () => {
@@ -390,6 +396,8 @@
   }, 20_000);
 
   // ── Editor callbacks ────────────────────────────────────────
+  let cercaDelFinal = $state(false);
+
   function handleEditorUpdate(html: string): void {
     editorContent = html;
     saveStatus = "unsaved";
@@ -404,6 +412,7 @@
     try {
       const content = await cargarCapitulo(projectPath, filename);
       editorRef?.setContent(content);
+      editorRef?.scrollToTop();
       activeChapter = filename;
       editorContent = content;
       saveStatus = "saved";
@@ -448,6 +457,21 @@
       pendingDelete = filename;
       // Auto-reset after 3 seconds
       setTimeout(() => { pendingDelete = null; }, 3_000);
+    }
+  }
+
+  // ── Chapter navigation ──────────────────────────────────────
+  function capituloAnterior(): void {
+    const idx = chapters.indexOf(activeChapter);
+    if (idx > 0) cargarCapituloActual(chapters[idx - 1]);
+  }
+
+  function capituloSiguiente(): void {
+    const idx = chapters.indexOf(activeChapter);
+    if (idx < chapters.length - 1) {
+      cargarCapituloActual(chapters[idx + 1]);
+    } else {
+      crearCapituloNuevo();
     }
   }
 
@@ -1010,29 +1034,51 @@
     }
   }
 
-  async function agregarEventoHandler(): Promise<void> {
-    if (!nuevoEventoFecha || !nuevoEventoTitulo) {
+  function editarEvento(evt: Record<string, any>): void {
+    eventoEditando = evt.id;
+    nuevoEventoFecha = evt.date ?? "";
+    nuevoEventoTitulo = evt.title ?? "";
+    nuevoEventoDescripcion = evt.description ?? "";
+    nuevoEventoPersonajes = [...(evt.relatedCharacters ?? [])];
+    nuevoEventoCapitulos = [...(evt.relatedChapters ?? [])];
+    eventoExpandido = null;
+    eventoFormVisible = true;
+  }
+
+  function cancelarEdicion(): void {
+    eventoEditando = null;
+    nuevoEventoFecha = "";
+    nuevoEventoTitulo = "";
+    nuevoEventoDescripcion = "";
+    nuevoEventoPersonajes = [];
+    nuevoEventoCapitulos = [];
+    eventoFormVisible = false;
+  }
+
+  async function guardarEventoHandler(): Promise<void> {
+    if (!nuevoEventoTitulo) {
       alert(t("timeline.requiredFields"));
       return;
     }
-    const evento = {
-      date: nuevoEventoFecha,
+    const evento: Record<string, any> = {
+      date: nuevoEventoFecha.trim(),
       title: nuevoEventoTitulo.trim(),
       description: nuevoEventoDescripcion.trim(),
       relatedCharacters: nuevoEventoPersonajes.filter(Boolean),
       relatedChapters: nuevoEventoCapitulos.filter(Boolean),
     };
+
     try {
-      await agregarEventoTimeline(projectPath, JSON.stringify(evento));
-      nuevoEventoFecha = "";
-      nuevoEventoTitulo = "";
-      nuevoEventoDescripcion = "";
-      nuevoEventoPersonajes = [];
-      nuevoEventoCapitulos = [];
-      eventoFormVisible = false;
+      if (eventoEditando) {
+        evento.id = eventoEditando;
+        await actualizarEventoTimeline(projectPath, JSON.stringify(evento));
+      } else {
+        await agregarEventoTimeline(projectPath, JSON.stringify(evento));
+      }
+      cancelarEdicion();
       await refreshTimeline();
     } catch (e) {
-      console.error("[cronista] Add timeline event failed:", e);
+      console.error("[cronista] Save timeline event failed:", e);
       alert(`${t("timeline.addError")} ${e}`);
     }
   }
@@ -1046,6 +1092,14 @@
       console.error("[cronista] Delete timeline event failed:", e);
       alert(`${t("timeline.deleteError")} ${e}`);
     }
+  }
+
+  function toggleEventoExpandido(id: string): void {
+    eventoExpandido = eventoExpandido === id ? null : id;
+  }
+
+  function getPersonajeName(id: string): string {
+    return personajes.find(p => p.id === id)?.name ?? id;
   }
 
   // ── Drag-and-drop reorder ────────────────────────────────────
@@ -1672,6 +1726,7 @@
               {#each timeline as evt}
                 <li
                   class="timeline-event"
+                  class:expanded={eventoExpandido === evt.id}
                   draggable="true"
                   ondragstart={(e) => handleDragStart(e, evt.id)}
                   ondragend={(e) => handleDragEnd(e)}
@@ -1679,13 +1734,47 @@
                   ondragleave={(e) => handleDragLeave(e)}
                   ondrop={(e) => handleDrop(e, evt.id)}
                 >
-                  <span class="event-date">{evt.date}</span>
-                  <span class="event-title">{evt.title}</span>
-                  <button
-                    class="item-delete"
-                    title={t("timeline.deleteTitle")}
-                    onclick={() => eliminarEventoHandler(evt.id)}
-                  >×</button>
+                  <div
+                    class="event-row"
+                    onclick={() => toggleEventoExpandido(evt.id)}
+                    onkeydown={(e) => { if (e.key === "Enter") toggleEventoExpandido(evt.id); }}
+                    role="button"
+                    tabindex="0"
+                  >
+                    {#if evt.date}
+                      <span class="event-moment">{evt.date}</span>
+                    {/if}
+                    <span class="event-title">{evt.title}</span>
+                    <span class="event-expand-icon">{eventoExpandido === evt.id ? "▼" : "▶"}</span>
+                    <button
+                      class="item-edit"
+                      title={t("timeline.editTitle")}
+                      onclick={(e) => { e.stopPropagation(); editarEvento(evt); }}
+                    >✎</button>
+                    <button
+                      class="item-delete"
+                      title={t("timeline.deleteTitle")}
+                      onclick={(e) => { e.stopPropagation(); eliminarEventoHandler(evt.id); }}
+                    >×</button>
+                  </div>
+                  {#if eventoExpandido === evt.id}
+                    <div class="event-details">
+                      {#if evt.date}
+                        <p class="event-meta"><strong>{t("timeline.date")}:</strong> {evt.date}</p>
+                      {/if}
+                      {#if evt.description}
+                        <p class="event-description">{evt.description}</p>
+                      {/if}
+                      {#if evt.relatedCharacters?.length}
+                        <p class="event-meta"><strong>{t("timeline.relatedCharacters")}:</strong>
+                          {evt.relatedCharacters.map((id: string) => getPersonajeName(id)).join(", ")}</p>
+                      {/if}
+                      {#if evt.relatedChapters?.length}
+                        <p class="event-meta"><strong>{t("timeline.relatedChapters")}:</strong>
+                          {evt.relatedChapters.join(", ")}</p>
+                      {/if}
+                    </div>
+                  {/if}
                 </li>
               {/each}
             </ul>
@@ -1695,13 +1784,22 @@
 
           {#if eventoFormVisible}
             <div class="inline-form">
-              <label class="field-label" for="evt-date">{t("timeline.date")}</label>
-              <input
-                id="evt-date"
-                class="field-input"
-                type="date"
-                bind:value={nuevoEventoFecha}
-              />
+              <label class="field-label" for="evt-moment">{t("timeline.date")}</label>
+              <div class="date-input-row">
+                <input
+                  id="evt-moment"
+                  class="field-input"
+                  type="text"
+                  bind:value={nuevoEventoFecha}
+                  placeholder={t("timeline.datePlaceholder")}
+                />
+                <input
+                  type="date"
+                  class="date-picker-cal"
+                  bind:value={nuevoEventoFecha}
+                  title={t("timeline.pickDate")}
+                />
+              </div>
               <label class="field-label" for="evt-title">{t("timeline.eventTitle")}</label>
               <input
                 id="evt-title"
@@ -1752,12 +1850,14 @@
               {/if}
 
               <div class="form-actions">
-                <button class="btn-sm btn-primary" onclick={agregarEventoHandler}>{t("timeline.add")}</button>
-                <button class="btn-sm" onclick={() => eventoFormVisible = false}>{t("common.cancel")}</button>
+                <button class="btn-sm btn-primary" onclick={guardarEventoHandler}>
+                  {eventoEditando ? t("timeline.save") : t("timeline.add")}
+                </button>
+                <button class="btn-sm" onclick={cancelarEdicion}>{t("common.cancel")}</button>
               </div>
             </div>
           {:else}
-            <button class="btn-add" onclick={() => eventoFormVisible = true}>
+            <button class="btn-add" onclick={() => { cancelarEdicion(); eventoFormVisible = true; }}>
               {t("timeline.newEvent")}
             </button>
           {/if}
@@ -1991,8 +2091,35 @@
             content={editorContent}
             {fontFamily}
             onUpdate={handleEditorUpdate}
+            onNearEnd={(v) => cercaDelFinal = v}
           />
         </div>
+
+        {#if projectPath && activeChapter && chapters.length > 0}
+          {@const idx = chapters.indexOf(activeChapter)}
+          <div class="chapter-nav-footer" class:visible={cercaDelFinal}>
+            <button
+              class="nav-btn"
+              disabled={idx <= 0}
+              onclick={capituloAnterior}
+              title={t("chapterNav.prev")}
+            >←</button>
+            <span class="nav-position">{idx + 1} / {chapters.length}</span>
+            {#if idx < chapters.length - 1}
+              <button
+                class="nav-btn"
+                onclick={capituloSiguiente}
+                title={t("chapterNav.next")}
+              >→</button>
+            {:else}
+              <button
+                class="nav-btn nav-btn-new"
+                onclick={capituloSiguiente}
+                title={t("chapterNav.newChapter")}
+              >+</button>
+            {/if}
+          </div>
+        {/if}
 
         {#if characterDocked}
           <div class="character-dock" transition:fly={{ x: 300, duration: 200 }}>
@@ -2052,7 +2179,7 @@
     <div class="help-panel" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
       <div class="help-header">
         <h2>Cronista</h2>
-        <span class="help-version">v0.1.3</span>
+        <span class="help-version">v{APP_VERSION}</span>
         <button class="help-close" onclick={() => (helpMode = false)}>✕</button>
       </div>
 
@@ -2381,7 +2508,7 @@
     <div class="closing-panel">
       <div class="closing-spinner"></div>
       <p class="closing-message">{closeStep}</p>
-      <p class="closing-sub">Cronista v0.1.3</p>
+      <p class="closing-sub">Cronista v{APP_VERSION}</p>
     </div>
   </div>
 {/if}
@@ -2720,6 +2847,81 @@
     min-width: 0;
   }
 
+  /* ── Chapter navigation footer ──────────────────────────────── */
+  .chapter-nav-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 0.375rem 1rem;
+    border-top: 1px solid transparent;
+    background: #f8fafc;
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 250ms ease, opacity 200ms ease, padding 250ms ease, border-color 250ms ease;
+  }
+  .chapter-nav-footer.visible {
+    max-height: 2.5rem;
+    opacity: 1;
+    border-top-color: #e2e8f0;
+  }
+
+  :global(.dark) .chapter-nav-footer {
+    background: #0f172a;
+  }
+  :global(.dark) .chapter-nav-footer.visible {
+    border-top-color: #334155;
+  }
+
+  .nav-btn {
+    background: none;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    color: #475569;
+    font-size: 0.875rem;
+    padding: 0.125rem 0.625rem;
+    cursor: pointer;
+    transition: background 120ms, color 120ms;
+  }
+  .nav-btn:hover:not(:disabled) {
+    background: #e2e8f0;
+    color: #1e293b;
+  }
+  .nav-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+
+  :global(.dark) .nav-btn {
+    border-color: #475569;
+    color: #94a3b8;
+  }
+  :global(.dark) .nav-btn:hover:not(:disabled) {
+    background: #1e293b;
+    color: #e2e8f0;
+  }
+
+  .nav-btn-new {
+    color: #3b82f6;
+    font-weight: 700;
+    font-size: 1rem;
+  }
+  :global(.dark) .nav-btn-new {
+    color: #60a5fa;
+  }
+
+  .nav-position {
+    font-size: 0.8125rem;
+    color: #94a3b8;
+    user-select: none;
+    min-width: 3rem;
+    text-align: center;
+  }
+  :global(.dark) .nav-position {
+    color: #64748b;
+  }
+
   /* ── Tab panels ────────────────────────────────────────────── */
   .tab-panel {
     display: flex;
@@ -2751,6 +2953,7 @@
     flex: 1;
   }
 
+  .item-edit,
   .item-delete {
     flex-shrink: 0;
     width: 24px;
@@ -2780,6 +2983,15 @@
   :global(.dark) .item-delete:hover {
     background: #7f1d1d33;
     color: #f87171;
+  }
+
+  .item-edit:hover {
+    background: #dbeafe;
+    color: #3b82f6;
+  }
+  :global(.dark) .item-edit:hover {
+    background: #1e3a5f33;
+    color: #60a5fa;
   }
 
   .delete-confirm {
@@ -2855,6 +3067,34 @@
   :global(.dark) .field-input:focus {
     border-color: #60a5fa;
     box-shadow: 0 0 0 2px #60a5fa33;
+  }
+
+  .date-input-row {
+    display: flex;
+    gap: 0.375rem;
+    align-items: center;
+  }
+  .date-input-row .field-input {
+    flex: 1;
+  }
+  .date-picker-cal {
+    flex-shrink: 0;
+    width: 2rem;
+    height: 1.9rem;
+    padding: 0;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+  }
+  .date-picker-cal::-webkit-calendar-picker-indicator {
+    margin: 0;
+    padding: 0.125rem;
+  }
+  :global(.dark) .date-picker-cal {
+    background: #0f172a;
+    border-color: #334155;
+    color-scheme: dark;
   }
 
   .field-input.small {
@@ -3072,23 +3312,49 @@
 
   .timeline-event {
     display: flex;
-    align-items: baseline;
-    gap: 0.5rem;
+    flex-direction: column;
     padding: 0.25rem 0;
     font-size: 0.75rem;
     cursor: grab;
   }
+  .timeline-event.expanded {
+    cursor: default;
+  }
   .timeline-event:global(.dragging) { opacity: 0.4; }
   .timeline-event:global(.drag-over) { border-top: 2px solid #3b82f6; }
 
-  .event-date {
+  .event-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    cursor: pointer;
+    padding: 0.125rem 0;
+  }
+  .event-row:hover {
+    color: #1e293b;
+  }
+  :global(.dark) .event-row:hover {
+    color: #e2e8f0;
+  }
+
+  .event-expand-icon {
+    flex-shrink: 0;
+    font-size: 0.5625rem;
+    color: #94a3b8;
+    margin-left: auto;
+  }
+
+  .event-moment {
     flex-shrink: 0;
     color: #3b82f6;
     font-weight: 500;
     font-size: 0.6875rem;
+    max-width: 10rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
-
-  :global(.dark) .event-date {
+  :global(.dark) .event-moment {
     color: #60a5fa;
   }
 
@@ -3102,6 +3368,37 @@
   }
 
   :global(.dark) .event-title {
+    color: #94a3b8;
+  }
+
+  .event-details {
+    padding: 0.375rem 0 0.375rem 0.75rem;
+    border-left: 2px solid #cbd5e1;
+    margin-top: 0.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  :global(.dark) .event-details {
+    border-left-color: #475569;
+  }
+
+  .event-description {
+    margin: 0;
+    color: #475569;
+    line-height: 1.5;
+    white-space: pre-wrap;
+  }
+  :global(.dark) .event-description {
+    color: #94a3b8;
+  }
+
+  .event-meta {
+    margin: 0;
+    font-size: 0.6875rem;
+    color: #64748b;
+  }
+  :global(.dark) .event-meta {
     color: #94a3b8;
   }
 

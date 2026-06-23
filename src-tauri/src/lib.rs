@@ -106,6 +106,7 @@ struct NoteIndexItem {
 struct TimelineEvent {
     #[serde(default)]
     id: String,
+    #[serde(default)]
     date: String,
     title: String,
     #[serde(default)]
@@ -1203,9 +1204,6 @@ fn agregar_evento_timeline(proyecto_path: String, evento_json: String) -> Result
         event.id = format!("evt-{}", Local::now().timestamp_millis());
     }
 
-    if event.date.trim().is_empty() {
-        return Err("La fecha del evento no puede estar vacía.".to_string());
-    }
     if event.title.trim().is_empty() {
         return Err("El título del evento no puede estar vacío.".to_string());
     }
@@ -1234,6 +1232,46 @@ fn agregar_evento_timeline(proyecto_path: String, evento_json: String) -> Result
         .map_err(|e| format!("Error al escribir la línea de tiempo: {}", e))?;
 
     Ok(format!("Evento '{}' agregado a la línea de tiempo.", event_id))
+}
+
+/// Update an existing timeline event by ID.
+///
+/// `evento_json` must include the event's `id`. All other fields are replaced.
+#[tauri::command]
+fn actualizar_evento_timeline(proyecto_path: String, evento_json: String) -> Result<String, String> {
+    if proyecto_path.trim().is_empty() {
+        return Err("La ruta del proyecto no puede estar vacía.".to_string());
+    }
+
+    let updated: TimelineEvent = serde_json::from_str(&evento_json)
+        .map_err(|e| format!("Error al parsear el evento: {}", e))?;
+
+    if updated.id.trim().is_empty() {
+        return Err("El ID del evento no puede estar vacío.".to_string());
+    }
+    if updated.title.trim().is_empty() {
+        return Err("El título del evento no puede estar vacío.".to_string());
+    }
+
+    let timeline_path = Path::new(&proyecto_path).join(".config").join("timeline.json");
+    let raw = std::fs::read_to_string(&timeline_path)
+        .map_err(|e| format!("Error al leer la línea de tiempo: {}", e))?;
+    let mut timeline: Vec<TimelineEvent> = serde_json::from_str(&raw)
+        .map_err(|e| format!("Error al parsear la línea de tiempo: {}", e))?;
+
+    let idx = timeline.iter()
+        .position(|e| e.id == updated.id)
+        .ok_or_else(|| format!("No se encontró el evento con ID '{}'.", updated.id))?;
+
+    let event_id = updated.id.clone();
+    timeline[idx] = updated;
+
+    let timeline_json = serde_json::to_string_pretty(&timeline)
+        .map_err(|e| format!("Error al serializar la línea de tiempo: {}", e))?;
+    std::fs::write(&timeline_path, timeline_json)
+        .map_err(|e| format!("Error al escribir la línea de tiempo: {}", e))?;
+
+    Ok(format!("Evento '{}' actualizado.", event_id))
 }
 
 /// Reorder timeline events to match the given ID order.
@@ -2257,6 +2295,7 @@ pub fn run() {
             eliminar_nota,
             cargar_timeline,
             agregar_evento_timeline,
+            actualizar_evento_timeline,
             reordenar_timeline,
             eliminar_evento_timeline,
             exportar_proyecto_zip,
@@ -3500,6 +3539,48 @@ mod tests {
             timeline[0].id
         );
         assert!(!timeline[0].id.is_empty());
+    }
+
+    // --- actualizar_evento_timeline (2 tests) ---
+
+    #[test]
+    fn test_actualizar_evento_timeline_updates_fields() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        let _ = create_project_for_test(path.clone(), "Test".to_string(), None);
+
+        // Add an event first
+        let _ = agregar_evento_timeline(
+            path.clone(),
+            r#"{"id":"evt-upd","date":"1999-05-10","title":"Original","description":"old"}"#.to_string(),
+        );
+
+        // Update it
+        let updated_json = r#"{"id":"evt-upd","date":"2000-01-01","title":"Actualizado","description":"new desc"}"#;
+        let result = actualizar_evento_timeline(path.clone(), updated_json.to_string());
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+
+        let raw = cargar_timeline(path).unwrap();
+        let timeline: Vec<TimelineEvent> = serde_json::from_str(&raw).unwrap();
+        assert_eq!(timeline.len(), 1);
+        assert_eq!(timeline[0].title, "Actualizado");
+        assert_eq!(timeline[0].date, "2000-01-01");
+        assert_eq!(timeline[0].description, "new desc");
+    }
+
+    #[test]
+    fn test_actualizar_evento_timeline_rejects_unknown_id() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        let _ = create_project_for_test(path.clone(), "Test".to_string(), None);
+
+        let result = actualizar_evento_timeline(
+            path.clone(),
+            r#"{"id":"no-existe","date":"","title":"Nope","description":""}"#.to_string(),
+        );
+        assert!(result.is_err(), "Expected Err for unknown ID");
     }
 
     // --- reordenar_timeline (1 test) ---

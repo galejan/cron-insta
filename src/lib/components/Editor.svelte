@@ -7,9 +7,10 @@
     content: string;
     onUpdate: (html: string) => void;
     fontFamily?: string;
+    onNearEnd?: (nearEnd: boolean) => void;
   }
 
-  const { content = "", onUpdate, fontFamily = "monospace" }: Props = $props();
+  const { content = "", onUpdate, fontFamily = "monospace", onNearEnd }: Props = $props();
 
   let editorContainer: HTMLDivElement;
   let editor = $state<Editor | null>(null);
@@ -50,6 +51,11 @@
     return editor?.isFocused ?? false;
   }
 
+  /** Scroll editor to the very beginning of the document. */
+  export function scrollToTop(): void {
+    editor?.chain().setTextSelection(0).run();
+  }
+
   onMount(() => {
     const ed = new Editor({
       element: editorContainer,
@@ -78,6 +84,31 @@
     });
 
     editor = ed;
+
+    // ── Near-end scroll detection for chapter navigation ──
+    if (onNearEnd) {
+      const scrollEl = editorContainer;
+      const NEAR_END_THRESHOLD = 0.85;
+
+      function checkNearEnd() {
+        const { scrollTop, scrollHeight, clientHeight } = scrollEl;
+        if (scrollHeight <= clientHeight) {
+          onNearEnd!(true); // content fits without scrolling
+        } else {
+          const pct = scrollTop / (scrollHeight - clientHeight);
+          onNearEnd!(pct >= NEAR_END_THRESHOLD);
+        }
+      }
+
+      scrollEl.addEventListener("scroll", checkNearEnd, { passive: true });
+      // Re-check after content renders (setContent, initial load, etc.)
+      setTimeout(checkNearEnd, 300);
+
+      return () => {
+        scrollEl.removeEventListener("scroll", checkNearEnd);
+        ed.destroy();
+      };
+    }
 
     return () => {
       ed.destroy();

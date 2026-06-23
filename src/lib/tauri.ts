@@ -199,6 +199,13 @@ export async function agregarEventoTimeline(
   return invoke("agregar_evento_timeline", { proyectoPath, eventoJson });
 }
 
+export async function actualizarEventoTimeline(
+  proyectoPath: string,
+  eventoJson: string,
+): Promise<string> {
+  return invoke("actualizar_evento_timeline", { proyectoPath, eventoJson });
+}
+
 export async function eliminarEventoTimeline(
   proyectoPath: string,
   id: string,

@@ -180,7 +180,9 @@ const translations: Record<Lang, Record<string, string>> = {
     "timeline.empty": "Sin eventos en la línea de tiempo.",
     "timeline.deleteTitle": "Eliminar evento",
     "timeline.deleteConfirm": "¿Eliminar este evento?",
-    "timeline.date": "Fecha",
+    "timeline.date": "Fecha o momento",
+    "timeline.datePlaceholder": "Ej: Verano del 98, tres días después, o usar calendario →",
+    "timeline.pickDate": "Seleccionar fecha del calendario",
     "timeline.eventTitle": "Título",
     "timeline.titlePlaceholder": "¿Qué pasó?",
     "timeline.description": "Descripción",
@@ -188,10 +190,17 @@ const translations: Record<Lang, Record<string, string>> = {
     "timeline.relatedCharacters": "Personajes relacionados",
     "timeline.relatedChapters": "Capítulos relacionados",
     "timeline.add": "Agregar",
+    "timeline.save": "Guardar",
     "timeline.newEvent": "+ Nuevo evento",
-    "timeline.requiredFields": "Fecha y título son obligatorios.",
+    "timeline.editTitle": "Editar evento",
+    "timeline.requiredFields": "El título es obligatorio.",
     "timeline.addError": "Error al agregar evento:",
     "timeline.deleteError": "Error al eliminar evento:",
+
+    // ── Chapter navigation ──────────────────────────────────
+    "chapterNav.prev": "Capítulo anterior",
+    "chapterNav.next": "Capítulo siguiente",
+    "chapterNav.newChapter": "Nuevo capítulo",
 
     // ── Help panel ─────────────────────────────────────────
     "help.ariaLabel": "Ayuda de Cronista",
@@ -458,7 +467,9 @@ const translations: Record<Lang, Record<string, string>> = {
     "timeline.empty": "No events in the timeline.",
     "timeline.deleteTitle": "Delete event",
     "timeline.deleteConfirm": "Delete this event?",
-    "timeline.date": "Date",
+    "timeline.date": "Date or moment",
+    "timeline.datePlaceholder": "E.g. Summer of '98, three days later, or pick a date →",
+    "timeline.pickDate": "Pick a date from calendar",
     "timeline.eventTitle": "Title",
     "timeline.titlePlaceholder": "What happened?",
     "timeline.description": "Description",
@@ -466,10 +477,17 @@ const translations: Record<Lang, Record<string, string>> = {
     "timeline.relatedCharacters": "Related characters",
     "timeline.relatedChapters": "Related chapters",
     "timeline.add": "Add",
+    "timeline.save": "Save",
     "timeline.newEvent": "+ New Event",
-    "timeline.requiredFields": "Date and title are required.",
+    "timeline.editTitle": "Edit event",
+    "timeline.requiredFields": "Title is required.",
     "timeline.addError": "Error adding event:",
     "timeline.deleteError": "Error deleting event:",
+
+    // ── Chapter navigation ──────────────────────────────────
+    "chapterNav.prev": "Previous chapter",
+    "chapterNav.next": "Next chapter",
+    "chapterNav.newChapter": "New chapter",
 
     // ── Help panel ─────────────────────────────────────────
     "help.ariaLabel": "Cronista Help",
