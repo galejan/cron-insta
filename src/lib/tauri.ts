@@ -220,6 +220,15 @@ export async function reordenarTimeline(
   return invoke("reordenar_timeline", { proyectoPath, idsJson: JSON.stringify(ids) });
 }
 
+// ── Font ──────────────────────────────────────────────────────
+
+export async function actualizarFuenteProyecto(
+  projectPath: string,
+  fontFamily: string,
+): Promise<string> {
+  return invoke("actualizar_fuente_proyecto", { projectPath, fontFamily });
+}
+
 // ── Git Identity & Remote ─────────────────────────────────────
 
 export async function cargarIdentidadGit(): Promise<{name: string, email: string, github_user?: string} | null> {

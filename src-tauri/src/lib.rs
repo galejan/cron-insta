@@ -892,6 +892,57 @@ fn cargar_personaje(proyecto_path: String, id: String) -> Result<String, String>
         .map_err(|e| format!("Error al leer el personaje: {}", e))
 }
 
+/// Update the project font family in metadata.json.
+///
+/// Reads `{project_path}/.config/metadata.json`, updates `font_family` and
+/// `last_modified` (ISO 8601), then writes the modified JSON back to disk.
+/// Preserves all other fields (`project_name`, `chapters_order`, `characters_index`).
+#[tauri::command]
+fn actualizar_fuente_proyecto(project_path: String, font_family: String) -> Result<String, String> {
+    if project_path.trim().is_empty() {
+        return Err("La ruta del proyecto no puede estar vacía.".to_string());
+    }
+    if font_family.trim().is_empty() {
+        return Err("La familia tipográfica no puede estar vacía.".to_string());
+    }
+
+    let valid_fonts = ["monospace", "serif", "sans-serif"];
+    if !valid_fonts.contains(&font_family.as_str()) {
+        return Err(format!(
+            "Fuente inválida: '{}'. Debe ser monospace, serif o sans-serif.",
+            font_family
+        ));
+    }
+
+    let metadata_path = Path::new(&project_path)
+        .join(".config")
+        .join("metadata.json");
+
+    if !metadata_path.exists() {
+        return Err(format!(
+            "Archivo de metadatos no encontrado: {}",
+            metadata_path.display()
+        ));
+    }
+
+    let metadata_str = std::fs::read_to_string(&metadata_path)
+        .map_err(|e| format!("Error al leer metadata.json: {}", e))?;
+
+    let mut metadata: Metadata = serde_json::from_str(&metadata_str)
+        .map_err(|e| format!("Error al parsear metadata.json: {}", e))?;
+
+    metadata.font_family = font_family;
+    metadata.last_modified = Local::now().to_rfc3339();
+
+    let updated_json = serde_json::to_string_pretty(&metadata)
+        .map_err(|e| format!("Error al serializar metadata.json: {}", e))?;
+
+    std::fs::write(&metadata_path, updated_json)
+        .map_err(|e| format!("Error al escribir metadata.json: {}", e))?;
+
+    Ok("".to_string())
+}
+
 /// Update a character.
 ///
 /// Overwrites `personajes/{id}.json`. If the name changed, updates the index entry.
@@ -2288,6 +2339,7 @@ pub fn run() {
             crear_personaje,
             cargar_personaje,
             actualizar_personaje,
+            actualizar_fuente_proyecto,
             eliminar_personaje,
             listar_notas,
             crear_nota,
@@ -4207,6 +4259,174 @@ mod tests {
 
         // Identity must be preserved through the strike update
         assert_eq!(final_config.identity.unwrap().name, "Ada");
+    }
+
+    // ========================================================================
+    // actualizar_fuente_proyecto tests
+    // ========================================================================
+
+    #[test]
+    fn test_actualizar_fuente_proyecto_updates_font() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        let _ = create_project_for_test(
+            path.clone(),
+            "Test Project".to_string(),
+            Some("monospace".to_string()),
+        );
+
+        // Update font from monospace to serif
+        let result = actualizar_fuente_proyecto(path.clone(), "serif".to_string());
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+        assert_eq!(result.unwrap(), "");
+
+        // Verify metadata.json was updated
+        let metadata_path = dir.path().join(".config").join("metadata.json");
+        let metadata_str = fs::read_to_string(&metadata_path).unwrap();
+        let metadata: Metadata = serde_json::from_str(&metadata_str).unwrap();
+
+        assert_eq!(metadata.font_family, "serif", "font_family should be serif");
+        assert!(metadata.last_modified.contains('T'), "last_modified should be ISO 8601");
+        assert_eq!(metadata.project_name, "Test Project", "project_name must be preserved");
+        assert!(metadata.chapters_order.is_empty(), "chapters_order must be preserved");
+        assert!(metadata.characters_index.is_empty(), "characters_index must be preserved");
+    }
+
+    #[test]
+    fn test_actualizar_fuente_proyecto_preserves_other_fields() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        let _ = create_project_for_test(
+            path.clone(),
+            "Mi Novela".to_string(),
+            Some("sans-serif".to_string()),
+        );
+
+        // Add a chapter to populate chapters_order
+        let _ = crear_capitulo(
+            path.clone(),
+            "cap1.md".to_string(),
+            "# Capítulo 1\n\n".to_string(),
+        );
+
+        // Update font
+        let result = actualizar_fuente_proyecto(path.clone(), "monospace".to_string());
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+
+        // Verify chapters_order preserved
+        let metadata_path = dir.path().join(".config").join("metadata.json");
+        let metadata_str = fs::read_to_string(&metadata_path).unwrap();
+        let metadata: Metadata = serde_json::from_str(&metadata_str).unwrap();
+
+        assert_eq!(metadata.font_family, "monospace");
+        assert_eq!(metadata.project_name, "Mi Novela");
+        assert!(
+            metadata.chapters_order.contains(&"cap1.md".to_string()),
+            "chapters_order must still contain cap1.md"
+        );
+    }
+
+    #[test]
+    fn test_actualizar_fuente_proyecto_rejects_invalid_font() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        let _ = create_project_for_test(
+            path.clone(),
+            "Test".to_string(),
+            Some("monospace".to_string()),
+        );
+
+        let original_metadata = fs::read_to_string(
+            dir.path().join(".config").join("metadata.json"),
+        )
+        .unwrap();
+
+        let result = actualizar_fuente_proyecto(path.clone(), "comic-sans".to_string());
+        assert!(result.is_err(), "Expected Err for invalid font");
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("inválida") || err.contains("invalid"),
+            "Error should mention invalid font, got: {}",
+            err
+        );
+
+        // metadata.json must be unchanged
+        let current_metadata =
+            fs::read_to_string(dir.path().join(".config").join("metadata.json")).unwrap();
+        assert_eq!(
+            current_metadata, original_metadata,
+            "metadata.json must not be modified on error"
+        );
+    }
+
+    #[test]
+    fn test_actualizar_fuente_proyecto_missing_metadata() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        // Don't create a project — no metadata.json exists
+        let result = actualizar_fuente_proyecto(path.clone(), "serif".to_string());
+        assert!(result.is_err(), "Expected Err for missing metadata.json");
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("no encontrado") || err.contains("not found"),
+            "Error should mention missing file, got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_actualizar_fuente_proyecto_corrupted_metadata() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        // Create project structure manually with corrupt metadata.json
+        fs::create_dir_all(dir.path().join(".config")).unwrap();
+        fs::create_dir_all(dir.path().join("capitulos")).unwrap();
+        fs::create_dir_all(dir.path().join("personajes")).unwrap();
+        fs::create_dir_all(dir.path().join("notas")).unwrap();
+        fs::write(
+            dir.path().join(".config").join("metadata.json"),
+            "this is not valid json {{{",
+        )
+        .unwrap();
+
+        let result = actualizar_fuente_proyecto(path.clone(), "serif".to_string());
+        assert!(result.is_err(), "Expected Err for corrupt metadata.json");
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("parsear") || err.contains("parse"),
+            "Error should mention parse failure, got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_actualizar_fuente_proyecto_empty_path() {
+        let result = actualizar_fuente_proyecto("".to_string(), "serif".to_string());
+        assert!(result.is_err(), "Expected Err for empty path");
+        let err = result.unwrap_err();
+        assert!(!err.is_empty(), "Error message should not be empty");
+    }
+
+    #[test]
+    fn test_actualizar_fuente_proyecto_empty_font() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        let _ = create_project_for_test(path.clone(), "Test".to_string(), None);
+
+        let result = actualizar_fuente_proyecto(path.clone(), "".to_string());
+        assert!(result.is_err(), "Expected Err for empty font family");
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("vacía") || err.contains("empty"),
+            "Error should mention empty font, got: {}",
+            err
+        );
     }
 
     // ========================================================================
