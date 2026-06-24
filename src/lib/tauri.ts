@@ -272,6 +272,17 @@ export async function actualizarFuenteProyecto(
 
 // ── Git Identity & Remote ─────────────────────────────────────
 
+export interface GitDetectedConfig {
+  name?: string;
+  email?: string;
+  remote_url?: string;
+}
+
+/** Detect git identity and origin remote from .git/config (best-effort, never errors). */
+export async function detectarConfigGit(path: string): Promise<GitDetectedConfig> {
+  return invoke("detectar_config_git", { projectPath: path });
+}
+
 export async function cargarIdentidadGit(): Promise<{name: string, email: string, github_user?: string} | null> {
   const result = await invoke<string>("cargar_identidad_git");
   if (result === "null") return null;

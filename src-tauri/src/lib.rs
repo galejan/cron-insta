@@ -45,6 +45,17 @@ struct ProjectState {
     closing: Mutex<bool>,
 }
 
+/// Auto-detected git identity + remote from `.git/config`.
+///
+/// All fields are `Option` — missing `.git` or partial config yields `None`.
+/// The struct is serialized directly by Tauri (no manual JSON).
+#[derive(Serialize)]
+struct GitDetectedConfig {
+    name: Option<String>,
+    email: Option<String>,
+    remote_url: Option<String>,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct Metadata {
     project_name: String,
@@ -144,6 +155,8 @@ struct TimelineEvent {
     relatedCharacters: Vec<String>,
     #[serde(default)]
     relatedChapters: Vec<String>,
+    #[serde(default)]
+    relatedPlaces: Vec<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -357,12 +370,14 @@ This is a literary writing project managed by **Cron-Insta**, a desktop writing 
   - `description` (string): Event description
   - `relatedCharacters` (array of strings): IDs of related characters (soft reference)
   - `relatedChapters` (array of strings): Filenames of related chapters (soft reference)
+  - `relatedPlaces` (array of strings): IDs of related places (soft reference)
 
 ## Relationships
 
 ```
 TimelineEvent.relatedCharacters ──soft──▶ Character.id
 TimelineEvent.relatedChapters   ──soft──▶ Chapter filename
+TimelineEvent.relatedPlaces     ──soft──▶ Place.id
 Character.relationships[].targetId ──soft──▶ Character.id
 ```
 
@@ -705,6 +720,66 @@ fn obtener_git_log(path: String, limit: usize) -> Result<String, String> {
 #[tauri::command]
 fn detectar_git() -> Result<bool, String> {
     Ok(find_git().is_ok())
+}
+
+/// Detect git identity and remote from `.git/config` for a project path.
+///
+/// Runs `git config user.name`, `git config user.email`,
+/// and `git remote get-url origin` inside the project directory.
+/// Best-effort only — never errors, missing data returns `None`.
+#[tauri::command]
+fn detectar_config_git(project_path: String) -> GitDetectedConfig {
+    let base = Path::new(&project_path);
+    let git_dir = base.join(".git");
+
+    if !git_dir.exists() {
+        return GitDetectedConfig {
+            name: None,
+            email: None,
+            remote_url: None,
+        };
+    }
+
+    let git_path = match find_git() {
+        Ok(p) => p,
+        Err(_) => {
+            return GitDetectedConfig {
+                name: None,
+                email: None,
+                remote_url: None,
+            };
+        }
+    };
+
+    let run_config = |key: &str| -> Option<String> {
+        system_command(&git_path)
+            .arg("config")
+            .arg("--local")
+            .arg(key)
+            .current_dir(base)
+            .output()
+            .ok()
+            .filter(|out| out.status.success())
+            .map(|out| String::from_utf8_lossy(&out.stdout).trim().to_string())
+            .filter(|s| !s.is_empty())
+    };
+
+    let remote_url = system_command(&git_path)
+        .arg("remote")
+        .arg("get-url")
+        .arg("origin")
+        .current_dir(base)
+        .output()
+        .ok()
+        .filter(|out| out.status.success())
+        .map(|out| String::from_utf8_lossy(&out.stdout).trim().to_string())
+        .filter(|s| !s.is_empty());
+
+    GitDetectedConfig {
+        name: run_config("user.name"),
+        email: run_config("user.email"),
+        remote_url,
+    }
 }
 
 /// Tell the Rust backend which project is currently open in the frontend.
@@ -1586,6 +1661,22 @@ fn eliminar_lugar(proyecto_path: String, id: String) -> Result<String, String> {
             .map_err(|e| format!("Error al serializar el índice de lugares: {}", e))?;
         std::fs::write(&index_path, index_json)
             .map_err(|e| format!("Error al escribir el índice de lugares: {}", e))?;
+    }
+
+    // Clean references from timeline events
+    let timeline_path = Path::new(&proyecto_path).join(".config").join("timeline.json");
+    if timeline_path.exists() {
+        let raw = std::fs::read_to_string(&timeline_path)
+            .map_err(|e| format!("Error al leer timeline: {}", e))?;
+        let mut timeline: Vec<TimelineEvent> =
+            serde_json::from_str(&raw).unwrap_or_default();
+        for event in &mut timeline {
+            event.relatedPlaces.retain(|pid| pid != &id);
+        }
+        let timeline_json = serde_json::to_string_pretty(&timeline)
+            .map_err(|e| format!("Error al serializar timeline: {}", e))?;
+        std::fs::write(&timeline_path, timeline_json)
+            .map_err(|e| format!("Error al escribir timeline: {}", e))?;
     }
 
     Ok(format!("Lugar '{}' eliminado.", id))
@@ -2740,6 +2831,7 @@ pub fn run() {
             eliminar_directorio_git,
             obtener_git_log,
             detectar_git,
+            detectar_config_git,
             set_active_project,
             guardar_capitulo,
             crear_checkpoint,
@@ -5105,6 +5197,100 @@ mod tests {
             "Error should mention empty font, got: {}",
             err
         );
+    }
+
+    // ── detectar_config_git tests ───────────────────────────
+
+    #[test]
+    fn test_detectar_config_git_full_config() {
+        if find_git().is_err() {
+            eprintln!("SKIP: git not available on this system");
+            return;
+        }
+
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        // Init repo with identity
+        let _ = init_git_for_test(&path);
+
+        // Add origin remote
+        let git_path = find_git().unwrap();
+        let _ = system_command(&git_path)
+            .arg("remote")
+            .arg("add")
+            .arg("origin")
+            .arg("git@github.com:user/test-repo.git")
+            .current_dir(dir.path())
+            .output();
+
+        let result = detectar_config_git(path);
+        assert_eq!(result.name.as_deref(), Some("Cron-Insta"));
+        assert_eq!(result.email.as_deref(), Some("cron-insta@local"));
+        assert_eq!(
+            result.remote_url.as_deref(),
+            Some("git@github.com:user/test-repo.git")
+        );
+    }
+
+    #[test]
+    fn test_detectar_config_git_missing_remote() {
+        if find_git().is_err() {
+            eprintln!("SKIP: git not available on this system");
+            return;
+        }
+
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        // Init repo with identity but NO remote
+        let _ = init_git_for_test(&path);
+
+        let result = detectar_config_git(path);
+        assert_eq!(result.name.as_deref(), Some("Cron-Insta"));
+        assert_eq!(result.email.as_deref(), Some("cron-insta@local"));
+        assert_eq!(result.remote_url, None);
+    }
+
+    #[test]
+    fn test_detectar_config_git_no_dotgit() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        // No .git dir — just an empty temp dir
+        let result = detectar_config_git(path);
+        assert_eq!(result.name, None);
+        assert_eq!(result.email, None);
+        assert_eq!(result.remote_url, None);
+    }
+
+    #[test]
+    fn test_detectar_config_git_partial_identity() {
+        if find_git().is_err() {
+            eprintln!("SKIP: git not available on this system");
+            return;
+        }
+
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        // Init repo manually with only user.name
+        let git_path = find_git().unwrap();
+        let _ = system_command(&git_path)
+            .arg("init")
+            .current_dir(dir.path())
+            .output();
+        let _ = system_command(&git_path)
+            .arg("config")
+            .arg("user.name")
+            .arg("Ada Lovelace")
+            .current_dir(dir.path())
+            .output();
+
+        let result = detectar_config_git(path);
+        assert_eq!(result.name.as_deref(), Some("Ada Lovelace"));
+        assert_eq!(result.email, None);
+        assert_eq!(result.remote_url, None);
     }
 
     // ========================================================================

@@ -206,6 +206,7 @@ const translations: Record<Lang, Record<string, string>> = {
     "timeline.descriptionPlaceholder": "Detalles del evento…",
     "timeline.relatedCharacters": "Personajes relacionados",
     "timeline.relatedChapters": "Capítulos relacionados",
+    "timeline.relatedPlaces": "Lugares relacionados",
     "timeline.add": "Agregar",
     "timeline.save": "Guardar",
     "timeline.newEvent": "+ Nuevo evento",
@@ -334,6 +335,8 @@ const translations: Record<Lang, Record<string, string>> = {
     "git.remoteHasCommits": "Repositorio remoto existente",
     "git.syncSuccess": "Historial remoto sincronizado correctamente.",
     "git.syncConflict": "Conflicto de sincronización",
+    "git.detected": "Git detectado: origin → {repo}, identidad → {name} <{email}>",
+    "git.detectedOrigin": "Git detectado: origin → {repo}",
 
     // ── Project Settings ─────────────────────────────────────
     "settings.title": "Configuración del proyecto",
@@ -551,6 +554,7 @@ const translations: Record<Lang, Record<string, string>> = {
     "timeline.descriptionPlaceholder": "Event details…",
     "timeline.relatedCharacters": "Related characters",
     "timeline.relatedChapters": "Related chapters",
+    "timeline.relatedPlaces": "Related places",
     "timeline.add": "Add",
     "timeline.save": "Save",
     "timeline.newEvent": "+ New Event",
@@ -679,6 +683,8 @@ const translations: Record<Lang, Record<string, string>> = {
     "git.remoteHasCommits": "Existing remote repository",
     "git.syncSuccess": "Remote history synchronized successfully.",
     "git.syncConflict": "Synchronization conflict",
+    "git.detected": "Git detected: origin → {repo}, identity → {name} <{email}>",
+    "git.detectedOrigin": "Git detected: origin → {repo}",
 
     // ── Project Settings ─────────────────────────────────────
     "settings.title": "Project Settings",

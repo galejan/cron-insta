@@ -16,6 +16,7 @@
     agregarEventoTimeline,
     cargarCapitulo,
     cargarConfigRemoto,
+    cargarIdentidadGit,
     cargarIndice,
     cargarLugar,
     cargarNota,
@@ -28,6 +29,7 @@
     crearNota,
     crearPersonaje,
     crearProyecto,
+    detectarConfigGit,
     detectarGit,
     eliminarCapitulo,
     eliminarEventoTimeline,
@@ -39,6 +41,7 @@
     eliminarPersonaje,
     guardarCapitulo,
     guardarConfigRemoto,
+    guardarIdentidadGit,
     importarProyecto,
     inicializarGit,
     listarLugares,
@@ -407,6 +410,7 @@
   let nuevoEventoDescripcion = $state("");
   let nuevoEventoPersonajes = $state<string[]>([]);
   let nuevoEventoCapitulos = $state<string[]>([]);
+  let nuevoEventoLugares = $state<string[]>([]);
   let eventoEditando = $state<string | null>(null); // event ID being edited, or null for new
 
   // ── Places state ────────────────────────────────────────────
@@ -635,6 +639,7 @@
       description: text,
       relatedCharacters: [] as string[],
       relatedChapters: [] as string[],
+      relatedPlaces: [] as string[],
     };
 
     try {
@@ -857,6 +862,90 @@
     }
   }
 
+  /**
+   * Extract repo slug from remote URL.
+   * "git@github.com:user/repo.git" → "user/repo"
+   * "https://github.com/user/repo.git" → "user/repo"
+   */
+  function extraerRepoDeUrl(url: string): string {
+    // SSH shortcut: git@host:user/repo.git
+    if (url.includes("@") && url.includes(":")) {
+      const slug = url.split(":").pop() ?? url;
+      return slug.replace(/\.git$/, "");
+    }
+    // HTTPS / ssh:// — take last two path segments
+    const clean = url.replace(/\.git$/, "");
+    const parts = clean.replace(/\/+$/, "").split("/");
+    if (parts.length >= 2) return parts.slice(-2).join("/");
+    return clean;
+  }
+
+  /**
+   * Detect git identity and remote from .git/config, merge into app config.
+   *
+   * Fire-and-forget: call after cargarIndice succeeds on project open.
+   * Compares detected identity with stored global config; saves if different.
+   * Auto-enables push when SSH origin is found (unless 3-strike rule blocks it).
+   */
+  async function detectarYGuardarConfigGit(path: string): Promise<void> {
+    try {
+      const detected = await detectarConfigGit(path);
+      const hasRemote = detected.remote_url && detected.remote_url.length > 0;
+      const hasIdentity = detected.name && detected.email;
+
+      // Nothing to do
+      if (!hasRemote && !hasIdentity) return;
+
+      let identityDiferente = false;
+
+      // ── Identity: compare with stored, save if different ───
+      if (hasIdentity) {
+        const stored = await cargarIdentidadGit();
+        const nameDiff = !stored || stored.name !== detected.name;
+        const emailDiff = !stored || stored.email !== detected.email;
+
+        if (nameDiff || emailDiff) {
+          identityDiferente = true;
+          await guardarIdentidadGit(detected.name!, detected.email!);
+        }
+      }
+
+      // ── Remote: SSH detection with 3-strike guard ──────────
+      if (hasRemote) {
+        const url = detected.remote_url!;
+        const isSSH = url.startsWith("git@") || url.startsWith("ssh://");
+
+        if (isSSH) {
+          const remoteState = await cargarConfigRemoto(path);
+          if (remoteState && remoteState.consecutive_failures === 0) {
+            // Only update if push_enabled is currently false
+            if (!remoteState.push_enabled) {
+              await guardarConfigRemoto(path, url, true);
+            }
+          }
+        }
+      }
+
+      // ── Toast ──────────────────────────────────────────────
+      if (hasRemote) {
+        const repo = extraerRepoDeUrl(detected.remote_url!);
+        if (identityDiferente) {
+          alert(
+            t("git.detected")
+              .replace("{repo}", repo)
+              .replace("{name}", detected.name!)
+              .replace("{email}", detected.email!),
+          );
+        } else {
+          alert(t("git.detectedOrigin").replace("{repo}", repo));
+        }
+      }
+    } catch (e) {
+      // Fire-and-forget — silently ignore detection errors
+      console.warn("[cron-insta] Git config detection skipped:", e);
+    }
+  }
+
   /** Open an existing project by loading its metadata.json. */
   async function abrirProyecto(): Promise<void> {
     // Close current project first if one is open
@@ -883,6 +972,7 @@
       setActiveProject(path);
       fontFamily = meta.font_family || "monospace";
       await actualizarGitStatus(path);
+      detectarYGuardarConfigGit(path); // fire-and-forget
       chapters = meta.chapters_order ?? [];
       console.log("[cron-insta] Project opened:", meta.project_name, chapters);
 
@@ -1277,6 +1367,7 @@
     nuevoEventoDescripcion = evt.description ?? "";
     nuevoEventoPersonajes = [...(evt.relatedCharacters ?? [])];
     nuevoEventoCapitulos = [...(evt.relatedChapters ?? [])];
+    nuevoEventoLugares = [...(evt.relatedPlaces ?? [])];
     eventoExpandido = null;
     eventoFormVisible = true;
   }
@@ -1288,6 +1379,7 @@
     nuevoEventoDescripcion = "";
     nuevoEventoPersonajes = [];
     nuevoEventoCapitulos = [];
+    nuevoEventoLugares = [];
     eventoFormVisible = false;
   }
 
@@ -1302,6 +1394,7 @@
       description: nuevoEventoDescripcion.trim(),
       relatedCharacters: nuevoEventoPersonajes.filter(Boolean),
       relatedChapters: nuevoEventoCapitulos.filter(Boolean),
+      relatedPlaces: nuevoEventoLugares.filter(Boolean),
     };
 
     try {
@@ -1336,6 +1429,10 @@
 
   function getPersonajeName(id: string): string {
     return personajes.find(p => p.id === id)?.name ?? id;
+  }
+
+  function getLugarName(id: string): string {
+    return lugares.find(l => l.id === id)?.name ?? id;
   }
 
   // ── Places CRUD ─────────────────────────────────────────────
@@ -1513,6 +1610,7 @@
         setActiveProject(lastPath);
         fontFamily = meta.font_family || "monospace";
         await actualizarGitStatus(lastPath);
+        detectarYGuardarConfigGit(lastPath); // fire-and-forget
         chapters = meta.chapters_order ?? [];
         console.log("[cron-insta] Project reopened:", meta.project_name, chapters);
 
@@ -2124,6 +2222,10 @@
                         <p class="event-meta"><strong>{t("timeline.relatedChapters")}:</strong>
                           {evt.relatedChapters.join(", ")}</p>
                       {/if}
+                      {#if evt.relatedPlaces?.length}
+                        <p class="event-meta"><strong>{t("timeline.relatedPlaces")}:</strong>
+                          {evt.relatedPlaces.map((id: string) => getLugarName(id)).join(", ")}</p>
+                      {/if}
                     </div>
                   {/if}
                 </li>
@@ -2195,6 +2297,22 @@
                         onchange={() => nuevoEventoCapitulos = togglePersonajeCapitulo(nuevoEventoCapitulos, ch)}
                       />
                       {ch}
+                    </label>
+                  {/each}
+                </div>
+              {/if}
+
+              {#if lugares.length > 0}
+                <span class="field-label">{t("timeline.relatedPlaces")}</span>
+                <div class="checkbox-group">
+                  {#each lugares as l}
+                    <label class="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={nuevoEventoLugares.includes(l.id)}
+                        onchange={() => nuevoEventoLugares = togglePersonajeCapitulo(nuevoEventoLugares, l.id)}
+                      />
+                      {l.name}
                     </label>
                   {/each}
                 </div>
