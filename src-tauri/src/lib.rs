@@ -24,6 +24,10 @@ use std::os::windows::process::CommandExt;
 fn system_command(program: &str) -> Command {
     let mut cmd = Command::new(program);
     cmd.stdin(std::process::Stdio::null());
+    // Inherit SSH agent socket for git operations on Linux
+    if let Ok(sock) = std::env::var("SSH_AUTH_SOCK") {
+        cmd.env("SSH_AUTH_SOCK", sock);
+    }
     #[cfg(target_os = "windows")]
     {
         cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
@@ -51,6 +55,12 @@ struct Metadata {
     places_index: Vec<LugarIndexItem>,
     #[serde(default = "default_font_family")]
     font_family: String,
+    /// Whether auto-push to remote is active for this project.
+    #[serde(default)]
+    push_enabled: bool,
+    /// Consecutive push failure count for the 3-strike rule.
+    #[serde(default)]
+    consecutive_failures: u32,
 }
 
 fn default_font_family() -> String {
@@ -150,6 +160,7 @@ struct GitIdentity {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[allow(dead_code)] // kept for test use
 struct GitRemoteConfig {
     url: String,
     #[serde(default)]
@@ -163,8 +174,6 @@ struct GitConfig {
     schema_version: u32,
     #[serde(default)]
     identity: Option<GitIdentity>,
-    #[serde(default)]
-    remote: Option<GitRemoteConfig>,
 }
 
 // ---------------------------------------------------------------------------
@@ -269,6 +278,8 @@ fn crear_proyecto(app: tauri::AppHandle, path: String, nombre: String, font_fami
         characters_index: vec![],
         places_index: vec![],
         font_family: font_family.unwrap_or_else(default_font_family),
+        push_enabled: false,
+        consecutive_failures: 0,
     };
     let metadata_json = serde_json::to_string_pretty(&metadata)
         .map_err(|e| format!("Error al serializar metadata: {}", e))?;
@@ -373,6 +384,8 @@ Timeline events linked to a deleted entity are NOT deleted — only the referenc
 | `characters_index` | object[] | Array of `{{ id, file, name }}` |
 | `places_index` | object[] | Array of `{{ id, name }}` |
 | `font_family` | string | Editor font: `"monospace"`, `"serif"`, or `"sans-serif"` |
+| `push_enabled` | boolean | Whether auto-push to remote is active for this project (default: false) |
+| `consecutive_failures` | number | Consecutive push failure count for the 3-strike auto-disable rule (default: 0) |
 
 ### `.config/timeline.json`
 
@@ -1884,7 +1897,7 @@ fn perform_commit(project_path: &Path) -> Result<String, String> {
 
 /// Internal helper: attempt to push to the configured remote.
 ///
-/// Reads the remote config from the global config file. If push is
+/// Reads push state from the project's `.config/metadata.json`. If push is
 /// disabled or no URL is configured, returns `Ok("")` (no-op).
 ///
 /// Implements 3-strike auto-disable: after 3 consecutive failures,
@@ -1893,40 +1906,49 @@ fn perform_commit(project_path: &Path) -> Result<String, String> {
 ///
 /// **NOT a Tauri command** — called internally by `crear_checkpoint`
 /// and `do_checkpoint`.
-fn sincronizar_checkpoint(app: &tauri::AppHandle, path: &str) -> Result<String, String> {
-    let config_path = match get_config_path(app) {
-        Some(p) => p,
-        None => return Ok("".to_string()),
-    };
+fn sincronizar_checkpoint(_app: &tauri::AppHandle, path: &str) -> Result<String, String> {
+    let project_path = Path::new(path);
 
-    if !config_path.exists() {
+    // Read push state from project metadata
+    let meta_path = project_path.join(".config").join("metadata.json");
+    if !meta_path.exists() {
         return Ok("".to_string());
     }
 
-    let raw = match std::fs::read_to_string(&config_path) {
+    let raw = match std::fs::read_to_string(&meta_path) {
         Ok(r) => r,
         Err(_) => return Ok("".to_string()),
     };
 
-    let mut config: GitConfig = match serde_json::from_str(&raw) {
-        Ok(c) => c,
+    let mut meta: Metadata = match serde_json::from_str(&raw) {
+        Ok(m) => m,
         Err(_) => return Ok("".to_string()),
     };
 
-    // Check preconditions: must have a remote URL and push enabled
-    let remote = match &config.remote {
-        Some(r) => r.clone(),
-        None => return Ok("".to_string()),
-    };
-
-    if !remote.push_enabled || remote.url.is_empty() {
+    if !meta.push_enabled {
         return Ok("".to_string());
     }
 
-    let project_path = Path::new(path);
+    // Read remote URL from git
+    let git_path = find_git()?;
+    let url_output = system_command(&git_path)
+        .arg("remote")
+        .arg("get-url")
+        .arg("origin")
+        .current_dir(project_path)
+        .output()
+        .map_err(|e| format!("Error al ejecutar git remote get-url: {}", e))?;
+
+    if !url_output.status.success() {
+        return Ok("".to_string()); // No remote configured
+    }
+
+    let remote_url = String::from_utf8_lossy(&url_output.stdout).trim().to_string();
+    if remote_url.is_empty() {
+        return Ok("".to_string());
+    }
 
     // Attempt push
-    let git_path = find_git()?;
     let push_output = system_command(&git_path)
         .arg("push")
         .current_dir(project_path)
@@ -1935,26 +1957,23 @@ fn sincronizar_checkpoint(app: &tauri::AppHandle, path: &str) -> Result<String, 
 
     eprintln!("git push output (sincronizar_checkpoint): {:?}", push_output);
 
-    let mut remote_config = remote;
-
     if push_output.status.success() {
         // Success: reset counter
-        remote_config.consecutive_failures = 0;
-        config.remote = Some(remote_config);
-
-        let json = serde_json::to_string_pretty(&config)
-            .map_err(|e| format!("Error serializing config: {}", e))?;
-        std::fs::write(&config_path, json)
-            .map_err(|e| format!("Error writing config: {}", e))?;
+        meta.consecutive_failures = 0;
+        meta.last_modified = Local::now().to_rfc3339();
+        let json = serde_json::to_string_pretty(&meta)
+            .map_err(|e| format!("Error serializing metadata: {}", e))?;
+        std::fs::write(&meta_path, json)
+            .map_err(|e| format!("Error writing metadata: {}", e))?;
 
         Ok("".to_string())
     } else {
         // Failure: increment counter, apply 3-strike rule
-        remote_config.consecutive_failures += 1;
-        let failures = remote_config.consecutive_failures;
+        meta.consecutive_failures += 1;
+        let failures = meta.consecutive_failures;
 
         let warning = if failures >= 3 {
-            remote_config.push_enabled = false;
+            meta.push_enabled = false;
             "Sincronización remota desactivada tras 3 intentos fallidos. Podés reactivarla desde la barra de herramientas.".to_string()
         } else {
             format!(
@@ -1963,12 +1982,11 @@ fn sincronizar_checkpoint(app: &tauri::AppHandle, path: &str) -> Result<String, 
             )
         };
 
-        config.remote = Some(remote_config);
-
-        let json = serde_json::to_string_pretty(&config)
-            .map_err(|e| format!("Error serializing config: {}", e))?;
-        std::fs::write(&config_path, json)
-            .map_err(|e| format!("Error writing config: {}", e))?;
+        meta.last_modified = Local::now().to_rfc3339();
+        let json = serde_json::to_string_pretty(&meta)
+            .map_err(|e| format!("Error serializing metadata: {}", e))?;
+        std::fs::write(&meta_path, json)
+            .map_err(|e| format!("Error writing metadata: {}", e))?;
 
         Ok(warning)
     }
@@ -2011,8 +2029,17 @@ fn do_checkpoint(app: &tauri::AppHandle, project_path: &str) -> Result<String, S
     let path_buf = Path::new(project_path);
     let commit_result = perform_commit(path_buf)?;
 
-    // Auto-push if remote is configured — silently
-    let _ = sincronizar_checkpoint(app, project_path);
+    // Auto-push if remote is configured
+    match sincronizar_checkpoint(app, project_path) {
+        Ok(warning) => {
+            if !warning.is_empty() {
+                eprintln!("[do_checkpoint] Push warning: {}", warning);
+            }
+        }
+        Err(e) => {
+            eprintln!("[do_checkpoint] Push error: {}", e);
+        }
+    }
 
     Ok(commit_result)
 }
@@ -2287,19 +2314,17 @@ fn guardar_identidad_git(
 
     let identity = GitIdentity { name, email, github_user };
 
-    // Read-modify-write: preserve any existing remote config
+    // Read-modify-write: preserve identity-only config
     let mut config = if config_path.exists() {
         let raw = std::fs::read_to_string(&config_path).unwrap_or_default();
         serde_json::from_str::<GitConfig>(&raw).unwrap_or(GitConfig {
             schema_version: 1,
             identity: None,
-            remote: None,
         })
     } else {
         GitConfig {
             schema_version: 1,
             identity: None,
-            remote: None,
         }
     };
 
@@ -2314,91 +2339,110 @@ fn guardar_identidad_git(
     Ok("Identity saved successfully.".to_string())
 }
 
-/// Load the stored Git remote configuration from the global config file.
+/// Load the per-project push state from the project's metadata.json.
 ///
-/// Returns the serialised `GitRemoteConfig` JSON `{url, push_enabled,
-/// consecutive_failures}` when present, or the literal string `"null"`
-/// when no config exists, no remote section is present, or the file is
-/// corrupted.
+/// Returns the serialised JSON `{push_enabled, consecutive_failures, url}`
+/// when metadata exists. The `url` is read from `git remote get-url origin`
+/// and is `null` when no remote is configured.
+///
+/// Returns the literal string `"null"` when metadata is missing or corrupted.
 #[tauri::command]
-fn cargar_config_remoto(app: tauri::AppHandle) -> Result<String, String> {
-    let config_path = match get_config_path(&app) {
-        Some(p) => p,
-        None => return Ok("null".to_string()),
-    };
+fn cargar_config_remoto(_app: tauri::AppHandle, proyecto_path: String) -> Result<String, String> {
+    let base = Path::new(&proyecto_path);
+    let meta_path = base.join(".config").join("metadata.json");
 
-    if !config_path.exists() {
+    if !meta_path.exists() {
         return Ok("null".to_string());
     }
 
-    let raw = match std::fs::read_to_string(&config_path) {
+    let raw = match std::fs::read_to_string(&meta_path) {
         Ok(r) => r,
         Err(_) => return Ok("null".to_string()),
     };
 
-    let config: GitConfig = match serde_json::from_str(&raw) {
-        Ok(c) => c,
+    let meta: Metadata = match serde_json::from_str(&raw) {
+        Ok(m) => m,
         Err(_) => return Ok("null".to_string()),
     };
 
-    match config.remote {
-        Some(r) => serde_json::to_string(&r)
-            .map_err(|e| format!("Error serializing remote config: {}", e)),
-        None => Ok("null".to_string()),
+    // Read remote URL from git config (best-effort)
+    let remote_url: Option<String> = if let Ok(git_path) = find_git() {
+        system_command(&git_path)
+            .arg("remote")
+            .arg("get-url")
+            .arg("origin")
+            .current_dir(base)
+            .output()
+            .ok()
+            .filter(|out| out.status.success())
+            .map(|out| String::from_utf8_lossy(&out.stdout).trim().to_string())
+            .filter(|s| !s.is_empty())
+    } else {
+        None
+    };
+
+    #[derive(Serialize)]
+    struct RemoteState {
+        push_enabled: bool,
+        consecutive_failures: u32,
+        url: Option<String>,
     }
+
+    let state = RemoteState {
+        push_enabled: meta.push_enabled,
+        consecutive_failures: meta.consecutive_failures,
+        url: remote_url,
+    };
+
+    serde_json::to_string(&state)
+        .map_err(|e| format!("Error serializing remote state: {}", e))
 }
 
-/// Persist the Git remote configuration to the global config file.
+/// Persist the push state to the project's metadata.json.
 ///
-/// Uses a read-modify-write pattern so any existing identity is preserved.
-/// `consecutive_failures` is set to 0 when remote config is saved (the
-/// counter management lives in the push-logic helpers in a later PR).
+/// Uses a read-modify-write pattern so existing metadata fields are
+/// preserved. `consecutive_failures` is set to 0 when remote config is
+/// saved (fresh start).
+///
+/// When `proyecto_path` is empty or metadata.json does not exist yet
+/// (pre-creation flow), returns `Ok` without writing — the state will
+/// be seeded by `crear_proyecto`.
+///
+/// The `url` parameter is accepted for backward-compatible signature
+/// but is NOT stored — the remote URL lives in Git's own config.
 #[tauri::command]
 fn guardar_config_remoto(
-    app: tauri::AppHandle,
-    url: String,
+    _app: tauri::AppHandle,
+    proyecto_path: String,
+    _url: String,
     push_enabled: bool,
 ) -> Result<String, String> {
-    let config_path = match get_config_path(&app) {
-        Some(p) => p,
-        None => return Err("Could not determine config directory".to_string()),
-    };
-
-    // Ensure the parent directory exists
-    if let Some(parent) = config_path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| format!("Error creating config directory: {}", e))?;
+    if proyecto_path.is_empty() {
+        return Ok("No project path — state will be set after creation.".to_string());
     }
 
-    let remote = GitRemoteConfig {
-        url,
-        push_enabled,
-        consecutive_failures: 0,
-    };
+    let base = Path::new(&proyecto_path);
+    let meta_path = base.join(".config").join("metadata.json");
 
-    // Read-modify-write: preserve any existing identity
-    let mut config = if config_path.exists() {
-        let raw = std::fs::read_to_string(&config_path).unwrap_or_default();
-        serde_json::from_str::<GitConfig>(&raw).unwrap_or(GitConfig {
-            schema_version: 1,
-            identity: None,
-            remote: None,
-        })
-    } else {
-        GitConfig {
-            schema_version: 1,
-            identity: None,
-            remote: None,
-        }
-    };
+    if !meta_path.exists() {
+        return Ok("Metadata not created yet — state will be set after project creation.".to_string());
+    }
 
-    config.remote = Some(remote);
+    let raw = std::fs::read_to_string(&meta_path)
+        .map_err(|e| format!("Error reading metadata: {}", e))?;
 
-    let json = serde_json::to_string_pretty(&config)
-        .map_err(|e| format!("Error serializing config: {}", e))?;
+    let mut meta: Metadata = serde_json::from_str(&raw)
+        .map_err(|e| format!("Error parsing metadata: {}", e))?;
 
-    std::fs::write(&config_path, json)
-        .map_err(|e| format!("Error writing config: {}", e))?;
+    meta.push_enabled = push_enabled;
+    meta.consecutive_failures = 0;
+    meta.last_modified = Local::now().to_rfc3339();
+
+    let json = serde_json::to_string_pretty(&meta)
+        .map_err(|e| format!("Error serializing metadata: {}", e))?;
+
+    std::fs::write(&meta_path, json)
+        .map_err(|e| format!("Error writing metadata: {}", e))?;
 
     Ok("Remote config saved successfully.".to_string())
 }
@@ -2612,36 +2656,42 @@ fn sincronizar_remoto(path: String) -> Result<String, String> {
 /// On success, the counter stays at 0. On failure, increments to 1
 /// (starting a fresh strike count).
 #[tauri::command]
-fn reintentar_push(app: tauri::AppHandle, path: String) -> Result<String, String> {
-    let config_path = match get_config_path(&app) {
-        Some(p) => p,
-        None => return Err("Could not determine config directory".to_string()),
-    };
+fn reintentar_push(_app: tauri::AppHandle, path: String) -> Result<String, String> {
+    let project_path = Path::new(&path);
+    let meta_path = project_path.join(".config").join("metadata.json");
 
-    if !config_path.exists() {
+    if !meta_path.exists() {
+        return Err("No hay metadata del proyecto.".to_string());
+    }
+
+    let raw = std::fs::read_to_string(&meta_path)
+        .map_err(|e| format!("Error reading metadata: {}", e))?;
+
+    let mut meta: Metadata = serde_json::from_str(&raw)
+        .map_err(|e| format!("Error parsing metadata: {}", e))?;
+
+    // Check if remote is configured
+    let git_path = find_git()?;
+    let url_output = system_command(&git_path)
+        .arg("remote")
+        .arg("get-url")
+        .arg("origin")
+        .current_dir(project_path)
+        .output()
+        .map_err(|e| format!("Error al ejecutar git remote get-url: {}", e))?;
+
+    if !url_output.status.success() {
         return Err("No hay un repositorio remoto configurado.".to_string());
     }
 
-    let raw = std::fs::read_to_string(&config_path)
-        .map_err(|e| format!("Error reading config: {}", e))?;
+    let remote_url = String::from_utf8_lossy(&url_output.stdout).trim().to_string();
+    if remote_url.is_empty() {
+        return Err("No hay un repositorio remoto configurado.".to_string());
+    }
 
-    let mut config: GitConfig = serde_json::from_str(&raw)
-        .map_err(|e| format!("Error parsing config: {}", e))?;
-
-    // Verify remote exists
-    let remote = match &config.remote {
-        Some(r) => r.clone(),
-        None => return Err("No hay un repositorio remoto configurado.".to_string()),
-    };
-
-    let mut remote_config = remote;
-    // Reset counter before attempting
-    remote_config.consecutive_failures = 0;
-    // Ensure push is enabled
-    remote_config.push_enabled = true;
-
-    let git_path = find_git()?;
-    let project_path = Path::new(&path);
+    // Reset counter and enable push
+    meta.consecutive_failures = 0;
+    meta.push_enabled = true;
 
     let push_output = system_command(&git_path)
         .arg("push")
@@ -2650,24 +2700,22 @@ fn reintentar_push(app: tauri::AppHandle, path: String) -> Result<String, String
         .map_err(|e| format!("Error al ejecutar git push: {}", e))?;
 
     if push_output.status.success() {
-        // Success: save config with fresh counter
-        config.remote = Some(remote_config);
-
-        let json = serde_json::to_string_pretty(&config)
-            .map_err(|e| format!("Error serializing config: {}", e))?;
-        std::fs::write(&config_path, json)
-            .map_err(|e| format!("Error writing config: {}", e))?;
+        // Success: save with fresh counter
+        meta.last_modified = Local::now().to_rfc3339();
+        let json = serde_json::to_string_pretty(&meta)
+            .map_err(|e| format!("Error serializing metadata: {}", e))?;
+        std::fs::write(&meta_path, json)
+            .map_err(|e| format!("Error writing metadata: {}", e))?;
 
         Ok("Sincronización exitosa.".to_string())
     } else {
         // Failure: increment to 1 (fresh count)
-        remote_config.consecutive_failures = 1;
-        config.remote = Some(remote_config);
-
-        let json = serde_json::to_string_pretty(&config)
-            .map_err(|e| format!("Error serializing config: {}", e))?;
-        std::fs::write(&config_path, json)
-            .map_err(|e| format!("Error writing config: {}", e))?;
+        meta.consecutive_failures = 1;
+        meta.last_modified = Local::now().to_rfc3339();
+        let json = serde_json::to_string_pretty(&meta)
+            .map_err(|e| format!("Error serializing metadata: {}", e))?;
+        std::fs::write(&meta_path, json)
+            .map_err(|e| format!("Error writing metadata: {}", e))?;
 
         let stderr = String::from_utf8_lossy(&push_output.stderr);
         Err(format!("Error al sincronizar: {}", stderr.trim()))
@@ -2847,6 +2895,8 @@ mod tests {
             characters_index: vec![],
             places_index: vec![],
             font_family: font_family.unwrap_or_else(default_font_family),
+            push_enabled: false,
+            consecutive_failures: 0,
         };
         let metadata_json = serde_json::to_string_pretty(&metadata)
             .map_err(|e| format!("Error al serializar metadata: {}", e))?;
@@ -4434,26 +4484,22 @@ mod tests {
 
     #[test]
     fn test_git_config_full_serde_roundtrip() {
-        let config = GitConfig {
-            schema_version: 1,
-            identity: Some(GitIdentity {
-                name: "Cervantes".to_string(),
-                email: "cervantes@lit.es".to_string(),
-                github_user: None,
-            }),
-            remote: Some(GitRemoteConfig {
-                url: "git@github.com:user/repo.git".to_string(),
-                push_enabled: true,
-                consecutive_failures: 0,
-            }),
-        };
-        let json = serde_json::to_string_pretty(&config).expect("serialize config");
-        let parsed: GitConfig = serde_json::from_str(&json).expect("deserialize config");
+        // Test backward compat: old config with remote key is deserialized
+        // without error (serde ignores unknown fields).
+        let old_json = r#"{
+            "schema_version": 1,
+            "identity": { "name": "Cervantes", "email": "cervantes@lit.es" },
+            "remote": { "url": "git@github.com:user/repo.git", "push_enabled": true, "consecutive_failures": 0 }
+        }"#;
+        let parsed: GitConfig = serde_json::from_str(old_json).expect("deserialize old-format config");
         assert_eq!(parsed.schema_version, 1);
-        let id = parsed.identity.expect("identity should be present");
+        let id = parsed.identity.as_ref().expect("identity should be present");
         assert_eq!(id.name, "Cervantes");
-        let remote = parsed.remote.expect("remote should be present");
-        assert!(remote.push_enabled);
+
+        // Write-back should NOT contain the remote key (stripped migration)
+        let new_json = serde_json::to_string_pretty(&parsed).expect("serialize");
+        assert!(!new_json.contains("\"remote\""), "write-back must strip remote key");
+        assert!(new_json.contains("\"Cervantes\""), "identity must be preserved");
     }
 
     #[test]
@@ -4462,7 +4508,6 @@ mod tests {
         let parsed: GitConfig = serde_json::from_str(json).expect("deserialize minimal config");
         assert_eq!(parsed.schema_version, 1);
         assert!(parsed.identity.is_none(), "identity should be None");
-        assert!(parsed.remote.is_none(), "remote should be None");
     }
 
     // --- Identity: save then load (filesystem roundtrip) ---
@@ -4480,7 +4525,6 @@ mod tests {
                 email: "ada@code.dev".to_string(),
                 github_user: None,
             }),
-            remote: None,
         };
         let json = serde_json::to_string_pretty(&config).unwrap();
         write_config(&config_path, &json);
@@ -4525,105 +4569,176 @@ mod tests {
 
     #[test]
     fn test_remote_config_save_then_load() {
+        // Now tests per-project push state in metadata.json
         let dir = TempDir::new().expect("failed to create temp dir");
-        let config_path = dir.path().join("cron-insta").join("git-config.json");
+        let project_path = dir.path().to_str().unwrap().to_string();
 
-        let config = GitConfig {
-            schema_version: 1,
-            identity: None,
-            remote: Some(GitRemoteConfig {
-                url: "git@github.com:user/repo.git".to_string(),
-                push_enabled: true,
-                consecutive_failures: 0,
-            }),
-        };
-        let json = serde_json::to_string_pretty(&config).unwrap();
-        write_config(&config_path, &json);
+        // Create project with push_enabled: true
+        create_project_for_test(project_path.clone(), "Test".to_string(), None).unwrap();
 
-        let raw = fs::read_to_string(&config_path).unwrap();
-        let parsed: GitConfig = serde_json::from_str(&raw).unwrap();
-        let remote = parsed.remote.expect("remote should be present");
-        assert_eq!(remote.url, "git@github.com:user/repo.git");
-        assert!(remote.push_enabled);
-        assert_eq!(remote.consecutive_failures, 0);
+        // Read metadata, set push_enabled, write back
+        let meta_path = dir.path().join(".config").join("metadata.json");
+        let raw = fs::read_to_string(&meta_path).unwrap();
+        let mut meta: Metadata = serde_json::from_str(&raw).unwrap();
+        meta.push_enabled = true;
+        meta.consecutive_failures = 0;
+        fs::write(&meta_path, serde_json::to_string_pretty(&meta).unwrap()).unwrap();
+
+        // Read back and verify
+        let raw = fs::read_to_string(&meta_path).unwrap();
+        let parsed: Metadata = serde_json::from_str(&raw).unwrap();
+        assert!(parsed.push_enabled);
+        assert_eq!(parsed.consecutive_failures, 0);
     }
 
-    // --- Read-modify-write: identity does NOT wipe remote ---
+    // --- Migration: old global config with remote key is safely deserialized ---
 
     #[test]
-    fn test_identity_save_preserves_remote() {
+    fn test_identity_load_strips_legacy_remote() {
+        // Old-format config had a "remote" key alongside identity.
+        // New struct ignores it (serde default) and write-back strips it.
         let dir = TempDir::new().expect("failed to create temp dir");
         let config_path = dir.path().join("cron-insta").join("git-config.json");
 
-        // Step 1: Write remote config first
-        let config = GitConfig {
-            schema_version: 1,
-            identity: None,
-            remote: Some(GitRemoteConfig {
-                url: "git@github.com:user/repo.git".to_string(),
-                push_enabled: true,
-                consecutive_failures: 0,
-            }),
-        };
-        write_config(&config_path, &serde_json::to_string_pretty(&config).unwrap());
+        // Write old-format config with both identity and remote
+        let old_json = r#"{
+            "schema_version": 1,
+            "identity": { "name": "Ada", "email": "ada@code.dev" },
+            "remote": { "url": "git@github.com:user/repo.git", "push_enabled": true, "consecutive_failures": 0 }
+        }"#;
+        write_config(&config_path, old_json);
 
-        // Step 2: Read-modify-write: add identity while preserving remote
+        // Load: should succeed, identity preserved, remote silently ignored
         let raw = fs::read_to_string(&config_path).unwrap();
-        let mut config: GitConfig = serde_json::from_str(&raw).unwrap();
-        config.identity = Some(GitIdentity {
-            name: "Ada".to_string(),
-            email: "ada@code.dev".to_string(),
-            github_user: None,
-        });
-        fs::write(&config_path, serde_json::to_string_pretty(&config).unwrap()).unwrap();
+        let config: GitConfig = serde_json::from_str(&raw).unwrap();
+        assert_eq!(config.identity.as_ref().unwrap().name, "Ada");
 
-        // Step 3: Read back — both sections should exist
-        let raw = fs::read_to_string(&config_path).unwrap();
-        let final_config: GitConfig = serde_json::from_str(&raw).unwrap();
-        assert_eq!(final_config.identity.unwrap().name, "Ada");
-        assert_eq!(
-            final_config.remote.unwrap().url,
-            "git@github.com:user/repo.git"
-        );
+        // Write-back: should NOT contain remote key
+        let new_json = serde_json::to_string_pretty(&config).unwrap();
+        fs::write(&config_path, &new_json).unwrap();
+        let final_raw = fs::read_to_string(&config_path).unwrap();
+        assert!(!final_raw.contains("\"remote\""), "migration must strip remote key");
+        assert!(final_raw.contains("\"Ada\""), "identity must be preserved");
     }
 
-    // --- Read-modify-write: remote does NOT wipe identity ---
+    // --- Per-project push state independence ---
 
     #[test]
-    fn test_remote_save_preserves_identity() {
+    fn test_push_state_per_project_isolation() {
         let dir = TempDir::new().expect("failed to create temp dir");
-        let config_path = dir.path().join("cron-insta").join("git-config.json");
 
-        // Step 1: Write identity first
-        let config = GitConfig {
-            schema_version: 1,
-            identity: Some(GitIdentity {
-                name: "Cervantes".to_string(),
-                email: "cervantes@lit.es".to_string(),
-                github_user: None,
-            }),
-            remote: None,
-        };
-        write_config(&config_path, &serde_json::to_string_pretty(&config).unwrap());
+        // Create project A with push enabled
+        let path_a = dir.path().join("project_a");
+        fs::create_dir_all(&path_a).unwrap();
+        create_project_for_test(
+            path_a.to_str().unwrap().to_string(),
+            "Project A".to_string(),
+            None,
+        ).unwrap();
 
-        // Step 2: Read-modify-write: add remote while preserving identity
-        let raw = fs::read_to_string(&config_path).unwrap();
-        let mut config: GitConfig = serde_json::from_str(&raw).unwrap();
-        config.remote = Some(GitRemoteConfig {
-            url: "git@github.com:user/repo.git".to_string(),
-            push_enabled: false,
-            consecutive_failures: 0,
-        });
-        fs::write(&config_path, serde_json::to_string_pretty(&config).unwrap()).unwrap();
+        // Enable push on project A
+        let meta_a = path_a.join(".config").join("metadata.json");
+        let raw = fs::read_to_string(&meta_a).unwrap();
+        let mut md_a: Metadata = serde_json::from_str(&raw).unwrap();
+        md_a.push_enabled = true;
+        md_a.consecutive_failures = 1;
+        fs::write(&meta_a, serde_json::to_string_pretty(&md_a).unwrap()).unwrap();
 
-        // Step 3: Read back — both sections should exist
-        let raw = fs::read_to_string(&config_path).unwrap();
-        let final_config: GitConfig = serde_json::from_str(&raw).unwrap();
-        assert_eq!(final_config.identity.unwrap().name, "Cervantes");
-        assert_eq!(
-            final_config.remote.unwrap().url,
-            "git@github.com:user/repo.git"
-        );
+        // Create project B (fresh, should have push_enabled=false)
+        let path_b = dir.path().join("project_b");
+        fs::create_dir_all(&path_b).unwrap();
+        create_project_for_test(
+            path_b.to_str().unwrap().to_string(),
+            "Project B".to_string(),
+            None,
+        ).unwrap();
+
+        let meta_b = path_b.join(".config").join("metadata.json");
+        let raw_b = fs::read_to_string(&meta_b).unwrap();
+        let md_b: Metadata = serde_json::from_str(&raw_b).unwrap();
+
+        // Project B should NOT be affected by project A's state
+        assert!(!md_b.push_enabled, "project B should start with push disabled");
+        assert_eq!(md_b.consecutive_failures, 0, "project B should have 0 failures");
+
+        // Verify project A still has its state
+        let raw_a = fs::read_to_string(&meta_a).unwrap();
+        let md_a2: Metadata = serde_json::from_str(&raw_a).unwrap();
+        assert!(md_a2.push_enabled, "project A push should still be enabled");
+        assert_eq!(md_a2.consecutive_failures, 1, "project A should have 1 failure");
+    }
+
+    // --- Metadata serde backward compat: old metadata without push fields ---
+
+    #[test]
+    fn test_metadata_serde_backward_compat() {
+        // Old metadata.json without push_enabled/consecutive_failures
+        let old_json = r#"{
+            "project_name": "Old Project",
+            "last_modified": "2024-01-01T00:00:00Z",
+            "chapters_order": [],
+            "characters_index": [],
+            "places_index": [],
+            "font_family": "monospace"
+        }"#;
+        let meta: Metadata = serde_json::from_str(old_json).expect("deserialize old metadata");
+        assert_eq!(meta.project_name, "Old Project");
+        assert!(!meta.push_enabled, "push_enabled should default to false");
+        assert_eq!(meta.consecutive_failures, 0, "consecutive_failures should default to 0");
+
+        // Round-trip: serialize back, deserialize again, fields survive
+        let json = serde_json::to_string_pretty(&meta).expect("serialize");
+        let meta2: Metadata = serde_json::from_str(&json).expect("deserialize round-trip");
+        assert!(!meta2.push_enabled, "push_enabled should survive round-trip");
+        assert_eq!(meta2.consecutive_failures, 0, "consecutive_failures should survive round-trip");
+    }
+
+    // --- Metadata push fields survive round-trip ---
+
+    #[test]
+    fn test_metadata_push_fields_survive_roundtrip() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        create_project_for_test(path.clone(), "Test".to_string(), None).unwrap();
+
+        let meta_path = dir.path().join(".config").join("metadata.json");
+
+        // Set push fields
+        let raw = fs::read_to_string(&meta_path).unwrap();
+        let mut meta: Metadata = serde_json::from_str(&raw).unwrap();
+        meta.push_enabled = true;
+        meta.consecutive_failures = 2;
+        fs::write(&meta_path, serde_json::to_string_pretty(&meta).unwrap()).unwrap();
+
+        // Modify an unrelated field (font_family) via actualizar_fuente_proyecto
+        actualizar_fuente_proyecto(path.clone(), "serif".to_string()).unwrap();
+
+        // Push fields must survive
+        let raw2 = fs::read_to_string(&meta_path).unwrap();
+        let meta2: Metadata = serde_json::from_str(&raw2).unwrap();
+        assert!(meta2.push_enabled, "push_enabled should survive unrelated modification");
+        assert_eq!(meta2.consecutive_failures, 2, "consecutive_failures should survive");
+        assert_eq!(meta2.font_family, "serif", "font_family should be updated");
+    }
+
+    // --- SSH_AUTH_SOCK env var inheritance ---
+
+    #[test]
+    fn test_system_command_inherits_ssh_auth_sock() {
+        // Set SSH_AUTH_SOCK in the current env
+        std::env::set_var("SSH_AUTH_SOCK", "/tmp/test-ssh-agent.sock");
+
+        // Spawn a child that echoes the env var
+        let output = system_command("sh")
+            .arg("-c")
+            .arg("echo $SSH_AUTH_SOCK")
+            .output()
+            .expect("failed to spawn child");
+
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        assert_eq!(stdout, "/tmp/test-ssh-agent.sock",
+            "SSH_AUTH_SOCK should be inherited by child process");
     }
 
     // --- Identity with Unicode names ---
@@ -4640,7 +4755,6 @@ mod tests {
                 email: "josé@español.es".to_string(),
                 github_user: None,
             }),
-            remote: None,
         };
         write_config(&config_path, &serde_json::to_string_pretty(&config).unwrap());
 
@@ -4788,49 +4902,41 @@ mod tests {
 
     #[test]
     fn test_config_write_read_strike_state() {
+        // Now tests per-project push state in metadata.json
         let dir = TempDir::new().expect("failed to create temp dir");
-        let config_path = dir.path().join("cron-insta").join("git-config.json");
+        let path = dir.path().to_str().unwrap().to_string();
 
-        // Write config with 2 strikes, push still enabled
-        let config = GitConfig {
-            schema_version: 1,
-            identity: Some(GitIdentity {
-                name: "Ada".to_string(),
-                email: "ada@code.dev".to_string(),
-                github_user: None,
-            }),
-            remote: Some(GitRemoteConfig {
-                url: "git@host:repo.git".to_string(),
-                push_enabled: true,
-                consecutive_failures: 2,
-            }),
-        };
-        write_config(&config_path, &serde_json::to_string_pretty(&config).unwrap());
+        // Create project
+        create_project_for_test(path.clone(), "Test".to_string(), None).unwrap();
+
+        let meta_path = dir.path().join(".config").join("metadata.json");
+
+        // Write metadata with 2 strikes, push still enabled
+        let raw = fs::read_to_string(&meta_path).unwrap();
+        let mut meta: Metadata = serde_json::from_str(&raw).unwrap();
+        meta.push_enabled = true;
+        meta.consecutive_failures = 2;
+        fs::write(&meta_path, serde_json::to_string_pretty(&meta).unwrap()).unwrap();
 
         // Read back
-        let raw = fs::read_to_string(&config_path).unwrap();
-        let parsed: GitConfig = serde_json::from_str(&raw).unwrap();
-        let remote = parsed.remote.as_ref().unwrap();
-        assert_eq!(remote.consecutive_failures, 2);
-        assert!(remote.push_enabled);
+        let raw = fs::read_to_string(&meta_path).unwrap();
+        let parsed: Metadata = serde_json::from_str(&raw).unwrap();
+        assert_eq!(parsed.consecutive_failures, 2);
+        assert!(parsed.push_enabled);
 
-        // Simulate: write updated config with push disabled (strike 3)
+        // Simulate: write updated metadata with push disabled (strike 3)
         let mut updated = parsed.clone();
-        updated.remote = Some(GitRemoteConfig {
-            url: "git@host:repo.git".to_string(),
-            push_enabled: false,
-            consecutive_failures: 3,
-        });
-        fs::write(&config_path, serde_json::to_string_pretty(&updated).unwrap()).unwrap();
+        updated.push_enabled = false;
+        updated.consecutive_failures = 3;
+        fs::write(&meta_path, serde_json::to_string_pretty(&updated).unwrap()).unwrap();
 
-        let raw2 = fs::read_to_string(&config_path).unwrap();
-        let final_config: GitConfig = serde_json::from_str(&raw2).unwrap();
-        let final_remote = final_config.remote.unwrap();
-        assert!(!final_remote.push_enabled, "push should be disabled");
-        assert_eq!(final_remote.consecutive_failures, 3);
+        let raw2 = fs::read_to_string(&meta_path).unwrap();
+        let final_meta: Metadata = serde_json::from_str(&raw2).unwrap();
+        assert!(!final_meta.push_enabled, "push should be disabled");
+        assert_eq!(final_meta.consecutive_failures, 3);
 
-        // Identity must be preserved through the strike update
-        assert_eq!(final_config.identity.unwrap().name, "Ada");
+        // Other fields must be preserved through the strike update
+        assert_eq!(final_meta.project_name, "Test");
     }
 
     // ========================================================================
