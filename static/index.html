@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Cron-Insta · Editor literario Local-First</title>
-  <meta name="description" content="Cron-Insta es un editor de texto local-first para escribir novelas. Sin distracciones, con control de versiones invisible y todas tus herramientas en un panel lateral." />
+  <title>Cron-Insta · El editor para novelistas</title>
+  <meta name="description" content="Cron-Insta es un editor de escritorio para escribir novelas. Sin distracciones, con control de versiones invisible, fichas de personajes, línea de tiempo, lugares y exportación. Todo en tu disco, sin nube." />
   <link rel="icon" href="favicon.png" />
 
   <style>
@@ -13,30 +13,32 @@
 
     /* ── Variables ───────────────────────────────────────── */
     :root {
-      --bg:       #f8fafc;
-      --bg-alt:   #f1f5f9;
-      --surface:  #ffffff;
-      --border:   #e2e8f0;
-      --text:     #1a1a1a;
+      --bg:         #f8fafc;
+      --bg-alt:     #f1f5f9;
+      --surface:    #ffffff;
+      --border:     #e2e8f0;
+      --text:       #1a1a1a;
       --text-muted: #64748b;
-      --accent:   #3b82f6;
+      --accent:     #3b82f6;
       --accent-hover: #2563eb;
-      --key-bg:   #e2e8f0;
-      --serif:    Georgia, "Times New Roman", serif;
-      --sans:     -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      --accent-soft:  #eff6ff;
+      --key-bg:     #e2e8f0;
+      --serif:      Georgia, "Times New Roman", serif;
+      --sans:       -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
     }
 
     @media (prefers-color-scheme: dark) {
       :root {
-        --bg:       #0f172a;
-        --bg-alt:   #1e293b;
-        --surface:  #1e293b;
-        --border:   #334155;
-        --text:     #e2e8f0;
+        --bg:         #0f172a;
+        --bg-alt:     #1e293b;
+        --surface:    #1e293b;
+        --border:     #334155;
+        --text:       #e2e8f0;
         --text-muted: #94a3b8;
-        --accent:   #60a5fa;
+        --accent:     #60a5fa;
         --accent-hover: #3b82f6;
-        --key-bg:   #334155;
+        --accent-soft:  #1e3a5f;
+        --key-bg:     #334155;
       }
     }
 
@@ -52,7 +54,7 @@
 
     /* ── Typography ──────────────────────────────────────── */
     h1, h2, h3 { font-weight: 700; line-height: 1.3; }
-    h1 { font-size: clamp(2rem, 5vw, 3.5rem); letter-spacing: -0.02em; }
+    h1 { font-size: clamp(2rem, 5vw, 3.25rem); letter-spacing: -0.02em; }
     h2 { font-size: clamp(1.5rem, 3vw, 2rem); }
     h3 { font-size: 1.125rem; }
     p  { color: var(--text-muted); max-width: 65ch; }
@@ -127,7 +129,7 @@
       background: var(--accent);
       color: #fff;
     }
-    .btn-primary:hover { background: var(--accent-hover); color: #fff; }
+    .btn-primary:hover { background: var(--accent-hover); }
 
     .btn-secondary {
       background: var(--surface);
@@ -152,21 +154,29 @@
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 2rem;
-      transition: border-color 0.2s;
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
 
-    .card:hover { border-color: var(--accent); }
+    .card:hover {
+      border-color: var(--accent);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    }
 
     .card-icon {
       width: 40px;
       height: 40px;
       border-radius: 10px;
-      background: color-mix(in srgb, var(--accent) 12%, transparent);
+      background: var(--accent-soft);
       display: flex;
       align-items: center;
       justify-content: center;
       margin-bottom: 1rem;
-      font-size: 1.25rem;
+      color: var(--accent);
+    }
+
+    .card-icon svg {
+      width: 20px;
+      height: 20px;
     }
 
     .card h3 { margin-bottom: 0.5rem; }
@@ -300,8 +310,6 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      color: var(--text-muted);
-      font-size: 0.9rem;
     }
 
     .screenshot-inner {
@@ -310,44 +318,61 @@
       height: 100%;
     }
 
-    /* Mock sidebar */
     .mock-sidebar {
-      width: 35%;
-      max-width: 220px;
+      width: 32%;
       background: var(--bg-alt);
       border-right: 1px solid var(--border);
-      padding: 1rem;
+      padding: 0.75rem;
       display: flex;
       flex-direction: column;
-      gap: 0.75rem;
+      gap: 0.5rem;
     }
 
-    .mock-sidebar-tab {
-      height: 28px;
-      border-radius: 4px;
-      background: color-mix(in srgb, var(--text) 8%, transparent);
+    .mock-tabs {
+      display: flex;
+      gap: 0.25rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
     }
-    .mock-sidebar-tab.active {
+
+    .mock-tab {
+      flex: 1;
+      height: 24px;
+      border-radius: 4px;
+      background: color-mix(in srgb, var(--text) 5%, transparent);
+    }
+    .mock-tab.active {
       background: color-mix(in srgb, var(--accent) 15%, transparent);
     }
 
-    .mock-sidebar-item {
-      height: 20px;
+    .mock-chapter-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      padding: 0.25rem 0;
+      flex: 1;
+    }
+
+    .mock-chapter {
+      height: 18px;
       border-radius: 3px;
       background: color-mix(in srgb, var(--text) 5%, transparent);
-      margin-left: 0.5rem;
     }
-    .mock-sidebar-item:nth-child(2) { width: 85%; }
-    .mock-sidebar-item:nth-child(3) { width: 60%; }
-    .mock-sidebar-item:nth-child(4) { width: 75%; }
+    .mock-chapter:first-child {
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+    }
+    .mock-chapter:nth-child(1) { width: 90%; }
+    .mock-chapter:nth-child(2) { width: 75%; }
+    .mock-chapter:nth-child(3) { width: 85%; }
+    .mock-chapter:nth-child(4) { width: 60%; }
 
     /* Mock editor */
     .mock-editor {
       flex: 1;
-      padding: 1.5rem 2rem;
+      padding: 1.25rem 2rem;
       display: flex;
       flex-direction: column;
-      gap: 0.6rem;
+      gap: 0.5rem;
     }
 
     .mock-editor-line {
@@ -355,18 +380,18 @@
       border-radius: 3px;
       background: color-mix(in srgb, var(--text) 6%, transparent);
     }
-    .mock-editor-line:nth-child(1) { width: 40%; height: 18px; }
+    .mock-editor-line:nth-child(1) { width: 35%; height: 18px; }
     .mock-editor-line:nth-child(2) { width: 100%; }
     .mock-editor-line:nth-child(3) { width: 100%; }
-    .mock-editor-line:nth-child(4) { width: 75%; }
+    .mock-editor-line:nth-child(4) { width: 80%; }
     .mock-editor-line:nth-child(5) { width: 100%; }
-    .mock-editor-line:nth-child(6) { width: 55%; }
+    .mock-editor-line:nth-child(6) { width: 50%; }
 
     /* ── Features list ───────────────────────────────────── */
     .feature-list {
       list-style: none;
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
       gap: 1rem;
       margin-top: 2rem;
     }
@@ -378,17 +403,62 @@
       border-radius: 8px;
       font-size: 0.9rem;
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       gap: 0.6rem;
     }
 
-    .feature-list li::before {
-      content: "";
+    .feature-list li .dot {
       width: 6px;
       height: 6px;
       border-radius: 50%;
       background: var(--accent);
       flex-shrink: 0;
+      margin-top: 0.55em;
+    }
+
+    /* ── Highlight box ──────────────────────────────────── */
+    .highlight-box {
+      margin-top: 2rem;
+      padding: 1.5rem 2rem;
+      background: var(--accent-soft);
+      border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+      border-radius: 12px;
+      max-width: 650px;
+      margin-left: auto;
+      margin-right: auto;
+      text-align: center;
+    }
+
+    .highlight-box h3 {
+      margin-bottom: 0.5rem;
+      font-size: 1rem;
+    }
+
+    .highlight-box p {
+      font-size: 0.9rem;
+      margin: 0 auto;
+    }
+
+    /* ── Download cards ─────────────────────────────────── */
+    .dl-card {
+      text-align: center;
+    }
+
+    .dl-card .card-icon {
+      margin: 0 auto 1rem;
+    }
+
+    .dl-small {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.75rem;
+    }
+
+    .dl-small code {
+      background: var(--key-bg);
+      padding: 0.15em 0.5em;
+      border-radius: 3px;
+      font-size: 0.85em;
     }
 
     /* ── Responsive ──────────────────────────────────────── */
@@ -399,6 +469,7 @@
       .mock-sidebar { display: none; }
       .shortcuts { grid-template-columns: 1fr; }
       .pillars { gap: 1.5rem; }
+      .feature-list { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -407,28 +478,40 @@
 <!-- ── Hero ──────────────────────────────────────────── -->
 <header>
   <p class="logo">Cron<span>-Insta</span></p>
-  <h1>Donde las palabras fluyen sin distracciones</h1>
+  <h1>La herramienta que te deja escribir</h1>
   <p class="hero-desc">
-    Un editor de texto local-first, sin distracciones, diseñado para escribir novelas largas.
-    Escribe, organiza, versiona — todo en tu máquina, sin depender de la nube.
+    Un editor de escritorio para novelistas. Sin menús, sin distracciones,
+    sin nube. Todo en tu disco: capítulos, personajes, notas, línea de tiempo y lugares.
+    Git invisible para que nunca pierdas una palabra.
   </p>
   <div class="hero-actions">
-    <a href="#caracteristicas" class="btn btn-primary">Conoce Cron-Insta</a>
-    <a href="#descargar" class="btn btn-secondary">Descargar</a>
+    <a href="#caracteristicas" class="btn btn-primary">
+      <svg width="18" height="18" viewBox="0 0 256 256" fill="none"><path d="M128 24a104 104 0 1 0 104 104A104.11 104.11 0 0 0 128 24Zm0 192a88 88 0 1 1 88-88 88.1 88.1 0 0 1-88 88Zm44-88a12 12 0 0 1-12 12h-20v20a12 12 0 0 1-24 0v-20H96a12 12 0 0 1 0-24h20V96a12 12 0 0 1 24 0v20h20a12 12 0 0 1 12 12Z" fill="currentColor"/></svg>
+      Cómo funciona
+    </a>
+    <a href="#descargar" class="btn btn-secondary">
+      <svg width="18" height="18" viewBox="0 0 256 256" fill="none"><path d="M228 128a12 12 0 0 1-12 12h-61l29.52 29.51a12 12 0 0 1-17 17l-48-48a12 12 0 0 1 0-17l48-48a12 12 0 1 1 17 17L155 120h61a12 12 0 0 1 12 12Zm-92 92H48a20 20 0 0 1-20-20V56a20 20 0 0 1 20-20h88a12 12 0 0 1 0 24H52v136h84a12 12 0 0 1 0 24Z" fill="currentColor"/></svg>
+      Descargar
+    </a>
   </div>
 
   <!-- Screenshot mock -->
   <div class="screenshot">
     <div class="screenshot-inner">
       <div class="mock-sidebar">
-        <div class="mock-sidebar-tab active" style="width:60%"></div>
-        <div class="mock-sidebar-tab" style="width:40%"></div>
-        <div class="mock-sidebar-tab" style="width:45%"></div>
-        <div style="flex:1"></div>
-        <div class="mock-sidebar-item"></div>
-        <div class="mock-sidebar-item"></div>
-        <div class="mock-sidebar-item"></div>
-        <div class="mock-sidebar-item"></div>
+        <div class="mock-tabs">
+          <div class="mock-tab active"></div>
+          <div class="mock-tab"></div>
+          <div class="mock-tab"></div>
+          <div class="mock-tab"></div>
+          <div class="mock-tab"></div>
+        </div>
+        <div class="mock-chapter-list">
+          <div class="mock-chapter"></div>
+          <div class="mock-chapter"></div>
+          <div class="mock-chapter"></div>
+          <div class="mock-chapter"></div>
+        </div>
       </div>
       <div class="mock-editor">
         <div class="mock-editor-line"></div>
@@ -444,71 +527,88 @@
 
 <!-- ── Pilares ───────────────────────────────────────── -->
 <section id="caracteristicas">
-  <h2 class="section-title">Tres principios, un solo editor</h2>
-  <p class="section-desc">Cron-Insta no es un procesador de textos convencional. Todo está diseñado para que te olvides de la herramienta y te concentres en lo que importa: escribir.</p>
+  <h2 class="section-title">Tres principios, una sola obsesión</h2>
+  <p class="section-desc">Cron-Insta está diseñado para que te olvides de la herramienta. No es un procesador de textos: es el espacio donde tu historia cobra vida.</p>
 
   <div class="pillars">
     <div class="pillar">
       <div class="pillar-num">01</div>
       <h3>Zona de escritura limpia</h3>
-      <p>Sin barras de herramientas, sin menús flotantes, sin formatos que distraigan. La pantalla es para tu texto.</p>
+      <p>Sin barras de herramientas, sin menús flotantes, sin formatos que interrumpan. La pantalla es para tus palabras.</p>
     </div>
     <div class="pillar">
       <div class="pillar-num">02</div>
       <h3>Todo en tu disco</h3>
-      <p>Archivos Markdown y JSON en tu carpeta de proyecto. Sin nube, sin dependencia externa. Tus palabras son tuyas.</p>
+      <p>Archivos Markdown y JSON en una carpeta que tú controlas. Sin nube, sin registro, sin dependencia externa. Tus palabras son tuyas.</p>
     </div>
     <div class="pillar">
       <div class="pillar-num">03</div>
       <h3>Git invisible</h3>
-      <p>Cada vez que cierras la aplicación, se crea un punto de control automático. Historial completo sin que tengas que preocuparte por ello.</p>
+      <p>Cada vez que cierras la aplicación se crea un punto de control. Historial completo con conteo de palabras sin que tengas que pensar en ello.</p>
     </div>
   </div>
 </section>
 
-<!-- ── Funcionalidades ───────────────────────────────── -->
+<!-- ── Organización ──────────────────────────────────── -->
 <section>
-  <h2 class="section-title">Todo lo que necesitas, al alcance</h2>
-  <p class="section-desc">El panel lateral concentra las herramientas de organización sin invadir tu área de escritura.</p>
+  <h2 class="section-title">Todo lo que tu novela necesita</h2>
+  <p class="section-desc">El panel lateral concentra las herramientas de organización. Aparecen cuando las necesitas y desaparecen cuando escribes.</p>
 
   <div class="grid">
     <div class="card">
-      <div class="card-icon">📖</div>
+      <div class="card-icon">
+        <svg width="20" height="20" viewBox="0 0 256 256" fill="none"><path d="M224 48v160a16 16 0 0 1-16 16H48a16 16 0 0 1-16-16V48a16 16 0 0 1 16-16h160a16 16 0 0 1 16 16ZM48 208h48V48H48Zm160 0V48H112v160h96Z" fill="currentColor"/></svg>
+      </div>
       <h3>Capítulos</h3>
-      <p>Crea, ordena y navega entre capítulos. Cada uno es un archivo .md independiente en tu proyecto.</p>
+      <p>Crea, ordena y navega entre capítulos con el teclado. Cada capítulo es un archivo independiente en tu proyecto.</p>
     </div>
     <div class="card">
-      <div class="card-icon">👤</div>
+      <div class="card-icon">
+        <svg width="20" height="20" viewBox="0 0 256 256" fill="none"><path d="M230.92 212c-15.23-26.33-38.7-45.21-66.09-54.16a72 72 0 1 0-73.66 0c-27.39 8.95-50.86 27.83-66.09 54.16a12 12 0 1 0 19.84 13.44C60.6 198.6 90.16 180 128 180s67.4 18.6 83.08 45.44a12 12 0 1 0 19.84-13.44ZM72 96a56 56 0 1 1 56 56 56.06 56.06 0 0 1-56-56Z" fill="currentColor"/></svg>
+      </div>
       <h3>Fichas de personajes</h3>
-      <p>Descripción física, personalidad, traumas, relaciones. Fichas completas en JSON, editables desde la aplicación.</p>
+      <p>Descripción física, personalidad, historia, relaciones entre personajes. Fichas completas que crecen con tu historia.</p>
     </div>
     <div class="card">
-      <div class="card-icon">📝</div>
+      <div class="card-icon">
+        <svg width="20" height="20" viewBox="0 0 256 256" fill="none"><path d="M216 40H40a16 16 0 0 0-16 16v128a8 8 0 0 0 11.58 7.15L64 176.94l28.42 14.21a8 8 0 0 0 7.16 0L128 176.94l28.42 14.21a8 8 0 0 0 7.16 0L192 176.94l28.42 14.21A8 8 0 0 0 232 184V56a16 16 0 0 0-16-16Zm0 127.06-20.42-10.22a8 8 0 0 0-7.16 0L160 171.06l-28.42-14.22a8 8 0 0 0-7.16 0L96 171.06l-28.42-14.22a8 8 0 0 0-7.16 0L40 167.06V56h176Z" fill="currentColor"/></svg>
+      </div>
       <h3>Notas</h3>
-      <p>Ideas sueltas, investigación, anotaciones. Notas enriquecidas que se cargan en el editor principal.</p>
+      <p>Ideas sueltas, investigación, esbozos. Notas enriquecidas con el mismo editor que usas para tus capítulos.</p>
     </div>
     <div class="card">
-      <div class="card-icon">⏳</div>
+      <div class="card-icon">
+        <svg width="20" height="20" viewBox="0 0 256 256" fill="none"><path d="M128 24a104 104 0 1 0 104 104A104.11 104.11 0 0 0 128 24Zm0 192a88 88 0 1 1 88-88 88.1 88.1 0 0 1-88 88Zm56-88a12 12 0 0 1-12 12h-32v32a12 12 0 0 1-24 0v-32H84a12 12 0 0 1 0-24h32V84a12 12 0 0 1 24 0v32h32a12 12 0 0 1 12 12Z" fill="currentColor"/></svg>
+      </div>
       <h3>Línea de tiempo</h3>
-      <p>Eventos del presente y del pasado vinculados a personajes y capítulos. Arrastra y suelta para reordenar.</p>
+      <p>Eventos del presente y del pasado, vinculados a personajes, capítulos y lugares. Arrastra y suelta para reordenar.</p>
     </div>
     <div class="card">
-      <div class="card-icon">🗜️</div>
-      <h3>Exportación</h3>
-      <p>Proyecto completo en .zip (para respaldo) o solo los capítulos en .md (para compartir con lectores beta).</p>
+      <div class="card-icon">
+        <svg width="20" height="20" viewBox="0 0 256 256" fill="none"><path d="M128 20a12 12 0 0 0-12 12v20.6C83.29 57.6 57.6 83.29 52.6 116H32a12 12 0 0 0 0 24h20.56c4.86 33.05 30.61 58.83 63.44 63.73V224a12 12 0 0 0 24 0v-20.27c32.83-4.9 58.58-30.68 63.44-63.73H224a12 12 0 0 0 0-24h-20.6c-5-32.71-30.69-58.4-63.4-63.4V32a12 12 0 0 0-12-12Zm0 48a60 60 0 1 1-60 60 60.07 60.07 0 0 1 60-60Z" fill="currentColor"/></svg>
+      </div>
+      <h3>Lugares</h3>
+      <p>Cada escenario de tu novela tiene su ficha: nombre, descripción, y vinculación automática con los eventos de la línea de tiempo.</p>
     </div>
     <div class="card">
-      <div class="card-icon">🔤</div>
-      <h3>Tres tipografías</h3>
-      <p>Monoespaciada, serif o sans-serif. Elige la que te resulte más cómoda para jornadas largas de escritura.</p>
+      <div class="card-icon">
+        <svg width="20" height="20" viewBox="0 0 256 256" fill="none"><path d="M228 88a12 12 0 0 1-12 12h-44v44a12 12 0 0 1-24 0v-44h-44a12 12 0 0 1 0-24h44V32a12 12 0 0 1 24 0v44h44a12 12 0 0 1 12 12ZM104 200H40v-64a12 12 0 0 0-24 0v72a12 12 0 0 0 12 12h76a12 12 0 0 0 0-24Z" fill="currentColor"/></svg>
+      </div>
+      <h3>Exportación y respaldo</h3>
+      <p>Proyecto completo en .zip para respaldo, o todos los capítulos en un solo .md para compartir con lectores beta.</p>
     </div>
+  </div>
+
+  <div class="highlight-box">
+    <h3>🧠 Preparado para IA</h3>
+    <p>Cada proyecto incluye un archivo <code>SCHEMA.md</code> que describe el modelo de datos completo: entidades, relaciones, rutas de archivos. Diseñado para que herramientas de IA puedan entender y navegar tu proyecto sin esfuerzo.</p>
   </div>
 </section>
 
-<!-- ── Atajos de teclado ────────────────────────────── -->
+<!-- ── Atajos ────────────────────────────────────────── -->
 <section>
   <h2 class="section-title">Sin sacar las manos del teclado</h2>
-  <p class="section-desc">Cada acción importante tiene su atajo. Navega, edita y organiza sin tocar el ratón.</p>
+  <p class="section-desc">Navega entre capítulos, guarda, crea y organiza sin tocar el ratón.</p>
 
   <div class="shortcuts">
     <div class="shortcut-item">
@@ -521,7 +621,11 @@
     </div>
     <div class="shortcut-item">
       <div class="keys"><kbd>Ctrl</kbd><kbd>O</kbd></div>
-      <span class="label">Abrir otro proyecto</span>
+      <span class="label">Abrir proyecto</span>
+    </div>
+    <div class="shortcut-item">
+      <div class="keys"><kbd>Alt</kbd><kbd>←</kbd> <kbd>→</kbd></div>
+      <span class="label">Capítulo anterior / siguiente</span>
     </div>
     <div class="shortcut-item">
       <div class="keys"><kbd>Ctrl</kbd><kbd>↑</kbd> <kbd>↓</kbd></div>
@@ -533,11 +637,11 @@
     </div>
     <div class="shortcut-item">
       <div class="keys"><kbd>Ctrl</kbd><kbd>+</kbd> <kbd>-</kbd></div>
-      <span class="label">Aumentar / reducir tamaño de letra</span>
+      <span class="label">Aumentar / reducir zoom</span>
     </div>
     <div class="shortcut-item">
       <div class="keys"><kbd>Ctrl</kbd><kbd>P</kbd></div>
-      <span class="label">Mostrar / ocultar panel de herramientas</span>
+      <span class="label">Mostrar / ocultar panel lateral</span>
     </div>
     <div class="shortcut-item">
       <div class="keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>←</kbd></div>
@@ -545,48 +649,44 @@
     </div>
     <div class="shortcut-item">
       <div class="keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>→</kbd></div>
-      <span class="label">Restaurar panel lateral</span>
-    </div>
-    <div class="shortcut-item">
-      <div class="keys"><kbd>F11</kbd></div>
-      <span class="label">Pantalla completa</span>
-    </div>
-    <div class="shortcut-item">
-      <div class="keys"><kbd>F1</kbd> <kbd>?</kbd></div>
-      <span class="label">Mostrar ayuda</span>
+      <span class="label">Expandir panel lateral</span>
     </div>
     <div class="shortcut-item">
       <div class="keys"><kbd>Ctrl</kbd><kbd>I</kbd></div>
       <span class="label">Importar proyecto .zip</span>
+    </div>
+    <div class="shortcut-item">
+      <div class="keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>N</kbd></div>
+      <span class="label">Nuevo proyecto</span>
     </div>
   </div>
 </section>
 
 <!-- ── Cómo funciona ─────────────────────────────────── -->
 <section>
-  <h2 class="section-title">En tres pasos</h2>
-  <p class="section-desc">Comenzar a escribir es cuestión de segundos. Sin registro, sin configuraciones complicadas, sin cuentas.</p>
+  <h2 class="section-title">Empieza en segundos</h2>
+  <p class="section-desc">Sin registro, sin configuraciones complicadas, sin cuentas. Abres la aplicación y escribes.</p>
 
   <div class="steps">
     <div class="step">
       <div class="step-num">1</div>
       <div class="step-content">
-        <h3>Crea un proyecto</h3>
-        <p>Elige nombre, carpeta y tipografía. Cron-Insta crea la estructura de directorios y archivos automáticamente.</p>
+        <h3>Crea tu proyecto</h3>
+        <p>Elige carpeta, nombre y tipografía. Cron-Insta crea la estructura de directorios y archivos. Si tienes Git instalado, también inicializa el control de versiones.</p>
       </div>
     </div>
     <div class="step">
       <div class="step-num">2</div>
       <div class="step-content">
-        <h3>Escribe sin pensar en el formato</h3>
-        <p>El editor ocupa casi toda la pantalla. Guardado automático cada 20 segundos. Sin distracciones.</p>
+        <h3>Escribe sin pensar en la herramienta</h3>
+        <p>El editor ocupa casi toda la pantalla. Guardado automático cada 20 segundos. El panel lateral aparece solo cuando lo necesitas.</p>
       </div>
     </div>
     <div class="step">
       <div class="step-num">3</div>
       <div class="step-content">
-        <h3>Organiza cuando quieras</h3>
-        <p>Personajes, notas, línea de tiempo — todo está ahí cuando lo necesitas, sin interrumpir el flujo de escritura.</p>
+        <h3>Organiza tu mundo</h3>
+        <p>Fichas de personajes con relaciones, notas de investigación, línea de tiempo con eventos vinculados a lugares y personajes. Todo conectado.</p>
       </div>
     </div>
   </div>
@@ -594,47 +694,52 @@
 
 <!-- ── Control de versiones ──────────────────────────── -->
 <section>
-  <h2 class="section-title">Tu tranquilidad tiene respaldo</h2>
-  <p class="section-desc">Cron-Insta integra Git de forma invisible. Cada sesión queda registrada sin que tengas que hacer nada.</p>
+  <h2 class="section-title">Nunca pierdas una palabra</h2>
+  <p class="section-desc">Git integrado de forma invisible. Cada sesión queda registrada con un punto de control automático y un conteo de palabras.</p>
 
   <ul class="feature-list">
-    <li>Punto de control automático al cerrar la aplicación</li>
-    <li>Conteo de palabras en cada punto de control</li>
-    <li>Historial completo accesible desde el panel de herramientas</li>
-    <li>Funciona igual si Git no está instalado — sin errores</li>
-    <li>Sincronización remota opcional por SSH</li>
-    <li>Política de 3 intentos: evita bloqueos por sincronización fallida</li>
+    <li><span class="dot"></span> Punto de control automático al cerrar la aplicación</li>
+    <li><span class="dot"></span> Conteo de palabras en cada punto de control</li>
+    <li><span class="dot"></span> Historial completo de sesiones desde el panel de herramientas</li>
+    <li><span class="dot"></span> Funciona igual si Git no está instalado — sin errores ni avisos</li>
+    <li><span class="dot"></span> Sincronización remota opcional por SSH (GitHub, GitLab)</li>
+    <li><span class="dot"></span> Detección automática de repositorios clonados: reconoce tu identidad y remoto sin configurar nada</li>
+    <li><span class="dot"></span> Protección de 3 intentos: si la sincronización falla, se desactiva sola para no interrumpir tu escritura</li>
   </ul>
 </section>
 
 <!-- ── Descargar ─────────────────────────────────────── -->
 <section id="descargar">
   <h2 class="section-title">Disponible para Linux y Windows</h2>
-  <p class="section-desc">Cron-Insta es una aplicación de escritorio nativa. Ligera, rápida, sin dependencias pesadas.</p>
+  <p class="section-desc">Aplicación de escritorio nativa. Ligera, rápida, sin dependencias externas.</p>
 
-  <div class="grid" style="max-width:600px;margin:2rem auto 0">
-    <div class="card" style="text-align:center">
-      <div class="card-icon" style="margin:0 auto 1rem">🐧</div>
+  <div class="grid dl-grid" style="max-width:600px;margin:2rem auto 0">
+    <div class="card dl-card">
+      <div class="card-icon">
+        <svg width="20" height="20" viewBox="0 0 256 256" fill="none"><path d="M224 128a12 12 0 0 1-12 12h-56.61l18.52 18.51a12 12 0 0 1-17 17l-36-36a12 12 0 0 1 0-17l36-36a12 12 0 1 1 17 17L155.39 116H212a12 12 0 0 1 12 12ZM92 40a12 12 0 0 0-12 12v10.89A100 100 0 0 0 40 128a12 12 0 0 0 24 0 76 76 0 0 1 76-76h10.89l-18.52 18.51a12 12 0 1 0 17 17l36-36a12 12 0 0 0 0-17l-36-36a12 12 0 1 0-17 17L150.89 28H92a12 12 0 0 0-12 12Z" fill="currentColor"/></svg>
+      </div>
       <h3>Linux</h3>
       <p style="margin:0.5rem 0 1rem">.deb &nbsp;·&nbsp; .rpm &nbsp;·&nbsp; AppImage</p>
       <a href="https://github.com/galejan/cron-insta/releases" class="btn btn-primary" style="font-size:0.85rem">Descargar</a>
     </div>
-    <div class="card" style="text-align:center">
-      <div class="card-icon" style="margin:0 auto 1rem">🪟</div>
+    <div class="card dl-card">
+      <div class="card-icon">
+        <svg width="20" height="20" viewBox="0 0 256 256" fill="none"><path d="M216 72h-40V32a8 8 0 0 0-8-8H88a8 8 0 0 0-8 8v40H40a8 8 0 0 0-8 8v128a16 16 0 0 0 16 16h160a16 16 0 0 0 16-16V80a8 8 0 0 0-8-8ZM96 40h64v32H96Zm112 168H48V88h160Zm-48-76a12 12 0 1 1-12-12 12 12 0 0 1 12 12Z" fill="currentColor"/></svg>
+      </div>
       <h3>Windows</h3>
       <p style="margin:0.5rem 0 1rem">.msi &nbsp;·&nbsp; .exe</p>
       <a href="https://github.com/galejan/cron-insta/releases" class="btn btn-primary" style="font-size:0.85rem">Descargar</a>
     </div>
   </div>
 
-  <p style="text-align:center;margin-top:1.5rem;font-size:0.85rem">
-    ¿Usas Arch? → <code>cron-insta.sh</code> en el repositorio para lanzar el binario compilado.
+  <p class="dl-small" style="text-align:center;margin-top:1.5rem">
+    ¿Usas Arch? Ejecuta <code>cron-insta.sh</code> desde el <a href="https://github.com/galejan/cron-insta">repositorio</a> para lanzar el binario.
   </p>
 </section>
 
 <!-- ── Footer ────────────────────────────────────────── -->
 <footer>
-  <p>Cron-Insta &mdash; Editor literario Local-First</p>
+  <p>Cron-Insta &mdash; El editor para novelistas</p>
   <p style="margin-top:0.5rem">
     <a href="https://github.com/galejan/cron-insta">GitHub</a>
     &nbsp;·&nbsp; MIT &copy; 2026
