@@ -2892,6 +2892,8 @@
                 reconfRemoteUrl = result.remoteUrl;
                 await configurarRemoto(projectPath, result.remoteUrl);
                 await guardarConfigRemoto(projectPath, result.remoteUrl, true);
+                remoteWarningVisible = false;
+                showToast(t("git.syncSuccess"), "warning", undefined, CheckCircle);
               }
               await actualizarGitStatus(projectPath);
             } catch (e) {
@@ -2930,7 +2932,8 @@
             remoteWarningDialog = false;
             try {
               await reintentarPush(projectPath);
-              showToast("Push completado", "warning", undefined, CheckCircle);
+              remoteWarningVisible = false;
+              showToast(t("git.syncSuccess"), "warning", undefined, CheckCircle);
               await actualizarGitStatus(projectPath);
             } catch (e) {
               showToast(String(e), "error");
