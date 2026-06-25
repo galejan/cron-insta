@@ -311,6 +311,10 @@ export async function reintentarPush(path: string): Promise<string> {
   return invoke("reintentar_push", { path });
 }
 
+export async function pushAhora(path: string): Promise<string> {
+  return invoke("push_ahora", { path });
+}
+
 export async function sincronizarRemoto(path: string): Promise<string> {
   return invoke("sincronizar_remoto", { path });
 }

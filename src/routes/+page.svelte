@@ -50,6 +50,7 @@
     marcarProyectoCronInsta,
     obtenerGitLog,
     reintentarPush,
+    pushAhora,
     reordenarTimeline,
     setActiveProject,
     sincronizarRemoto,
@@ -89,6 +90,7 @@
   import NotePencil from "phosphor-svelte/lib/NotePencil";
   import Notepad from "phosphor-svelte/lib/Notepad";
   import Package from "phosphor-svelte/lib/Package";
+  import PaperPlaneTilt from "phosphor-svelte/lib/PaperPlaneTilt";
   import PencilSimple from "phosphor-svelte/lib/PencilSimple";
   import PushPin from "phosphor-svelte/lib/PushPin";
   import Question from "phosphor-svelte/lib/Question";
@@ -274,6 +276,7 @@
   let identityDialogResolve = $state<((ctx: {remoteConfigured: boolean, remoteUrl: string}) => void) | null>(null);
   let remoteWarningVisible = $state(false);
   let remoteWarningDialog = $state(false);
+  let pushReady = $state(false);
 
   // ── Project Settings dialog ──────────────────────────────────
   let settingsOpen = $state(false);
@@ -1135,17 +1138,20 @@
           const remote = await cargarConfigRemoto(path);
           const wasDisabled = remoteWarningVisible;
           remoteWarningVisible = !!(remote && !remote.push_enabled && remote.url);
+          pushReady = !!(remote && remote.push_enabled && remote.url);
           // Show toast when push was just disabled
           if (!wasDisabled && remoteWarningVisible) {
             showToast(t("git.pushDisabled"), "warning");
           }
         } catch {
           remoteWarningVisible = false;
+          pushReady = false;
         }
       } else {
         gitStatus = "not-initialized";
         gitEnabled = true; // Binary exists, just needs init
         remoteWarningVisible = false;
+        pushReady = false;
       }
     } catch {
       gitStatus = "unknown";
@@ -2539,6 +2545,28 @@
               {#if gitStatus === "active"}
                 <span class="git-indicator git-active" title={t("git.activeTitle")}>🟢 {t("git.active")}</span>
                 <button class="git-log-link" onclick={cargarGitLog}>{t("git.viewSessions")} <ArrowRight size={16} weight="light" color="currentColor" /></button>
+                {#if pushReady}
+                  <button
+                    class="push-now-btn"
+                    onclick={async () => {
+                      if (!projectPath) return;
+                      saveStatus = "saving";
+                      try {
+                        const result = await pushAhora(projectPath);
+                        const successMsg = result.split("\n").pop() || t("git.pushSuccess");
+                        showToast(successMsg, "warning");
+                        // Result starts with ✅ or ⚠️ — success either way (commit went through)
+                      } catch (e) {
+                        showToast(t("git.pushFailed") + " " + String(e), "error");
+                      }
+                      saveStatus = "saved";
+                      actualizarGitStatus(projectPath!);
+                    }}
+                    title={t("git.pushNowTitle")}
+                  >
+                    <PaperPlaneTilt size={16} weight="light" color="currentColor" /> {t("git.pushNow")}
+                  </button>
+                {/if}
                 {#if remoteWarningVisible}
                   <span class="remote-warning-icon"><Warning size={16} weight="light" color="currentColor" /></span>
                   <button
@@ -2977,6 +3005,7 @@
   >
     <div class="modal-panel text-picker-panel" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
       <h2>{textPickerMessage}</h2>
+      <!-- svelte-ignore a11y_autofocus — modal picker, focus is intentional -->
       <input
         type="text"
         class="modal-input"
@@ -4554,6 +4583,33 @@
 
   :global(.dark) .git-log-link:hover {
     color: #93bbfd;
+  }
+
+  .push-now-btn {
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: #059669;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .push-now-btn:hover {
+    color: #047857;
+  }
+
+  :global(.dark) .push-now-btn {
+    color: #34d399;
+  }
+
+  :global(.dark) .push-now-btn:hover {
+    color: #6ee7b7;
   }
 
   .git-log-panel {

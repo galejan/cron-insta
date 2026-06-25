@@ -108,6 +108,18 @@ Si hay problemas de permisos al escribir en la carpeta de destino, se muestra un
 
 ## Instalación
 
+### Descargas
+
+Descargá la última versión desde [GitHub Releases](https://github.com/galejan/cron-insta/releases):
+
+| Plataforma | Formato |
+|-----------|---------|
+| **Linux** | `.deb` · `.rpm` · AppImage |
+| **macOS** | `.dmg` (Apple Silicon) |
+| **Windows** | `.msi` · `.exe` |
+
+> **Nota macOS:** Al abrir la app por primera vez, hacé *clic derecho → Abrir* para saltar Gatekeeper.
+
 ### Requisitos
 
 - [Rust](https://rustup.rs) (stable)

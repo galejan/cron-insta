@@ -2641,6 +2641,19 @@ fn configurar_remoto(_app: tauri::AppHandle, path: String, url: String) -> Resul
     eprintln!("git push -u origin main output: {:?}", push_output);
 
     if push_output.status.success() {
+        // Reset consecutive_failures on successful push
+        let meta_path = project_path.join(".config").join("metadata.json");
+        if let Ok(raw) = std::fs::read_to_string(&meta_path) {
+            if let Ok(mut meta) = serde_json::from_str::<Metadata>(&raw) {
+                meta.push_enabled = true;
+                meta.consecutive_failures = 0;
+                meta.last_modified = Local::now().to_rfc3339();
+                if let Ok(json) = serde_json::to_string_pretty(&meta) {
+                    let _ = std::fs::write(&meta_path, json);
+                }
+            }
+        }
+
         Ok("Repositorio remoto configurado y sincronizado correctamente.".to_string())
     } else {
         let stderr = String::from_utf8_lossy(&push_output.stderr);
@@ -2744,6 +2757,19 @@ fn sincronizar_remoto(path: String) -> Result<String, String> {
         ));
     }
 
+    // Reset consecutive_failures on successful push
+    let meta_path = project_path.join(".config").join("metadata.json");
+    if let Ok(raw) = std::fs::read_to_string(&meta_path) {
+        if let Ok(mut meta) = serde_json::from_str::<Metadata>(&raw) {
+            meta.push_enabled = true;
+            meta.consecutive_failures = 0;
+            meta.last_modified = Local::now().to_rfc3339();
+            if let Ok(json) = serde_json::to_string_pretty(&meta) {
+                let _ = std::fs::write(&meta_path, json);
+            }
+        }
+    }
+
     Ok("Historial remoto sincronizado correctamente.".to_string())
 }
 
@@ -2820,6 +2846,38 @@ fn reintentar_push(_app: tauri::AppHandle, path: String) -> Result<String, Strin
     }
 }
 
+/// Save a checkpoint and push to the configured remote now.
+///
+/// Commits all pending changes (same as `crear_checkpoint`) and then
+/// pushes to `origin`. Returns a combined result so the user gets
+/// immediate feedback in the UI.
+///
+/// When `push_enabled` is false or no remote is configured, push is
+/// silently skipped — same behaviour as the close-time `do_checkpoint`.
+#[tauri::command]
+fn push_ahora(app: tauri::AppHandle, path: String) -> Result<String, String> {
+    let project_path = Path::new(&path);
+
+    // 1) Commit pending changes
+    let commit_result = perform_commit(project_path)?;
+
+    // 2) Push
+    match sincronizar_checkpoint(&app, &path) {
+        Ok(warning) => {
+            if warning.is_empty() {
+                Ok(format!("✅ {}\n{}", commit_result, "Sincronizado con el remoto."))
+            } else {
+                // Push produced a warning (e.g. 3-strike message)
+                Ok(format!("⚠️ {}\n{}", commit_result, warning))
+            }
+        }
+        Err(e) => {
+            // Push failed — the commit already succeeded, report both
+            Err(format!("Commit realizado, pero el push falló: {}", e))
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -2876,6 +2934,7 @@ pub fn run() {
             configurar_remoto,
             sincronizar_remoto,
             reintentar_push,
+            push_ahora,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {

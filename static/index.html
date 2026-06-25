@@ -94,14 +94,10 @@
 
     /* ── Hero ────────────────────────────────────────────── */
     .logo {
-      font-family: var(--serif);
-      font-size: 1.25rem;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      margin-bottom: 1.5rem;
+      display: block;
+      margin: 0 auto 1.5rem;
+      border-radius: 16px;
     }
-
-    .logo span { color: var(--accent); }
 
     .hero-desc {
       font-size: 1.125rem;
@@ -483,7 +479,7 @@
 
 <!-- ── Hero ──────────────────────────────────────────── -->
 <header>
-  <p class="logo">Cron<span>-Insta</span></p>
+  <img class="logo" src="logo.png" alt="Cron-Insta" width="80" height="80" />
   <h1>La herramienta que te deja escribir</h1>
   <p class="hero-desc">
     Un editor de escritorio para novelistas. Sin menús, sin distracciones,
@@ -716,17 +712,25 @@
 
 <!-- ── Descargar ─────────────────────────────────────── -->
 <section id="descargar">
-  <h2 class="section-title">Disponible para Linux y Windows</h2>
+  <h2 class="section-title">Disponible para Linux, macOS y Windows</h2>
   <p class="section-desc">Aplicación de escritorio nativa. Ligera, rápida, sin dependencias externas.</p>
 
-  <div class="grid dl-grid" style="max-width:600px;margin:2rem auto 0">
+  <div class="grid dl-grid" style="max-width:900px;margin:2rem auto 0">
     <div class="card dl-card">
       <div class="card-icon">
         <svg width="20" height="20" viewBox="0 0 256 256" fill="none"><path d="M224 128a12 12 0 0 1-12 12h-56.61l18.52 18.51a12 12 0 0 1-17 17l-36-36a12 12 0 0 1 0-17l36-36a12 12 0 1 1 17 17L155.39 116H212a12 12 0 0 1 12 12ZM92 40a12 12 0 0 0-12 12v10.89A100 100 0 0 0 40 128a12 12 0 0 0 24 0 76 76 0 0 1 76-76h10.89l-18.52 18.51a12 12 0 1 0 17 17l36-36a12 12 0 0 0 0-17l-36-36a12 12 0 1 0-17 17L150.89 28H92a12 12 0 0 0-12 12Z" fill="currentColor"/></svg>
       </div>
       <h3>Linux</h3>
       <p style="margin:0.5rem 0 1rem">.deb &nbsp;·&nbsp; .rpm &nbsp;·&nbsp; AppImage</p>
-      <a href="https://github.com/galejan/cron-insta/releases/tag/v0.2.0" class="btn btn-primary" style="font-size:0.85rem">Descargar</a>
+      <a href="https://github.com/galejan/cron-insta/releases/tag/v0.2.1" class="btn btn-primary" style="font-size:0.85rem">Descargar</a>
+    </div>
+    <div class="card dl-card">
+      <div class="card-icon">
+        <svg width="20" height="20" viewBox="0 0 256 256" fill="none"><path d="M208 40H48a24 24 0 0 0-24 24v112a24 24 0 0 0 24 24h160a24 24 0 0 0 24-24V64a24 24 0 0 0-24-24Zm0 136H48V64h160Zm-80 48a12 12 0 0 1-12 12h-16a12 12 0 0 1 0-24h16a12 12 0 0 1 12 12Z" fill="currentColor"/></svg>
+      </div>
+      <h3>macOS</h3>
+      <p style="margin:0.5rem 0 1rem">.dmg &nbsp;·&nbsp; Apple Silicon</p>
+      <a href="https://github.com/galejan/cron-insta/releases/tag/v0.2.1" class="btn btn-primary" style="font-size:0.85rem">Descargar</a>
     </div>
     <div class="card dl-card">
       <div class="card-icon">
@@ -734,7 +738,7 @@
       </div>
       <h3>Windows</h3>
       <p style="margin:0.5rem 0 1rem">.msi &nbsp;·&nbsp; .exe</p>
-      <a href="https://github.com/galejan/cron-insta/releases/tag/v0.2.0" class="btn btn-primary" style="font-size:0.85rem">Descargar</a>
+      <a href="https://github.com/galejan/cron-insta/releases/tag/v0.2.1" class="btn btn-primary" style="font-size:0.85rem">Descargar</a>
     </div>
   </div>
 
