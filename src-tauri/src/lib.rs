@@ -2948,7 +2948,7 @@ fn traer_cambios(path: String) -> Result<String, String> {
 
     if has_changes {
         return Err(
-            "Hay cambios locales sin guardar. Guardá o descartá los cambios antes de sincronizar."
+            "Hay cambios locales sin guardar. Guarda o descarta los cambios antes de sincronizar."
                 .to_string(),
         );
     }
@@ -2979,7 +2979,7 @@ fn traer_cambios(path: String) -> Result<String, String> {
         let stderr_str = stderr.trim();
         if stderr_str.contains("CONFLICT") || stderr_str.contains("conflict") {
             Err(format!(
-                "Hay conflictos al sincronizar. Resolvelos manualmente en la terminal:\n{}",
+                "Hay conflictos al sincronizar. Resuélvelos manualmente en la terminal:\n{}",
                 stderr_str
             ))
         } else {
