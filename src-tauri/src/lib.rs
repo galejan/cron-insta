@@ -2181,22 +2181,18 @@ fn commit_metadata_file(project_path: &Path, git_exe: &str) {
     }
 }
 
-/// Fetch from origin and check if local is ahead of remote.
+/// Sync local branch with remote: fetch → pull (if behind) → push (if ahead).
 ///
-/// Attempts `git fetch origin` (only when SSH agent is available).
-/// Compares `HEAD` with the upstream tracking branch using
-/// `git rev-list --count --left-right @{upstream}...HEAD`.
+/// Handles the full cycle so non-technical users never deal with diverged branches:
+/// - Only behind: fast-forward pull to catch up
+/// - Only ahead: push local commits
+/// - Both ahead and behind: pull first (reduces divergence), then push what remains
+/// - Up to date: nothing
 ///
-/// Returns `true` when local has commits ahead of the remote. On any error
-/// (no network, no origin, no upstream branch, etc.) returns `Ok(false)`.
-fn check_ahead(project_path: &Path) -> Result<bool, String> {
-    let git_path = match find_git() {
-        Ok(p) => p,
-        Err(e) => {
-            eprintln!("[check_ahead] find_git error: {}", e);
-            return Ok(false);
-        }
-    };
+/// Returns `Ok(warning)` if push produced a warning, `Ok("")` on clean sync.
+/// Returns `Err` only on unexpected errors.
+fn sync_with_remote(app: &tauri::AppHandle, path: &str, project_path: &Path) -> Result<String, String> {
+    let git_path = find_git()?;
 
     // Check if origin remote exists
     let url_output = system_command(&git_path)
@@ -2206,82 +2202,81 @@ fn check_ahead(project_path: &Path) -> Result<bool, String> {
         .current_dir(project_path)
         .output();
 
-    let remote_exists = match url_output {
-        Ok(o) => o.status.success(),
-        Err(_) => false,
-    };
-
-    if !remote_exists {
-        eprintln!("[check_ahead] no origin remote configured — skipping push");
-        return Ok(false);
+    if !url_output.map(|o| o.status.success()).unwrap_or(false) {
+        return Ok("".to_string()); // No remote — nothing to sync
     }
 
-    // Only fetch if SSH agent is available
+    // Fetch (only if SSH agent is available)
     if ssh_available() {
-        eprintln!("[check_ahead] SSH agent found, fetching origin...");
-        let fetch_result = system_command(&git_path)
+        eprintln!("[sync] fetching origin...");
+        let _ = system_command(&git_path)
             .arg("fetch")
             .arg("origin")
             .current_dir(project_path)
             .output();
-        match fetch_result {
-            Ok(o) if o.status.success() => eprintln!("[check_ahead] fetch OK"),
-            _ => eprintln!("[check_ahead] fetch failed (non-fatal)"),
-        }
     } else {
-        eprintln!("[check_ahead] no SSH agent available, skipping fetch (using local tracking branch)");
+        eprintln!("[sync] no SSH agent, skipping fetch");
     }
 
-    // Check if the current branch has an upstream configured
-    let upstream_output = system_command(&git_path)
-        .arg("rev-parse")
-        .arg("--abbrev-ref")
-        .arg("--symbolic-full-name")
-        .arg("@{upstream}")
-        .current_dir(project_path)
-        .output();
-
-    let upstream_ref = match upstream_output {
-        Ok(o) if o.status.success() => {
-            let name = String::from_utf8_lossy(&o.stdout).trim().to_string();
-            eprintln!("[check_ahead] upstream ref: {}", name);
-            name
-        }
-        _ => {
-            let stderr = upstream_output.ok()
-                .map(|o| String::from_utf8_lossy(&o.stderr).trim().to_string())
-                .unwrap_or_default();
-            eprintln!("[check_ahead] no upstream branch configured: {}", stderr);
-            return Ok(false);
+    // Get upstream ref
+    let upstream_ref = {
+        let out = system_command(&git_path)
+            .arg("rev-parse")
+            .arg("--abbrev-ref")
+            .arg("--symbolic-full-name")
+            .arg("@{upstream}")
+            .current_dir(project_path)
+            .output();
+        match out {
+            Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).trim().to_string(),
+            _ => return Ok("".to_string()), // No upstream — nothing to sync
         }
     };
+    eprintln!("[sync] upstream: {}", upstream_ref);
 
-    // Count how many commits HEAD is ahead of the upstream
-    let ahead_output = system_command(&git_path)
-        .arg("rev-list")
-        .arg("--count")
-        .arg("HEAD")
-        .arg(format!("^{}", upstream_ref))
-        .current_dir(project_path)
-        .output();
+    // Get ahead/behind counts
+    let (ahead, behind) = {
+        let out = system_command(&git_path)
+            .arg("rev-list")
+            .arg("--count")
+            .arg("--left-right")
+            .arg(format!("{}...HEAD", upstream_ref))
+            .current_dir(project_path)
+            .output();
+        match out {
+            Ok(o) if o.status.success() => {
+                let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
+                let parts: Vec<&str> = s.split('\t').collect();
+                let ahead: u32 = parts.first().and_then(|p| p.parse().ok()).unwrap_or(0);
+                let behind: u32 = parts.get(1).and_then(|p| p.parse().ok()).unwrap_or(0);
+                (ahead, behind)
+            }
+            _ => (0, 0),
+        }
+    };
+    eprintln!("[sync] ahead={}, behind={}", ahead, behind);
 
-    match ahead_output {
-        Ok(o) if o.status.success() => {
-            let count = String::from_utf8_lossy(&o.stdout).trim().to_string();
-            let ahead: u32 = count.parse().unwrap_or(0);
-            eprintln!("[check_ahead] commits ahead: {} — {}", ahead,
-                if ahead > 0 { "WILL PUSH" } else { "up to date, nothing to push" });
-            Ok(ahead > 0)
+    // If behind, pull first (fast-forward only — safe for non-technical users)
+    if behind > 0 {
+        eprintln!("[sync] behind by {} — pulling...", behind);
+        let pull_out = system_command(&git_path)
+            .arg("pull")
+            .arg("--ff-only")
+            .current_dir(project_path)
+            .output();
+        match pull_out {
+            Ok(o) if o.status.success() => eprintln!("[sync] pull OK (fast-forward)"),
+            _ => eprintln!("[sync] pull failed or not fast-forward (non-fatal)"),
         }
-        Ok(o) => {
-            let stderr = String::from_utf8_lossy(&o.stderr).trim().to_string();
-            eprintln!("[check_ahead] rev-list failed: {}", stderr);
-            Ok(false)
-        }
-        Err(e) => {
-            eprintln!("[check_ahead] rev-list error: {}", e);
-            Ok(false)
-        }
+    }
+
+    // If still ahead, push
+    if ahead > 0 {
+        eprintln!("[sync] ahead by {} — pushing...", ahead);
+        sincronizar_checkpoint(app, path)
+    } else {
+        eprintln!("[sync] nothing to push");
+        Ok("".to_string())
     }
 }
 
@@ -2321,33 +2316,22 @@ fn do_checkpoint(app: &tauri::AppHandle, project_path: &str) -> Result<String, S
     let path_buf = Path::new(project_path);
     eprintln!("[do_checkpoint] Starting checkpoint for: {}", project_path);
 
-    // 1) Commit local changes (best-effort — never skips push)
+    // 1) Commit local changes (best-effort — never skips sync)
     let commit_result = perform_commit(path_buf);
     eprintln!("[do_checkpoint] Commit result: {:?}", commit_result);
 
-    // 2) Check ahead and push if needed
-    eprintln!("[do_checkpoint] Calling check_ahead...");
-    match check_ahead(path_buf) {
-        Ok(true) => {
-            eprintln!("[do_checkpoint] check_ahead says ahead! Calling sincronizar_checkpoint...");
-            match sincronizar_checkpoint(app, project_path) {
-                Ok(warning) => {
-                    if !warning.is_empty() {
-                        eprintln!("[do_checkpoint] Push warning: {}", warning);
-                    } else {
-                        eprintln!("[do_checkpoint] Push completed successfully");
-                    }
-                }
-                Err(e) => {
-                    eprintln!("[do_checkpoint] Push error: {}", e);
-                }
+    // 2) Sync with remote: fetch → pull (if behind) → push (if ahead)
+    eprintln!("[do_checkpoint] Syncing with remote...");
+    match sync_with_remote(app, project_path, path_buf) {
+        Ok(warning) => {
+            if !warning.is_empty() {
+                eprintln!("[do_checkpoint] Sync warning: {}", warning);
+            } else {
+                eprintln!("[do_checkpoint] Sync completed successfully");
             }
         }
-        Ok(false) => {
-            eprintln!("[do_checkpoint] check_ahead says NOT ahead — no push needed");
-        }
         Err(e) => {
-            eprintln!("[do_checkpoint] check_ahead error: {}", e);
+            eprintln!("[do_checkpoint] Sync error: {}", e);
         }
     }
 
@@ -3070,32 +3054,17 @@ fn push_ahora(app: tauri::AppHandle, path: String) -> Result<String, String> {
     // 1) Commit pending changes (best-effort — never fails)
     let commit_msg = perform_commit(project_path).unwrap_or_default();
 
-    // 2) Check ahead and push conditionally
-    match check_ahead(project_path) {
-        Ok(true) => {
-            // We have commits ahead of remote — push
-            match sincronizar_checkpoint(&app, &path) {
-                Ok(warning) => {
-                    if warning.is_empty() {
-                        Ok(format!("✅ {}\n{}", commit_msg, "Sincronizado con el remoto."))
-                    } else {
-                        // Push produced a warning (e.g. 3-strike message)
-                        Ok(format!("⚠️ {}\n{}", commit_msg, warning))
-                    }
-                }
-                Err(e) => {
-                    // Push failed — the commit already succeeded, report both
-                    Err(format!("Commit realizado, pero el push falló: {}", e))
-                }
+    // 2) Sync with remote: fetch → pull (if behind) → push (if ahead)
+    match sync_with_remote(&app, &path, project_path) {
+        Ok(warning) => {
+            if warning.is_empty() {
+                Ok(format!("✅ {}\n{}", commit_msg, "Sincronizado con el remoto."))
+            } else {
+                Ok(format!("⚠️ {}\n{}", commit_msg, warning))
             }
         }
-        Ok(false) => {
-            // Nothing to push (no remote, not ahead, or fetch failed)
-            Ok(commit_msg)
-        }
         Err(e) => {
-            eprintln!("[push_ahora] check_ahead error: {}", e);
-            Ok(commit_msg)
+            Err(format!("Commit realizado, pero la sincronización falló: {}", e))
         }
     }
 }
