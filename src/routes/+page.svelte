@@ -4051,8 +4051,8 @@
   }
 
   .tab.active {
-    color: #3b82f6;
-    border-bottom-color: #3b82f6;
+    color: var(--accent, #3b82f6);
+    border-bottom-color: var(--accent, #3b82f6);
   }
 
   :global(.dark) .tab {
@@ -4060,10 +4060,6 @@
   }
   :global(.dark) .tab:hover {
     color: #e2e8f0;
-  }
-  :global(.dark) .tab.active {
-    color: #60a5fa;
-    border-bottom-color: #60a5fa;
   }
 
   .sidebar-content {
@@ -4100,30 +4096,19 @@
     background: transparent;
     border-radius: 0.25rem;
     font-size: 0.8125rem;
-    color: #475569;
+    color: var(--text-muted, #475569);
     cursor: pointer;
     transition: background 120ms;
   }
 
   .chapter-link:hover {
-    background: #f1f5f9;
+    background: var(--bg-active-tab, #f1f5f9);
   }
 
   .chapter-link.active-chapter {
-    background: #eff6ff;
-    color: #3b82f6;
+    background: var(--bg-active-tab, #eff6ff);
+    color: var(--accent, #3b82f6);
     font-weight: 500;
-  }
-
-  :global(.dark) .chapter-link {
-    color: #94a3b8;
-  }
-  :global(.dark) .chapter-link:hover {
-    background: #1e293b;
-  }
-  :global(.dark) .chapter-link.active-chapter {
-    background: #1e3a5f;
-    color: #60a5fa;
   }
 
   /* ── Editor area ───────────────────────────────────────────── */
