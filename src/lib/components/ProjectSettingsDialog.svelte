@@ -55,6 +55,7 @@
 
   // ── Remote panel state ─────────────────────────────────────
   let remoteUrl = $state("");
+  let originalRemoteUrl = "";
   let remoteSaving = $state(false);
   let remoteError = $state("");
   let remoteSuccess = $state(false);
@@ -90,6 +91,7 @@
       identitySaving = false;
 
       remoteUrl = "";
+      originalRemoteUrl = "";
       remoteError = "";
       remoteSuccess = false;
       remoteSaving = false;
@@ -240,6 +242,7 @@
       const remote = await cargarConfigRemoto(projectPath);
       if (remote && remote.url) {
         remoteUrl = remote.url;
+        originalRemoteUrl = remote.url;
       }
     } catch (e) {
       console.error("[Settings] Failed to load remote config:", e);
@@ -265,12 +268,18 @@
         "La URL no parece válida. Debe comenzar con git@, ssh:// o https://.";
       return;
     }
+    // If URL hasn't changed, nothing to do — remote is already configured
+    if (remoteUrl.trim() === originalRemoteUrl) {
+      remoteSuccess = true;
+      return;
+    }
     remoteSaving = true;
     remoteError = "";
     remoteSuccess = false;
     try {
       await configurarRemoto(projectPath, remoteUrl.trim());
       await guardarConfigRemoto(projectPath, remoteUrl.trim(), true);
+      originalRemoteUrl = remoteUrl.trim();
       remoteSuccess = true;
     } catch (e) {
       remoteError = String(e);
