@@ -3267,17 +3267,18 @@
             <Image size={16} weight="light" color="currentColor" /> {t("media.upload")}
           </button>
           {#if mediaFiles.length > 0}
-            <ul class="chapter-list" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.5rem;">
+            <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.5rem;">
               {#each mediaFiles as f}
-                <li style="width:calc(50% - 0.25rem);cursor:pointer;border-radius:4px;overflow:hidden;"
+                <button
+                  style="width:calc(50% - 0.25rem);cursor:pointer;border-radius:4px;overflow:hidden;border:none;background:transparent;padding:0;text-align:left;"
                   onclick={() => mediaViewer = f.name}
                 >
                   <img src={mediaSrc(f.name)} alt={f.name}
                     style="width:100%;height:80px;object-fit:cover;display:block;" />
                   <span style="font-size:0.625rem;color:#64748b;padding:0.125rem 0.25rem;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{f.name}</span>
-                </li>
+                </button>
               {/each}
-            </ul>
+            </div>
           {:else}
             <p class="empty-hint">{t("media.empty")}</p>
           {/if}
