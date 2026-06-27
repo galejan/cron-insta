@@ -119,8 +119,11 @@ pub fn run() {
                         // Brief pause lets any in-flight autosave IPC complete
                         tokio::time::sleep(std::time::Duration::from_millis(600)).await;
 
-                        // Checkpoint (git commit + auto-push). Ignore errors — we close anyway.
-                        let _ = do_checkpoint(&app_handle, &path);
+                        // Checkpoint with 8-second timeout guard — never block close
+                        let _ = tokio::time::timeout(
+                            std::time::Duration::from_secs(8),
+                            async { let _ = do_checkpoint(&app_handle, &path); },
+                        ).await;
 
                         // Force-close. This re-enters on_window_event but
                         // the `closing` guard lets it through immediately.
