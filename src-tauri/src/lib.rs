@@ -119,9 +119,9 @@ pub fn run() {
                         // Brief pause lets any in-flight autosave IPC complete
                         tokio::time::sleep(std::time::Duration::from_millis(600)).await;
 
-                        // Checkpoint with 8-second timeout guard — never block close
+                        // Checkpoint with 5-second timeout guard — safety net
                         let _ = tokio::time::timeout(
-                            std::time::Duration::from_secs(8),
+                            std::time::Duration::from_secs(5),
                             async { let _ = do_checkpoint(&app_handle, &path); },
                         ).await;
 

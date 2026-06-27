@@ -745,19 +745,34 @@ pub fn do_checkpoint(app: &tauri::AppHandle, project_path: &str) -> Result<Strin
             finalizar_sesion_escritura(&mut tracker, path_buf);
         }
     }
-    // 3) Sync with remote: fetch → pull (if behind) → push (if ahead)
-    eprintln!("[do_checkpoint] Syncing with remote...");
-    match sync_with_remote(app, project_path, path_buf) {
-        Ok(warning) => {
-            if !warning.is_empty() {
-                eprintln!("[do_checkpoint] Sync warning: {}", warning);
-            } else {
-                eprintln!("[do_checkpoint] Sync completed successfully");
+    // 3) Sync with remote — only if a remote is actually configured
+    let has_remote = find_git().ok().map_or(false, |git| {
+        system_command(&git)
+            .arg("remote")
+            .arg("get-url")
+            .arg("origin")
+            .current_dir(path_buf)
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+    });
+
+    if has_remote {
+        eprintln!("[do_checkpoint] Syncing with remote...");
+        match sync_with_remote(app, project_path, path_buf) {
+            Ok(warning) => {
+                if !warning.is_empty() {
+                    eprintln!("[do_checkpoint] Sync warning: {}", warning);
+                } else {
+                    eprintln!("[do_checkpoint] Sync completed successfully");
+                }
+            }
+            Err(e) => {
+                eprintln!("[do_checkpoint] Sync error: {}", e);
             }
         }
-        Err(e) => {
-            eprintln!("[do_checkpoint] Sync error: {}", e);
-        }
+    } else {
+        eprintln!("[do_checkpoint] No remote configured — skipping sync");
     }
     commit_result
 }
