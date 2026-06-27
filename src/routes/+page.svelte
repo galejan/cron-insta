@@ -53,6 +53,8 @@
     inicializarGit,
     iniciarSesionEscritura,
     listarLugares,
+    listarMedia,
+    copiarAMedia,
     listarNotas,
     listarPersonajes,
     marcarProyectoCronInsta,
@@ -73,6 +75,7 @@
   import { PhysicalSize, PhysicalPosition } from "@tauri-apps/api/dpi";
   import { open, message, ask } from "@tauri-apps/plugin-dialog";
   import { openUrl } from "@tauri-apps/plugin-opener";
+  import { convertFileSrc } from "@tauri-apps/api/core";
   import pkg from "../../package.json";
   const APP_VERSION = pkg.version;
 
@@ -97,6 +100,7 @@
   import GitBranch from "phosphor-svelte/lib/GitBranch";
   import Keyboard from "phosphor-svelte/lib/Keyboard";
   import MapTrifold from "phosphor-svelte/lib/MapTrifold";
+  import Image from "phosphor-svelte/lib/Image";
   import Notebook from "phosphor-svelte/lib/Notebook";
   import NotePencil from "phosphor-svelte/lib/NotePencil";
   import Notepad from "phosphor-svelte/lib/Notepad";
@@ -561,7 +565,7 @@
   }>();
 
   // ── Sidebar tab state ───────────────────────────────────────
-  let activeTab = $state<"capitulos" | "personajes" | "notas" | "timeline" | "lugares">("capitulos");
+  let activeTab = $state<"capitulos" | "personajes" | "notas" | "timeline" | "lugares" | "media">("capitulos");
 
   // ── Characters state ────────────────────────────────────────
   let personajes = $state<{ id: string; name: string }[]>([]);
@@ -604,6 +608,42 @@
   let lugarNuevaDescripcion = $state("");
   let lugarExpandido = $state<string | null>(null);
   let lugarEditando = $state<Record<string, any> | null>(null);
+
+  // ── Media state ──────────────────────────────────────────────
+  let mediaFiles = $state<{name: string; size: number}[]>([]);
+  let mediaViewer = $state<string | null>(null); // filename shown in modal
+  let mediaDocked = $state<string | null>(null); // docked image filename
+
+  async function refreshMedia(): Promise<void> {
+    if (!projectPath) return;
+    try {
+      const raw = await listarMedia(projectPath);
+      mediaFiles = JSON.parse(raw);
+    } catch { mediaFiles = []; }
+  }
+
+  async function subirMedia(): Promise<void> {
+    if (!projectPath) return;
+    try {
+      const selected = await open({
+        multiple: true,
+        filters: [{ name: "Imágenes", extensions: ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"] }],
+      });
+      if (!selected) return;
+      const paths = Array.isArray(selected) ? selected : [selected];
+      for (const sp of paths) {
+        await copiarAMedia(projectPath, sp);
+      }
+      await refreshMedia();
+    } catch (e) {
+      console.error("[cron-insta] Media upload failed:", e);
+    }
+  }
+
+  function mediaSrc(filename: string): string {
+    // Use Tauri asset protocol for local files
+    return convertFileSrc(`${projectPath}/media/${filename}`, "asset");
+  }
 
   // ── Actual save logic (shared by debounced auto-save and manual button) ──
   async function doSave(): Promise<void> {
@@ -2138,13 +2178,14 @@
     // Ctrl+T — cycle visible sidebar tabs (skips hidden tabs)
     if (e.ctrlKey && !e.shiftKey && (e.key === "t" || e.key === "T")) {
       e.preventDefault();
-      type TabName = "capitulos" | "personajes" | "notas" | "timeline" | "lugares";
+      type TabName = "capitulos" | "personajes" | "notas" | "timeline" | "lugares" | "media";
       const fullOrder: Record<TabName, TabName[]> = {
-        capitulos: ["capitulos", "personajes", "notas", "timeline", "lugares"],
-        personajes: ["personajes", "notas", "timeline", "lugares", "capitulos"],
-        notas: ["notas", "timeline", "lugares", "capitulos", "personajes"],
-        timeline: ["timeline", "lugares", "capitulos", "personajes", "notas"],
-        lugares: ["lugares", "capitulos", "personajes", "notas", "timeline"],
+        capitulos: ["capitulos", "personajes", "notas", "timeline", "lugares", "media"],
+        personajes: ["personajes", "notas", "timeline", "lugares", "media", "capitulos"],
+        notas: ["notas", "timeline", "lugares", "media", "capitulos", "personajes"],
+        timeline: ["timeline", "lugares", "media", "capitulos", "personajes", "notas"],
+        lugares: ["lugares", "media", "capitulos", "personajes", "notas", "timeline"],
+        media: ["media", "capitulos", "personajes", "notas", "timeline", "lugares"],
       };
       const candidates = fullOrder[activeTab] || fullOrder["capitulos"];
       const tabKeyMap: Record<TabName, string> = {
@@ -2153,6 +2194,7 @@
         notas: "notes",
         timeline: "timeline",
         lugares: "places",
+        media: "media",
       };
       let next: TabName = activeTab;
       for (const candidate of candidates) {
@@ -2205,6 +2247,12 @@
           const lugar = JSON.parse(raw);
           placeDocked = { id: placeId, name: lugar.name || placeId, description: lugar.description || "", notes: lugar.notes || "" };
         }).catch(() => {});
+        return;
+      }
+      if (mediaViewer) {
+        e.preventDefault();
+        mediaDocked = mediaViewer;
+        mediaViewer = null;
         return;
       }
     }
@@ -2295,6 +2343,12 @@
           onclick={() => { pendingDelete = null; activeTab = "lugares"; }}
           title={t("tabs.places")}
         ><MapTrifold size={18} weight="light" color="currentColor" /></button>
+      {/if}
+      {#if visibleTabs.media !== false}
+        <button class="tab" class:active={activeTab === "media"}
+          onclick={() => { pendingDelete = null; activeTab = "media"; refreshMedia(); }}
+          title={t("tabs.media")}
+        ><Image size={18} weight="light" color="currentColor" /></button>
       {/if}
     </nav>
 
@@ -3204,8 +3258,32 @@
                 onclick={capituloSiguiente}
                 title={t("chapterNav.newChapter")}
               ><Notebook size={16} weight="light" color="currentColor" aria-hidden="true" /></button>
-            {/if}
-          </div>
+      {/if}
+
+      <!-- ═══ Media tab ═══ -->
+      {#if activeTab === "media"}
+        <div class="tab-panel">
+          <button class="btn-add" onclick={() => subirMedia()}>
+            <Image size={16} weight="light" color="currentColor" /> {t("media.upload")}
+          </button>
+          {#if mediaFiles.length > 0}
+            <ul class="chapter-list" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.5rem;">
+              {#each mediaFiles as f}
+                <li style="width:calc(50% - 0.25rem);cursor:pointer;border-radius:4px;overflow:hidden;"
+                  onclick={() => mediaViewer = f.name}
+                >
+                  <img src={mediaSrc(f.name)} alt={f.name}
+                    style="width:100%;height:80px;object-fit:cover;display:block;" />
+                  <span style="font-size:0.625rem;color:#64748b;padding:0.125rem 0.25rem;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{f.name}</span>
+                </li>
+              {/each}
+            </ul>
+          {:else}
+            <p class="empty-hint">{t("media.empty")}</p>
+          {/if}
+        </div>
+      {/if}
+    </div>
         {/if}
 
         {#if characterDocked}
@@ -3389,6 +3467,20 @@
           </div>
         {/if}
 
+        {#if mediaDocked}
+          <div class="character-dock" transition:fly={{ x: 300, duration: 200 }}>
+            <div class="character-dock-header">
+              <h3><PushPin size={16} weight="light" color="currentColor" aria-hidden="true" /> {mediaDocked}</h3>
+              <button class="character-dock-close" onclick={() => mediaDocked = null}
+                title={t("characters.undock")}><XCircle size={16} weight="light" color="currentColor" /></button>
+            </div>
+            <div class="character-dock-body">
+              <img src={mediaSrc(mediaDocked)} alt={mediaDocked}
+                style="max-width:100%;max-height:300px;object-fit:contain;display:block;" />
+            </div>
+          </div>
+        {/if}
+
         <!-- Shortcuts panel -->
 {#if shortcutsOpen}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -3459,6 +3551,25 @@
 
 <!-- Global Settings dialog -->
 <GlobalSettingsDialog bind:open={globalSettingsOpen} />
+
+<!-- Media viewer modal -->
+{#if mediaViewer}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="modal-overlay" role="dialog" tabindex="-1"
+    aria-label={t("media.viewerTitle")}
+    onclick={() => mediaViewer = null}
+    onkeydown={(e) => e.key === "Escape" && (mediaViewer = null)}
+  >
+    <div class="modal-panel" style="max-width:90vw;max-height:90vh;padding:0.5rem;" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
+      <img src={mediaSrc(mediaViewer)} alt={mediaViewer}
+        style="max-width:100%;max-height:85vh;object-fit:contain;display:block;" />
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:0.25rem 0.5rem;">
+        <span style="font-size:0.75rem;color:#64748b;">{mediaViewer}</span>
+        <button class="btn-sm" onclick={() => mediaViewer = null}>{t("common.cancel")}</button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <!-- Editor context menu -->
 <EditorContextMenu

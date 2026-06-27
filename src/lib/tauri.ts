@@ -398,3 +398,13 @@ export async function iniciarSesionEscritura(
 ): Promise<void> {
   return invoke("iniciar_sesion_escritura", { path, chapterFilename });
 }
+
+/** List files in the project's media/ directory. */
+export async function listarMedia(path: string): Promise<string> {
+  return invoke("listar_media", { proyectoPath: path });
+}
+
+/** Copy a file into the project's media/ directory. Returns the saved filename. */
+export async function copiarAMedia(projectPath: string, sourcePath: string): Promise<string> {
+  return invoke("copiar_a_media", { proyectoPath: projectPath, sourcePath });
+}

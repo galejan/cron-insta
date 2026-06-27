@@ -18,6 +18,7 @@
     places: boolean;
     timeline: boolean;
     notes: boolean;
+    media: boolean;
   }
 
   interface ProjectConfig {
@@ -58,6 +59,7 @@
     places: initialData?.visible_tabs?.places ?? true,
     timeline: initialData?.visible_tabs?.timeline ?? true,
     notes: initialData?.visible_tabs?.notes ?? true,
+    media: initialData?.visible_tabs?.media ?? true,
   })));
 
   let autoSaveInterval = $state(untrack(() => initialData?.auto_save_interval_minutes ?? 5));
@@ -108,6 +110,7 @@
     { key: "places", label: t("config.tabsPlaces"), disabled: false },
     { key: "timeline", label: t("config.tabsTimeline"), disabled: false },
     { key: "notes", label: t("config.tabsNotes"), disabled: false },
+    { key: "media", label: t("config.tabsMedia"), disabled: false },
   ];
 
   // ── Interval options ────────────────────────────────────
@@ -257,6 +260,7 @@
                  tab.key === "characters" ? t("tabs.characters") :
                  tab.key === "places" ? t("tabs.places") :
                  tab.key === "timeline" ? t("tabs.timeline") :
+                 tab.key === "media" ? t("tabs.media") :
                  t("tabs.notes")}
                 <span class="review-tab-status">
                   {visibleTabs[tab.key] ? t("config.reviewShown") : t("config.reviewHidden")}

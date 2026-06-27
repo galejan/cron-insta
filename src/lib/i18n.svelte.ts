@@ -133,6 +133,10 @@ const translations: Record<Lang, Record<string, string>> = {
     "tabs.notes": "Notas",
     "tabs.timeline": "Línea de tiempo",
     "tabs.places": "Lugares",
+    "tabs.media": "Multimedia",
+    "media.upload": "+ Subir imágenes",
+    "media.empty": "Sin imágenes aún.",
+    "media.viewerTitle": "Visor de imagen",
 
     // ── Chapters ───────────────────────────────────────────
     "chapters.label": "Capítulos:",
@@ -420,6 +424,7 @@ const translations: Record<Lang, Record<string, string>> = {
     "config.tabsPlaces": "Lugares",
     "config.tabsTimeline": "Línea de tiempo",
     "config.tabsNotes": "Notas",
+    "config.tabsMedia": "Multimedia",
     "config.intervalLabel": "Cada cuánto se guarda automáticamente",
     "config.intervalHint": "El editor guarda los cambios solos. Elegí la frecuencia.",
     "config.interval1": "1 minuto (rápido)",
@@ -561,6 +566,10 @@ const translations: Record<Lang, Record<string, string>> = {
     "tabs.notes": "Notes",
     "tabs.timeline": "Timeline",
     "tabs.places": "Places",
+    "tabs.media": "Media",
+    "media.upload": "+ Upload images",
+    "media.empty": "No images yet.",
+    "media.viewerTitle": "Image viewer",
 
     // ── Chapters ───────────────────────────────────────────
     "chapters.label": "Chapters:",
@@ -847,6 +856,7 @@ const translations: Record<Lang, Record<string, string>> = {
     "config.tabsPlaces": "Places",
     "config.tabsTimeline": "Timeline",
     "config.tabsNotes": "Notes",
+    "config.tabsMedia": "Media",
     "config.intervalLabel": "How often to auto-save",
     "config.intervalHint": "The editor saves changes automatically. Choose the frequency.",
     "config.interval1": "1 minute (fast)",
