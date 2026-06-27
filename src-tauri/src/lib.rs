@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Mutex;
+use std::collections::HashMap;
 use std::io::Write;
 use tauri::Manager;
 
@@ -71,6 +72,65 @@ fn ssh_available() -> bool {
 struct ProjectState {
     active_project: Mutex<Option<String>>,
     closing: Mutex<bool>,
+    session_tracker: Mutex<SessionTracker>,
+}
+
+// ── Session statistics data structures ─────────────────────────
+
+/// Per-chapter accumulated stats.
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+struct StatsChapter {
+    #[serde(default)]
+    words: u64,
+    #[serde(default)]
+    time_seconds: u64,
+}
+
+/// A single writing session record.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct StatsSession {
+    date: String,
+    duration_seconds: u64,
+    words_added: u64,
+    chapter_id: String,
+}
+
+/// Top-level stats container persisted to `.config/stats.json`.
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+struct SessionStats {
+    #[serde(default)]
+    total_time_seconds: u64,
+    #[serde(default)]
+    total_words: u64,
+    #[serde(default)]
+    chapters: HashMap<String, StatsChapter>,
+    #[serde(default)]
+    sessions: Vec<StatsSession>,
+}
+
+/// In-memory runtime state for the writing session timer.
+///
+/// Tracks elapsed time per chapter and overall session duration.
+/// Mutations happen only on chapter open (frontend IPC) and project
+/// close (do_checkpoint), so contention is minimal.
+struct SessionTracker {
+    start_time: Option<std::time::Instant>,
+    chapter_start: Option<std::time::Instant>,
+    chapter_filename: Option<String>,
+    initial_word_count: Option<u64>,
+    chapter_times: HashMap<String, u64>,
+}
+
+impl Default for SessionTracker {
+    fn default() -> Self {
+        Self {
+            start_time: None,
+            chapter_start: None,
+            chapter_filename: None,
+            initial_word_count: None,
+            chapter_times: HashMap::new(),
+        }
+    }
 }
 
 /// Auto-detected git identity + remote from `.git/config`.
@@ -2424,6 +2484,35 @@ fn sync_with_remote(app: &tauri::AppHandle, path: &str, project_path: &Path) -> 
     } else {
         eprintln!("[sync] nothing to push");
         Ok("".to_string())
+    }
+}
+
+/// Count text words inside HTML content by stripping tags first.
+///
+/// Two-state char-by-char machine: skip everything between `<` and `>`,
+/// collect the remaining text, then split on Unicode whitespace.
+/// No regex or HTML parser dependency.
+fn count_words_in_html(html: &str) -> u64 {
+    let mut inside_tag = false;
+    let mut text = String::with_capacity(html.len());
+    for ch in html.chars() {
+        match ch {
+            '<' => inside_tag = true,
+            '>' => inside_tag = false,
+            _ if !inside_tag => text.push(ch),
+            _ => {}
+        }
+    }
+    text.split_whitespace().count() as u64
+}
+
+/// Read a chapter file and return its word count via `count_words_in_html`.
+/// Returns 0 when the file is missing or unreadable.
+fn word_count_chapter(project_path: &Path, filename: &str) -> u64 {
+    let file_path = project_path.join("capitulos").join(filename);
+    match std::fs::read_to_string(&file_path) {
+        Ok(content) => count_words_in_html(&content),
+        Err(_) => 0,
     }
 }
 
