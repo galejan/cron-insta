@@ -5518,18 +5518,10 @@
     color: var(--accent-hover);
   }
 
-  :global(.dark) .git-log-link {
-    color: var(--accent);
-  }
-
-  :global(.dark) .git-log-link:hover {
-    color: #93bbfd;
-  }
-
   .push-now-btn {
     font-size: 0.7rem;
     font-weight: 500;
-    color: #059669;
+    color: var(--text-muted);
     background: none;
     border: none;
     cursor: pointer;
@@ -5542,21 +5534,13 @@
   }
 
   .push-now-btn:hover {
-    color: #047857;
-  }
-
-  :global(.dark) .push-now-btn {
-    color: #34d399;
-  }
-
-  :global(.dark) .push-now-btn:hover {
-    color: #6ee7b7;
+    color: var(--accent);
   }
 
   .pull-now-btn {
     font-size: 0.7rem;
     font-weight: 500;
-    color: #7c3aed;
+    color: var(--text-muted);
     background: none;
     border: none;
     cursor: pointer;
@@ -5569,15 +5553,7 @@
   }
 
   .pull-now-btn:hover {
-    color: #6d28d9;
-  }
-
-  :global(.dark) .pull-now-btn {
-    color: #a78bfa;
-  }
-
-  :global(.dark) .pull-now-btn:hover {
-    color: #c4b5fd;
+    color: var(--accent);
   }
 
   .git-log-panel {
@@ -5586,7 +5562,7 @@
 
   .git-log-empty {
     text-align: center;
-    color: #94a3b8;
+    color: var(--text-muted);
     font-size: 0.875rem;
     padding: 1.5rem 0;
   }
