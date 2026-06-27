@@ -497,46 +497,45 @@
       console.log("[cron-insta:close] Registering onCloseRequested handler");
 
       w.onCloseRequested(async (event) => {
-        const path = untrack(() => projectPath);
-        const gitOk = untrack(() => gitEnabled);
-
-        console.log("[cron-insta:close] ── Close requested ──");
-        console.log("[cron-insta:close]   projectPath:", path || "(none)");
-        console.log("[cron-insta:close]   gitEnabled:", gitOk);
-
-        if (!path || !gitOk) {
-          console.log("[cron-insta:close] → no project or no git, closing immediately");
-          // Don't prevent close — let the window close naturally
-          return;
-        }
-
-        if (untrack(() => closing)) {
-          console.log("[cron-insta:close] → already closing, letting through");
-          return;
-        }
-
-        closing = true;
-        closeStep = "Cerrando aplicación...";
-        console.log("[cron-insta:close] → showing overlay, Rust handles checkpoint");
-
-        event.preventDefault(); // Keep window alive while overlay shows
-
-        // Brief pause so user sees the overlay
-        await new Promise(r => setTimeout(r, 500));
-
-        // Force-close. Rust's on_window_event already did the checkpoint
-        // (or is about to) on its own thread.
-        console.log("[cron-insta:close] → destroying window");
         try {
-          getCurrentWindow().destroy();
-        } catch (e) {
-          console.error("[cron-insta:close]   destroy FAILED:", e);
+          const path = untrack(() => projectPath);
+          const gitOk = untrack(() => gitEnabled);
+
+          console.log("[cron-insta:close] ── Close requested ──");
+          console.log("[cron-insta:close]   projectPath:", path || "(none)");
+          console.log("[cron-insta:close]   gitEnabled:", gitOk);
+
+          // No project open — let the window close naturally
+          if (!path) {
+            console.log("[cron-insta:close] → no project, closing immediately");
+            return;
+          }
+
+          if (untrack(() => closing)) {
+            console.log("[cron-insta:close] → already closing, letting through");
+            return;
+          }
+
+          closing = true;
+          closeStep = "Cerrando aplicación...";
+          console.log("[cron-insta:close] → showing overlay, Rust handles checkpoint");
+
+          event.preventDefault(); // Keep window alive while overlay shows
+
+          // Brief pause so user sees the overlay
+          await new Promise(r => setTimeout(r, 500));
+
+          // Force-close
+          console.log("[cron-insta:close] → destroying window");
+          try {
+            getCurrentWindow().destroy();
+          } catch (e) {
+            console.error("[cron-insta:close]   destroy FAILED:", e);
+          }
+        } catch (err) {
+          console.error("[cron-insta:close] Handler error:", err);
+          // If anything fails, let the window close
         }
-      }).then((fn) => {
-        unlisten = fn;
-        console.log("[cron-insta:close] Handler registered successfully");
-      }).catch((err) => {
-        console.error("[cron-insta:close] Failed to register handler:", err);
       });
     } catch (err) {
       console.error("[cron-insta:close] Not in Tauri:", err);

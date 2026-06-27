@@ -92,21 +92,22 @@ pub fn run() {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 let state = window.state::<ProjectState>();
 
-                // Guard against re-entry
-                {
-                    let mut closing = state.closing.lock().unwrap();
-                    if *closing {
-                        return; // Already in close flow, let it through
-                    }
-                    *closing = true;
-                }
-
                 let project_path = {
                     let active = state.active_project.lock().unwrap();
                     active.clone()
                 };
 
+                // Only handle close if there's an active project
                 if let Some(ref path) = project_path {
+                    // Guard against re-entry
+                    {
+                        let mut closing = state.closing.lock().unwrap();
+                        if *closing {
+                            return; // Already in close flow, let it through
+                        }
+                        *closing = true;
+                    }
+
                     // Prevent immediate close so we can checkpoint
                     api.prevent_close();
 
