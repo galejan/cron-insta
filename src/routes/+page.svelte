@@ -2786,16 +2786,18 @@
           {:else}
             <span></span>
           {/if}
-          <button
-            class="gear-btn"
-            onclick={() => (globalSettingsOpen = true)}
-            title={t("settings.settings")}
-          ><Gear size={16} weight="light" color="currentColor" /></button>
-          <button
-            class="help-btn"
-            onclick={() => (helpMode = !helpMode)}
-            title={t("toolbar.helpTitle")}
-          ><Question size={16} weight="light" color="currentColor" /></button>
+          <div class="toolbar-actions">
+            <button
+              class="toolbar-icon-btn"
+              onclick={() => (globalSettingsOpen = true)}
+              title={t("settings.settings")}
+            ><Gear size={16} weight="light" color="currentColor" /></button>
+            <button
+              class="toolbar-icon-btn"
+              onclick={() => (helpMode = !helpMode)}
+              title={t("toolbar.helpTitle")}
+            ><Question size={16} weight="light" color="currentColor" /></button>
+          </div>
         </div>
 
         <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -3654,16 +3656,20 @@
     color: #94a3b8;
   }
 
-  .help-btn {
+  .toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
     justify-self: end;
+  }
+
+  .toolbar-icon-btn {
     width: 1.5rem;
     height: 1.5rem;
     padding: 0;
     border: 1px solid #e2e8f0;
     border-radius: 50%;
     background: transparent;
-    font-size: 0.75rem;
-    font-weight: 700;
     color: #64748b;
     cursor: pointer;
     display: flex;
@@ -3672,16 +3678,16 @@
     transition: background 120ms;
   }
 
-  .help-btn:hover {
+  .toolbar-icon-btn:hover {
     background: #e2e8f0;
   }
 
-  :global(.dark) .help-btn {
+  :global(.dark) .toolbar-icon-btn {
     border-color: #334155;
     color: #94a3b8;
   }
 
-  :global(.dark) .help-btn:hover {
+  :global(.dark) .toolbar-icon-btn:hover {
     background: #334155;
   }
 
