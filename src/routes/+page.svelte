@@ -1066,8 +1066,13 @@
       }
     }
 
-    const filename = await pickText(t("chapters.newFilePrompt"), "0001_prologue.md");
+    const nextNum = String(chapters.length + 1).padStart(2, "0");
+    let filename = await pickText(t("chapters.newFilePrompt"), `${nextNum}_nuevo_capitulo`);
     if (!filename) return;
+
+    // Strip any non-.md extension the user may have typed, then ensure .md
+    filename = filename.replace(/\.(md|txt|doc|docx|rtf|html)$/i, "");
+    filename = `${filename}.md`;
 
     // Use the chapter filename (without .md) as the initial title
     const titulo = filename.replace(/\.md$/, "")
