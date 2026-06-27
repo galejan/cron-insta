@@ -3032,6 +3032,19 @@ fn finalizar_sesion_escritura(tracker: &mut SessionTracker, project_path: &Path)
 fn cargar_estadisticas(project_path: String) -> Result<String, String> {
     let stats_path = Path::new(&project_path).join(".config").join("stats.json");
     if !stats_path.exists() {
+        // Bootstrap stats for existing projects from git history + existing .md files
+        if let Ok(stats) = inicializar_estadisticas_historicas(Path::new(&project_path)) {
+            if let Ok(json) = serde_json::to_string_pretty(&stats) {
+                let _ = std::fs::write(&stats_path, &json);
+            }
+            let total_hours = stats.total_time_seconds as f64 / 3600.0;
+            let result = serde_json::json!({
+                "total_sessions": stats.sessions.len(),
+                "total_hours": (total_hours * 10.0).round() / 10.0,
+                "total_words": stats.total_words,
+            });
+            return Ok(result.to_string());
+        }
         return Ok(r#"{"total_sessions":0,"total_hours":0,"total_words":0}"#.to_string());
     }
     let raw = std::fs::read_to_string(&stats_path)
@@ -3044,6 +3057,61 @@ fn cargar_estadisticas(project_path: String) -> Result<String, String> {
         "total_words": stats.total_words,
     });
     Ok(result.to_string())
+}
+
+/// Build a baseline `SessionStats` for projects created before stats tracking existed.
+///
+/// Uses `git rev-list --count HEAD` for the session count and counts words in every
+/// `.md` file under `capitulos/`. Time cannot be reconstructed — set to 0.
+fn inicializar_estadisticas_historicas(project_path: &Path) -> Result<SessionStats, String> {
+    let mut stats = SessionStats::default();
+    let capitulos_dir = project_path.join("capitulos");
+
+    // Count words per chapter
+    if capitulos_dir.is_dir() {
+        if let Ok(entries) = std::fs::read_dir(&capitulos_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().map(|e| e == "md").unwrap_or(false) {
+                    if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
+                        if let Ok(content) = std::fs::read_to_string(&path) {
+                            let words = count_words_in_html(&content);
+                            stats.total_words += words;
+                            stats.chapters.insert(
+                                filename.to_string(),
+                                StatsChapter { time_seconds: 0, words },
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Count git commits as proxy for sessions
+    let commit_count = if let Ok(git_path) = find_git() {
+        if let Ok(out) = std::process::Command::new(&git_path)
+            .args(["rev-list", "--count", "HEAD"])
+            .current_dir(project_path)
+            .output()
+        {
+            if out.status.success() {
+                String::from_utf8_lossy(&out.stdout).trim().parse::<usize>().unwrap_or(0)
+            } else { 0 }
+        } else { 0 }
+    } else { 0 };
+
+    // Synthesize session entries so total_sessions reflects git history
+    for _ in 0..commit_count {
+        stats.sessions.push(StatsSession {
+            date: "---".to_string(),
+            duration_seconds: 0,
+            words_added: 0,
+            chapter_id: String::new(),
+        });
+    }
+
+    Ok(stats)
 }
 
 /// Internal checkpoint for close handler.
