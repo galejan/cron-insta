@@ -2170,12 +2170,14 @@
       return;
     }
 
-    // Ctrl+Enter — dock/undock selected character to editor panel
+    // Ctrl+Enter — dock/undock the active element (character, note, or place)
     if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key === "Enter") {
-      if (characterDocked) {
-        characterDocked = null;
-        return;
-      }
+      // Undock if anything is already docked
+      if (characterDocked) { characterDocked = null; return; }
+      if (noteDocked) { noteDocked = null; return; }
+      if (placeDocked) { placeDocked = null; return; }
+
+      // Dock whichever element is currently active/expanded
       if (personajeEditando && personajeExpandido) {
         e.preventDefault();
         characterDocked = {
@@ -2188,11 +2190,6 @@
         };
         return;
       }
-    }
-
-    // Ctrl+Shift+Enter — dock/undock active note
-    if (e.ctrlKey && e.shiftKey && !e.altKey && e.key === "Enter") {
-      if (noteDocked) { noteDocked = null; return; }
       if (activeNote) {
         e.preventDefault();
         cargarNota(projectPath, activeNote).then(raw => {
@@ -2201,11 +2198,6 @@
         }).catch(() => {});
         return;
       }
-    }
-
-    // Ctrl+Alt+Enter — dock/undock selected place
-    if (e.ctrlKey && !e.shiftKey && e.altKey && e.key === "Enter") {
-      if (placeDocked) { placeDocked = null; return; }
       if (lugarExpandido) {
         e.preventDefault();
         const placeId = lugarExpandido;
@@ -3426,9 +3418,7 @@
             <tr><td><kbd>Ctrl+O</kbd></td><td>{t("help.shortcuts.openProject")}</td></tr>
             <tr><td><kbd>Ctrl+Shift+N</kbd></td><td>{t("help.shortcuts.newProject")}</td></tr>
             <tr><td><kbd>Ctrl+T</kbd></td><td>{t("help.shortcuts.cycleTabs")}</td></tr>
-            <tr><td><kbd>Ctrl+Enter</kbd></td><td>{t("help.shortcuts.dockCharacter")}</td></tr>
-            <tr><td><kbd>Ctrl+Shift+Enter</kbd></td><td>Pinear nota activa</td></tr>
-            <tr><td><kbd>Ctrl+Alt+Enter</kbd></td><td>Pinear lugar seleccionado</td></tr>
+            <tr><td><kbd>Ctrl+Enter</kbd></td><td>Pinear elemento activo (personaje, nota o lugar)</td></tr>
             <tr><td><kbd>Ctrl+I</kbd></td><td>{t("help.shortcuts.importProject")}</td></tr>
             <tr><td><kbd>Ctrl+↑</kbd> / <kbd>Ctrl+↓</kbd></td><td>{t("help.shortcuts.applyHeading")}</td></tr>
             <tr><td><kbd>Ctrl+D</kbd></td><td>{t("help.shortcuts.dialogDash")}</td></tr>
