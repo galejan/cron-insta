@@ -1,12 +1,13 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import type { Component } from "svelte";
-  import { fly } from "svelte/transition";
   import Editor from "$lib/components/Editor.svelte";
+  import DockPanel from "$lib/components/DockPanel.svelte";
   import EditorContextMenu from "$lib/components/EditorContextMenu.svelte";
   import GitIdentityDialog from "$lib/components/GitIdentityDialog.svelte";
   import ProjectSettingsDialog from "$lib/components/ProjectSettingsDialog.svelte";
   import GlobalSettingsDialog from "$lib/components/GlobalSettingsDialog.svelte";
+  import StatsFooter from "$lib/components/StatsFooter.svelte";
   import ProjectConfigForm from "$lib/ProjectConfigForm.svelte";
   import { debounce } from "$lib/debounce";
   import { t, lang } from "$lib/i18n.svelte";
@@ -86,7 +87,6 @@
   import CaretLeft from "phosphor-svelte/lib/CaretLeft";
   import CaretRight from "phosphor-svelte/lib/CaretRight";
   import CaretUp from "phosphor-svelte/lib/CaretUp";
-  import ChartBar from "phosphor-svelte/lib/ChartBar";
   import ChatText from "phosphor-svelte/lib/ChatText";
   import CheckCircle from "phosphor-svelte/lib/CheckCircle";
   import Clock from "phosphor-svelte/lib/Clock";
@@ -107,7 +107,6 @@
   import Package from "phosphor-svelte/lib/Package";
   import PaperPlaneTilt from "phosphor-svelte/lib/PaperPlaneTilt";
   import PencilSimple from "phosphor-svelte/lib/PencilSimple";
-  import PushPin from "phosphor-svelte/lib/PushPin";
   import Question from "phosphor-svelte/lib/Question";
   import Scroll from "phosphor-svelte/lib/Scroll";
   import Sparkle from "phosphor-svelte/lib/Sparkle";
@@ -2999,16 +2998,7 @@
       {#if footerExpanded}
         <div class="footer-rows">
           <!-- Stats row -->
-          {#if projectPath}
-            <div class="footer-row footer-stats">
-              <ChartBar size={18} weight="light" color="currentColor" />
-              <span class="stat-item" title={t("stats.sessions")}>{projectStats.total_sessions} {t("stats.sessionsLabel")}</span>
-              <span class="stat-sep">·</span>
-              <span class="stat-item" title={t("stats.hours")}>{projectStats.total_hours}h</span>
-              <span class="stat-sep">·</span>
-              <span class="stat-item" title={t("stats.words")}>{projectStats.total_words.toLocaleString()} {t("stats.wordsLabel")}</span>
-            </div>
-          {/if}
+          <StatsFooter {projectStats} {projectPath} {t} />
           <!-- Row 1: project management (general) -->
           <div class="footer-row">
             <button class="footer-btn" onclick={nuevoProyectoHandler} title={t("toolbar.newProjectTitle")}>
@@ -3289,45 +3279,6 @@
     </div>
         {/if}
 
-        {#if characterDocked}
-          <div class="character-dock" transition:fly={{ x: 300, duration: 200 }}>
-            <div class="character-dock-header">
-              <h3><PushPin size={16} weight="light" color="currentColor" aria-hidden="true" /> {characterDocked.name}</h3>
-              <button class="character-dock-close" onclick={() => characterDocked = null}
-                title={t("characters.undock")}><XCircle size={16} weight="light" color="currentColor" /></button>
-            </div>
-            <div class="character-dock-body">
-              {#if characterDocked.physicalDescription}
-                <div class="char-dock-field">
-                  <span class="char-dock-label">{t("characters.physicalDescription")}</span>
-                  <p>{characterDocked.physicalDescription}</p>
-                </div>
-              {/if}
-              {#if characterDocked.personality}
-                <div class="char-dock-field">
-                  <span class="char-dock-label">{t("characters.personality")}</span>
-                  <p>{characterDocked.personality}</p>
-                </div>
-              {/if}
-              {#if characterDocked.traumas}
-                <div class="char-dock-field">
-                  <span class="char-dock-label">{t("characters.traumas")}</span>
-                  <p>{characterDocked.traumas}</p>
-                </div>
-              {/if}
-              {#if characterDocked.relationships.length > 0}
-                <div class="char-dock-field">
-                  <span class="char-dock-label">{t("characters.relationships")}</span>
-                  <ul class="char-dock-rels">
-                    {#each characterDocked.relationships as rel}
-                      <li>{rel.targetName}{#if rel.type} — {rel.type}{/if}{#if rel.notes}: {rel.notes}{/if}</li>
-                    {/each}
-                  </ul>
-                </div>
-              {/if}
-            </div>
-          </div>
-        {/if}
       </div>
     {/if}
   </main>
@@ -3431,64 +3382,19 @@
   </div>
         {/if}
 
-        {#if noteDocked}
-          <div class="character-dock" transition:fly={{ x: 300, duration: 200 }}>
-            <div class="character-dock-header">
-              <h3><PushPin size={16} weight="light" color="currentColor" aria-hidden="true" /> {noteDocked.title}</h3>
-              <button class="character-dock-close" onclick={() => noteDocked = null}
-                title={t("characters.undock")}><XCircle size={16} weight="light" color="currentColor" /></button>
-            </div>
-            <div class="character-dock-body">
-              <div class="char-dock-field">
-                {@html noteDocked.content}
-              </div>
-            </div>
-          </div>
-        {/if}
-
-        {#if placeDocked}
-          <div class="character-dock" transition:fly={{ x: 300, duration: 200 }}>
-            <div class="character-dock-header">
-              <h3><PushPin size={16} weight="light" color="currentColor" aria-hidden="true" /> {placeDocked.name}</h3>
-              <button class="character-dock-close" onclick={() => placeDocked = null}
-                title={t("characters.undock")}><XCircle size={16} weight="light" color="currentColor" /></button>
-            </div>
-            <div class="character-dock-body">
-              {#if placeDocked.description}
-                <div class="char-dock-field">
-                  <span class="char-dock-label">{t("places.description")}</span>
-                  <p>{placeDocked.description}</p>
-                </div>
-              {/if}
-              {#if placeDocked.notes}
-                <div class="char-dock-field">
-                  <span class="char-dock-label">{t("places.notes")}</span>
-                  <p>{placeDocked.notes}</p>
-                </div>
-              {/if}
-            </div>
-          </div>
-        {/if}
-
-        {#if mediaDocked}
-          <div class="character-dock" transition:fly={{ x: 300, duration: 200 }}>
-            <div class="character-dock-header">
-              <h3><PushPin size={16} weight="light" color="currentColor" aria-hidden="true" /> {mediaDocked}</h3>
-              <button class="character-dock-close" onclick={() => mediaDocked = null}
-                title={t("characters.undock")}><XCircle size={16} weight="light" color="currentColor" /></button>
-            </div>
-            <div class="character-dock-body">
-              <button
-                style="border:none;background:transparent;padding:0;cursor:pointer;width:100%;"
-                onclick={() => mediaViewer = mediaDocked}
-              >
-                <img src={mediaUrl(mediaDocked)} alt={mediaDocked}
-                  style="max-width:100%;max-height:60vh;min-height:120px;object-fit:contain;display:block;" />
-              </button>
-              <p style="font-size:0.6875rem;color:#64748b;margin-top:0.25rem;text-align:center;">{mediaDocked}</p>
-            </div>
-          </div>
-        {/if}
+<DockPanel
+  {characterDocked}
+  {noteDocked}
+  {placeDocked}
+  {mediaDocked}
+  onCloseCharacter={() => characterDocked = null}
+  onCloseNote={() => noteDocked = null}
+  onClosePlace={() => placeDocked = null}
+  onCloseMedia={() => mediaDocked = null}
+  onMediaClick={(filename) => mediaViewer = filename}
+  {mediaUrl}
+  {t}
+/>
 
         <!-- Shortcuts panel -->
 {#if shortcutsOpen}
@@ -5745,31 +5651,6 @@
     background: #334155;
   }
 
-  .footer-stats {
-    gap: 0.375rem;
-    font-size: 0.6875rem;
-    color: #64748b;
-    padding-bottom: 0.25rem;
-    border-bottom: 1px solid #e2e8f0;
-  }
-
-  :global(.dark) .footer-stats {
-    color: #94a3b8;
-    border-bottom-color: #334155;
-  }
-
-  .stat-item {
-    white-space: nowrap;
-  }
-
-  .stat-sep {
-    color: #cbd5e1;
-  }
-
-  :global(.dark) .stat-sep {
-    color: #475569;
-  }
-
   /* ── Remote sync warning indicator ──────────────────────────── */
   .remote-warning-icon {
     font-size: 0.8rem;
@@ -5858,99 +5739,4 @@
     background: rgba(255, 255, 255, 0.3);
   }
 
-  /* ── Character dock panel ───────────────────────────────────── */
-  .character-dock {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
-    width: 320px;
-    max-height: calc(100% - 2rem);
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.12);
-    z-index: 50;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-  :global(.dark) .character-dock {
-    background: #1e293b;
-    border-color: #334155;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.4);
-  }
-  .character-dock-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid #e2e8f0;
-    flex-shrink: 0;
-  }
-  :global(.dark) .character-dock-header {
-    border-bottom-color: #334155;
-  }
-  .character-dock-header h3 {
-    margin: 0;
-    font-size: 0.9375rem;
-    font-weight: 600;
-    color: #1e293b;
-  }
-  :global(.dark) .character-dock-header h3 {
-    color: #f1f5f9;
-  }
-  .character-dock-close {
-    background: none;
-    border: none;
-    font-size: 1.125rem;
-    color: #64748b;
-    cursor: pointer;
-    padding: 0.25rem;
-    line-height: 1;
-    border-radius: 4px;
-  }
-  .character-dock-close:hover { color: #ef4444; }
-  :global(.dark) .character-dock-close { color: #94a3b8; }
-  :global(.dark) .character-dock-close:hover { color: #f87171; }
-  .character-dock-body {
-    padding: 1rem;
-    overflow-y: auto;
-    flex: 1;
-  }
-  .char-dock-field {
-    margin-bottom: 0.75rem;
-  }
-  .char-dock-label {
-    font-size: 0.6875rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #94a3b8;
-    display: block;
-    margin-bottom: 0.25rem;
-  }
-  .char-dock-field p {
-    margin: 0;
-    font-size: 0.8125rem;
-    line-height: 1.5;
-    color: #334155;
-  }
-  :global(.dark) .char-dock-field p {
-    color: #cbd5e1;
-  }
-  .char-dock-rels {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-  }
-  .char-dock-rels li {
-    font-size: 0.8125rem;
-    color: #475569;
-    padding: 0.25rem 0;
-    border-bottom: 1px solid #f1f5f9;
-  }
-  :global(.dark) .char-dock-rels li {
-    color: #94a3b8;
-    border-bottom-color: #334155;
-  }
 </style>
