@@ -117,6 +117,7 @@
   let sidebarCollapsed = $state(false); // derived for CSS class
   let globalSettingsOpen = $state(false);
   let helpMode = $state(false);
+  let shortcutsOpen = $state(false);
 
   // ── Set window title (hide dev URL) ──────────────────────────
   $effect(() => {
@@ -432,6 +433,7 @@
 
   async function handleDropOnTrama(e: DragEvent, tramaId: string | null): Promise<void> {
     e.preventDefault();
+    dragOverTrama = null;
     if (!dragChapter) return;
     const chapterFilename = dragChapter;
     dragChapter = null;
@@ -1829,6 +1831,7 @@
   // ── Drag-and-drop reorder ────────────────────────────────────
   let dragId = $state<string | null>(null);
   let dragChapter = $state<string | null>(null);
+  let dragOverTrama = $state<string | null>(null);
 
   function handleDragStart(e: DragEvent, id: string) {
     dragId = id;
@@ -2243,13 +2246,13 @@
                 {#if !isUnassigned || chapterCount > 0 || tramas.length === 0}
                   <li
                     class="trama-group"
-                    class:drag-over={false}
+                    class:drag-over={dragOverTrama === section.tramaId}
                     ondragover={(e) => {
                       e.preventDefault();
-                      (e.currentTarget as HTMLElement).classList.add("drag-over");
+                      dragOverTrama = section.tramaId;
                     }}
                     ondragleave={(e) => {
-                      (e.currentTarget as HTMLElement).classList.remove("drag-over");
+                      dragOverTrama = null;
                     }}
                     ondrop={(e) => handleDropOnTrama(e, section.tramaId)}
                   >
@@ -2297,10 +2300,13 @@
                             draggable="true"
                             ondragstart={(e) => {
                               dragChapter = ch;
+                              e.dataTransfer!.effectAllowed = 'move';
+                              e.dataTransfer!.setData('text/plain', ch);
                               (e.currentTarget as HTMLElement).classList.add("dragging");
                             }}
                             ondragend={(e) => {
                               (e.currentTarget as HTMLElement).classList.remove("dragging");
+                              dragChapter = null;
                             }}
                           >
                             <button
@@ -3048,12 +3054,17 @@
               class="toolbar-icon-btn"
               onclick={() => (globalSettingsOpen = true)}
               title={t("settings.settings")}
-            ><Gear size={16} weight="light" color="currentColor" /></button>
+            ><Gear size={18} weight="light" color="currentColor" /></button>
+            <button
+              class="toolbar-icon-btn"
+              onclick={() => (shortcutsOpen = !shortcutsOpen)}
+              title={t("toolbar.shortcutsTitle")}
+            ><Keyboard size={18} weight="light" color="currentColor" /></button>
             <button
               class="toolbar-icon-btn"
               onclick={() => (helpMode = !helpMode)}
               title={t("toolbar.helpTitle")}
-            ><Question size={16} weight="light" color="currentColor" /></button>
+            ><Question size={18} weight="light" color="currentColor" /></button>
           </div>
         </div>
 
@@ -3239,6 +3250,49 @@
           <tr><td><kbd>Ctrl++</kbd> / <kbd>Ctrl+-</kbd></td><td>{t("help.shortcuts.zoomIn")} / {t("help.shortcuts.zoomOut")}</td></tr>
           <tr><td><kbd>F11</kbd></td><td>{t("help.shortcuts.fullscreen")}</td></tr>
           <tr><td><kbd>F1</kbd> o <kbd>?</kbd></td><td>{t("help.shortcuts.toggleHelp")}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Shortcuts panel -->
+{#if shortcutsOpen}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="help-overlay"
+    role="dialog"
+    tabindex="-1"
+    aria-label={t("help.shortcutsTitle")}
+    onclick={() => (shortcutsOpen = false)}
+    onkeydown={(e) => e.key === "Escape" && (shortcutsOpen = false)}
+  >
+    <div class="help-panel" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
+      <div class="help-header">
+        <h2><Keyboard size={20} weight="light" color="currentColor" aria-hidden="true" /> {t("help.shortcutsTitle")}</h2>
+        <button class="help-close" onclick={() => (shortcutsOpen = false)} title={t("common.cancel")}><X size={16} weight="light" color="currentColor" /></button>
+      </div>
+      <div class="help-body">
+        <table class="help-shortcuts">
+          <tbody>
+            <tr><td><kbd>Ctrl+Shift+←</kbd></td><td>{t("help.shortcuts.toggleSidebar")}</td></tr>
+            <tr><td><kbd>Ctrl+Shift+→</kbd></td><td>{t("help.shortcuts.fullSidebar")}</td></tr>
+            <tr><td><kbd>Ctrl+←</kbd> / <kbd>Ctrl+→</kbd></td><td>{t("help.shortcuts.resizeSidebar")}</td></tr>
+            <tr><td><kbd>Ctrl+P</kbd></td><td>{t("help.shortcuts.toggleFooter")}</td></tr>
+            <tr><td><kbd>Ctrl+S</kbd></td><td>{t("help.shortcuts.saveNow")}</td></tr>
+            <tr><td><kbd>Ctrl+N</kbd></td><td>{t("help.shortcuts.newChapter")}</td></tr>
+            <tr><td><kbd>Alt+←</kbd> / <kbd>Alt+→</kbd></td><td>{t("help.shortcuts.prevNextChapter")}</td></tr>
+            <tr><td><kbd>Ctrl+O</kbd></td><td>{t("help.shortcuts.openProject")}</td></tr>
+            <tr><td><kbd>Ctrl+Shift+N</kbd></td><td>{t("help.shortcuts.newProject")}</td></tr>
+            <tr><td><kbd>Ctrl+T</kbd></td><td>{t("help.shortcuts.cycleTabs")}</td></tr>
+            <tr><td><kbd>Ctrl+Enter</kbd></td><td>{t("help.shortcuts.dockCharacter")}</td></tr>
+            <tr><td><kbd>Ctrl+I</kbd></td><td>{t("help.shortcuts.importProject")}</td></tr>
+            <tr><td><kbd>Ctrl+↑</kbd> / <kbd>Ctrl+↓</kbd></td><td>{t("help.shortcuts.applyHeading")}</td></tr>
+            <tr><td><kbd>Ctrl+D</kbd></td><td>{t("help.shortcuts.dialogDash")}</td></tr>
+            <tr><td><kbd>Ctrl++</kbd> / <kbd>Ctrl+-</kbd></td><td>{t("help.shortcuts.zoomIn")} / {t("help.shortcuts.zoomOut")}</td></tr>
+            <tr><td><kbd>F11</kbd></td><td>{t("help.shortcuts.fullscreen")}</td></tr>
+            <tr><td><kbd>F1</kbd> o <kbd>?</kbd></td><td>{t("help.shortcuts.toggleHelp")}</td></tr>
           </tbody>
         </table>
       </div>
@@ -3957,31 +4011,30 @@
   }
 
   .toolbar-icon-btn {
-    width: 1.5rem;
-    height: 1.5rem;
-    padding: 0;
-    border: 1px solid #e2e8f0;
-    border-radius: 50%;
+    padding: 0.25rem;
+    border: none;
     background: transparent;
     color: #64748b;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 120ms;
+    transition: color 120ms;
+    border-radius: 4px;
   }
 
   .toolbar-icon-btn:hover {
+    color: #1e293b;
     background: #e2e8f0;
   }
 
   :global(.dark) .toolbar-icon-btn {
-    border-color: #334155;
     color: #94a3b8;
   }
 
   :global(.dark) .toolbar-icon-btn:hover {
-    background: #334155;
+    color: #e2e8f0;
+    background: #1e293b;
   }
 
 
