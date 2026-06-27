@@ -1701,28 +1701,21 @@
   }
 
   async function cargarNotaHandler(id: string): Promise<void> {
-    saveTrigger.trigger(); // save current work first
-    try {
-      const raw = await cargarNota(projectPath, id);
-      editorRef?.setContent(raw);
-      activeNote = id;
-      activeChapter = "";
-      editorContent = raw;
-      saveStatus = "saved";
-      // Find title from index
-      const found = notas.find((n) => n.id === id);
-      if (found) notaTitulo = found.title;
-      console.log("[cron-insta] Note loaded:", id);
-    } catch (e) {
-      console.error("[cron-insta] Load note failed:", e);
-    }
+    // Select the note without touching the main editor
+    activeNote = id;
+    const found = notas.find((n) => n.id === id);
+    if (found) notaTitulo = found.title;
+    console.log("[cron-insta] Note selected:", id);
   }
 
   async function guardarNotaActual(): Promise<void> {
     if (!activeNote) return;
     saveStatus = "saving";
     try {
-      await crearNota(projectPath, activeNote, notaTitulo, editorContent);
+      // Preserve existing note content — only the title may change here
+      const existing = await cargarNota(projectPath, activeNote);
+      const nota = JSON.parse(existing);
+      await crearNota(projectPath, activeNote, notaTitulo, nota.content || "<p></p>");
       saveStatus = "saved";
       await refreshNotas();
     } catch (e) {
@@ -3486,7 +3479,9 @@
             </div>
             <div class="character-dock-body">
               <img src={mediaUrl(mediaDocked)} alt={mediaDocked}
-                style="max-width:100%;max-height:300px;object-fit:contain;display:block;" />
+                style="max-width:100%;max-height:60vh;min-height:120px;object-fit:contain;display:block;cursor:pointer;"
+                onclick={() => mediaViewer = mediaDocked} />
+              <p style="font-size:0.6875rem;color:#64748b;margin-top:0.25rem;text-align:center;">{mediaDocked}</p>
             </div>
           </div>
         {/if}
