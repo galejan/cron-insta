@@ -91,7 +91,15 @@ pub fn run() {
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 let state = window.state::<ProjectState>();
-                eprintln!("[rust:close] CloseRequested fired");
+
+                // Guard against re-entry: window.close() triggers another
+                // CloseRequested, but the closing flag breaks the cycle.
+                {
+                    let closing = state.closing.lock().unwrap();
+                    if *closing {
+                        return;
+                    }
+                }
 
                 let project_path = {
                     let active = state.active_project.lock().unwrap();
@@ -99,43 +107,36 @@ pub fn run() {
                 };
                 eprintln!("[rust:close] project_path = {:?}", project_path);
 
-                // Only handle close if there's an active project
                 if let Some(ref path) = project_path {
-                    // Guard against re-entry
+                    // Guard against re-entry for project case
                     {
                         let mut closing = state.closing.lock().unwrap();
-                        if *closing {
-                            return; // Already in close flow, let it through
-                        }
                         *closing = true;
                     }
 
-                    // Prevent immediate close so we can checkpoint
                     api.prevent_close();
-
+                    // ... rest of project close logic ...
                     let path = path.clone();
                     let window_clone = window.clone();
                     let app_handle = window.app_handle().clone();
 
-                    // Spawn async task — checkpoint + close happens off the event loop
                     tauri::async_runtime::spawn(async move {
-                        // Brief pause lets any in-flight autosave IPC complete
                         tokio::time::sleep(std::time::Duration::from_millis(600)).await;
-
-                        // Checkpoint with 5-second timeout guard — safety net
                         let _ = tokio::time::timeout(
                             std::time::Duration::from_secs(5),
                             async { let _ = do_checkpoint(&app_handle, &path); },
                         ).await;
-
-                        // Force-close. This re-enters on_window_event but
-                        // the `closing` guard lets it through immediately.
                         let _ = window_clone.destroy();
                     });
+                } else {
+                    // No project — set closing flag to break re-entry, then close
+                    {
+                        let mut closing = state.closing.lock().unwrap();
+                        *closing = true;
+                    }
+                    eprintln!("[rust:close] No project → closing window directly");
+                    let _ = window.close();
                 }
-                // If no active project, close the window immediately
-                eprintln!("[rust:close] No project → closing window directly");
-                let _ = window.close();
             }
         })
         .run(tauri::generate_context!())
