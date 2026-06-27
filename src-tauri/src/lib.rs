@@ -2922,6 +2922,7 @@ fn configurar_remoto(_app: tauri::AppHandle, path: String, url: String) -> Resul
 
     // 1b) Add or set remote URL
     if remote_exists {
+        // Remote already configured — just update the URL and fetch
         let set_output = system_command(&git_path)
             .arg("remote")
             .arg("set-url")
@@ -2935,23 +2936,33 @@ fn configurar_remoto(_app: tauri::AppHandle, path: String, url: String) -> Resul
             let stderr = String::from_utf8_lossy(&set_output.stderr);
             return Err(format!("Error al configurar el remoto: {}", stderr.trim()));
         }
-    } else {
-        let add_output = system_command(&git_path)
-            .arg("remote")
-            .arg("add")
-            .arg("origin")
-            .arg(&url)
-            .current_dir(project_path)
-            .output()
-            .map_err(|e| format!("Error al ejecutar git remote add: {}", e))?;
 
-        if !add_output.status.success() {
-            let stderr = String::from_utf8_lossy(&add_output.stderr);
-            return Err(format!("Error al configurar el remoto: {}", stderr.trim()));
-        }
+        // Fetch the new remote to update tracking refs
+        let _ = system_command(&git_path)
+            .arg("fetch")
+            .arg("origin")
+            .current_dir(project_path)
+            .output();
+
+        return Ok("Remote actualizado correctamente.".to_string());
     }
 
-    // 1c) Check if remote already has commits
+    // Remote doesn't exist yet — add it and attempt initial push
+    let add_output = system_command(&git_path)
+        .arg("remote")
+        .arg("add")
+        .arg("origin")
+        .arg(&url)
+        .current_dir(project_path)
+        .output()
+        .map_err(|e| format!("Error al ejecutar git remote add: {}", e))?;
+
+    if !add_output.status.success() {
+        let stderr = String::from_utf8_lossy(&add_output.stderr);
+        return Err(format!("Error al configurar el remoto: {}", stderr.trim()));
+    }
+
+    // 1c) Check if remote already has commits (new remote flow only)
     let ls_output = system_command(&git_path)
         .arg("ls-remote")
         .arg("origin")
