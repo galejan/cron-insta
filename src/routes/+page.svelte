@@ -6,9 +6,10 @@
   import EditorContextMenu from "$lib/components/EditorContextMenu.svelte";
   import GitIdentityDialog from "$lib/components/GitIdentityDialog.svelte";
   import ProjectSettingsDialog from "$lib/components/ProjectSettingsDialog.svelte";
+  import GlobalSettingsDialog from "$lib/components/GlobalSettingsDialog.svelte";
   import ProjectConfigForm from "$lib/ProjectConfigForm.svelte";
   import { debounce } from "$lib/debounce";
-  import { t, setLang, lang } from "$lib/i18n.svelte";
+  import { t, lang } from "$lib/i18n.svelte";
   import {
     actualizarConfigProyecto,
     actualizarFuenteProyecto,
@@ -89,7 +90,6 @@
   import Gear from "phosphor-svelte/lib/Gear";
   import GitBranch from "phosphor-svelte/lib/GitBranch";
   import Keyboard from "phosphor-svelte/lib/Keyboard";
-  import Moon from "phosphor-svelte/lib/Moon";
   import MapTrifold from "phosphor-svelte/lib/MapTrifold";
   import Notebook from "phosphor-svelte/lib/Notebook";
   import NotePencil from "phosphor-svelte/lib/NotePencil";
@@ -101,7 +101,6 @@
   import Question from "phosphor-svelte/lib/Question";
   import Scroll from "phosphor-svelte/lib/Scroll";
   import Sparkle from "phosphor-svelte/lib/Sparkle";
-  import Sun from "phosphor-svelte/lib/Sun";
   import User from "phosphor-svelte/lib/User";
   import UserPlus from "phosphor-svelte/lib/UserPlus";
   import Warning from "phosphor-svelte/lib/Warning";
@@ -112,32 +111,14 @@
   let sidebarPct = $state(40);          // current sidebar width in %
   let sidebarSaved = $state(40);        // width to restore on un-collapse
   let sidebarCollapsed = $state(false); // derived for CSS class
-  let theme = $state<"light" | "dark">("light");
+  let globalSettingsOpen = $state(false);
   let helpMode = $state(false);
-
-  // ── Persist theme in localStorage, default to system preference ──
-  $effect(() => {
-    const stored = localStorage.getItem("cron-insta-theme");
-    if (stored === "light" || stored === "dark") {
-      theme = stored;
-    } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-      theme = "dark";
-    }
-  });
 
   // ── Set window title (hide dev URL) ──────────────────────────
   $effect(() => {
     try {
       getCurrentWindow().setTitle("Cron-Insta");
     } catch { /* not in Tauri */ }
-  });
-  $effect(() => {
-    const stored = localStorage.getItem("cron-insta-theme");
-    if (stored === "light" || stored === "dark") {
-      theme = stored;
-    } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-      theme = "dark";
-    }
   });
 
   // ── Restore zoom level ────────────────────────────────────────
@@ -151,24 +132,23 @@
     const scales = [1, 1.15, 1.3];
     document.body.style.zoom = String(scales[zoomLevel] ?? 1);
   });
+  // ── First-run detection: auto-open global settings if never launched ──
   $effect(() => {
-    const stored = localStorage.getItem("cron-insta-theme");
-    if (stored === "light" || stored === "dark") {
-      theme = stored;
-    } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-      theme = "dark";
+    if (typeof localStorage !== "undefined" && !localStorage.getItem("cron-insta-has-launched")) {
+      globalSettingsOpen = true;
     }
   });
 
-  // ── Apply dark class to <html> whenever theme changes ──────────
+  // ── Set first-run flag when dialog is dismissed ──────────────────
   $effect(() => {
-    const isDark = theme === "dark";
-    document.documentElement.classList.toggle("dark", isDark);
-    document.documentElement.style.colorScheme = isDark ? "dark" : "light";
-    // Sync Tauri window theme (affects title bar on Windows)
-    try {
-      getCurrentWindow().setTheme(isDark ? "dark" : "light");
-    } catch { /* not in Tauri */ }
+    // Only set the flag after the dialog has been opened and then closed
+    // (avoid setting on initial mount where globalSettingsOpen is false)
+    if (!globalSettingsOpen && typeof localStorage !== "undefined") {
+      if (localStorage.getItem("cron-insta-has-launched") !== "true") {
+        // Dialog was opened (auto or manual) and now closed — first run complete
+        localStorage.setItem("cron-insta-has-launched", "true");
+      }
+    }
   });
 
   // ── Window state persistence (Tauri only, fails silently elsewhere) ──
@@ -2592,29 +2572,7 @@
 
       {#if footerExpanded}
         <div class="footer-rows">
-          <!-- Row 1: language + theme -->
-          <div class="footer-row">
-            <button
-              class="footer-btn footer-lang"
-              class:active={lang.current === "es"}
-              onclick={() => setLang("es")}
-              title="Español"
-            >ES</button>
-            <button
-              class="footer-btn footer-lang"
-              class:active={lang.current === "en"}
-              onclick={() => setLang("en")}
-              title="English"
-            >EN</button>
-            <span class="footer-sep"></span>
-            <button
-              class="footer-btn"
-              onclick={() => (theme = theme === "light" ? "dark" : "light")}
-              title={theme === "light" ? t("toolbar.darkMode") : t("toolbar.lightMode")}
-            >{#if theme === "light"}<Moon size={16} weight="light" color="currentColor" />{:else}<Sun size={16} weight="light" color="currentColor" />{/if}</button>
-          </div>
-
-          <!-- Row 2: project management (general) -->
+          <!-- Row 1: project management (general) -->
           <div class="footer-row">
             <button class="footer-btn" onclick={nuevoProyectoHandler} title={t("toolbar.newProjectTitle")}>
               <Sparkle size={18} weight="light" color="currentColor" /> {t("toolbar.newProject")}
@@ -2828,6 +2786,11 @@
           {:else}
             <span></span>
           {/if}
+          <button
+            class="gear-btn"
+            onclick={() => (globalSettingsOpen = true)}
+            title={t("settings.settings")}
+          ><Gear size={16} weight="light" color="currentColor" /></button>
           <button
             class="help-btn"
             onclick={() => (helpMode = !helpMode)}
@@ -3048,6 +3011,9 @@
     autoSaveInterval = config.auto_save_interval_minutes;
   }}
 />
+
+<!-- Global Settings dialog -->
+<GlobalSettingsDialog bind:open={globalSettingsOpen} />
 
 <!-- Editor context menu -->
 <EditorContextMenu
@@ -3646,7 +3612,7 @@
 
   .editor-toolbar {
     display: grid;
-    grid-template-columns: 1fr auto 1fr;
+    grid-template-columns: 1fr auto auto 1fr;
     align-items: center;
     padding: 0 1rem;
     border-bottom: 1px solid #e2e8f0;
@@ -5039,26 +5005,6 @@
   :global(.dark) .footer-btn:hover {
     background: #334155;
     color: #e2e8f0;
-  }
-
-  .footer-lang {
-    font-weight: 700;
-    font-size: 0.6rem;
-    letter-spacing: 0.05em;
-    min-width: 1.5rem;
-    text-align: center;
-  }
-
-  .footer-lang.active {
-    border-color: #3b82f6;
-    background: #eff6ff;
-    color: #1e40af;
-  }
-
-  :global(.dark) .footer-lang.active {
-    border-color: #60a5fa;
-    background: #1e3a5f;
-    color: #93c5fd;
   }
 
   .footer-sep {
