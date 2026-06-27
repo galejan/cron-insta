@@ -5,6 +5,7 @@
    * new mode: font → tabs → auto-save → review
    * edit mode: tabs → auto-save → review (font handled by ProjectSettingsDialog)
    */
+  import { untrack } from "svelte";
   import { t } from "$lib/i18n.svelte";
   import CaretRight from "phosphor-svelte/lib/CaretRight";
   import CaretLeft from "phosphor-svelte/lib/CaretLeft";
@@ -48,17 +49,18 @@
   let currentStep = $derived(steps[currentStepIdx]);
 
   // ── Form data state ─────────────────────────────────────
-  let fontFamily = $state(initialData?.font_family ?? "monospace");
+  // untrack: we want the initial snapshot, not reactive rebinding on prop change
+  let fontFamily = $state(untrack(() => initialData?.font_family ?? "monospace"));
 
-  let visibleTabs = $state<VisibleTabs>({
+  let visibleTabs = $state<VisibleTabs>(untrack(() => ({
     chapters: initialData?.visible_tabs?.chapters ?? true,
     characters: initialData?.visible_tabs?.characters ?? true,
     places: initialData?.visible_tabs?.places ?? true,
     timeline: initialData?.visible_tabs?.timeline ?? true,
     notes: initialData?.visible_tabs?.notes ?? true,
-  });
+  })));
 
-  let autoSaveInterval = $state(initialData?.auto_save_interval_minutes ?? 5);
+  let autoSaveInterval = $state(untrack(() => initialData?.auto_save_interval_minutes ?? 5));
 
   // ── Derived ─────────────────────────────────────────────
   let canGoNext = $derived.by(() => {
