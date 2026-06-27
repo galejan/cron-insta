@@ -313,6 +313,7 @@ struct ChapterTrama {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[allow(non_snake_case)]
 struct TimelineEvent {
     #[serde(default)]
     id: String,
