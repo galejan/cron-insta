@@ -447,8 +447,8 @@
   let lugarExpandido = $state<string | null>(null);
   let lugarEditando = $state<Record<string, any> | null>(null);
 
-  // ── Debounced auto-save (2 s after last keystroke) ──────────
-  const save = debounce(async () => {
+  // ── Actual save logic (shared by debounced auto-save and manual button) ──
+  async function doSave(): Promise<void> {
     if (!projectPath) return;
     saveStatus = "saving";
 
@@ -469,13 +469,12 @@
         saveStatus = "saved";
         console.log("[cron-insta] Save OK:", activeChapter);
 
-        // Trigger checkpoint for auto-push (best-effort, non-blocking)
+        // Trigger checkpoint (best-effort, non-blocking)
         try {
           const ckResult = await crearCheckpoint(projectPath);
           if (ckResult.includes("⚠️")) {
             const warnPart = ckResult.split("⚠️")[1]?.trim() || "";
             showToast(warnPart || t("git.pushFailed"), "warning");
-            // Refresh remote status to update the toolbar indicator
             actualizarGitStatus(projectPath);
           }
         } catch {
@@ -486,7 +485,10 @@
         saveStatus = "unsaved";
       }
     }
-  }, 20_000);
+  }
+
+  // ── Debounced auto-save (20 s after last keystroke) ──────────
+  const save = debounce(doSave, 20_000);
 
   // ── Editor callbacks ────────────────────────────────────────
   let cercaDelFinal = $state(false);
@@ -2599,7 +2601,7 @@
           <div class="footer-row">
             <button
               class="footer-btn"
-              onclick={() => { saveStatus = "saving"; save.trigger(); }}
+              onclick={async () => { await doSave(); }}
               title={t("toolbar.saveTitle")}
             ><FloppyDisk size={18} weight="light" color="currentColor" /> {t("toolbar.save")}</button>
             <span class="save-indicator"

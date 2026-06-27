@@ -25,14 +25,42 @@ fn system_command(program: &str) -> Command {
     let mut cmd = Command::new(program);
     cmd.stdin(std::process::Stdio::null());
     // Inherit SSH agent socket for git operations on Linux
-    if let Ok(sock) = std::env::var("SSH_AUTH_SOCK") {
+    let ssh_sock = std::env::var("SSH_AUTH_SOCK").ok()
+        .or_else(find_ssh_auth_sock_fallback);
+    if let Some(sock) = ssh_sock {
         cmd.env("SSH_AUTH_SOCK", sock);
     }
+    // Never prompt for password, timeout after 5s to avoid 30s hangs
+    cmd.env("GIT_SSH_COMMAND", "ssh -o BatchMode=yes -o ConnectTimeout=5");
     #[cfg(target_os = "windows")]
     {
         cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
     }
     cmd
+}
+
+/// Fallback: try common SSH_AUTH_SOCK paths when the env var is not set.
+/// This covers desktop-launched Tauri apps that don't inherit the terminal env.
+fn find_ssh_auth_sock_fallback() -> Option<String> {
+    let uid = std::fs::read_to_string("/proc/self/loginuid").ok()?;
+    let uid = uid.trim();
+    let candidates = [
+        format!("/run/user/{}/keyring/ssh", uid),
+        format!("/run/user/{}/ssh-agent.socket", uid),
+    ];
+    for path in &candidates {
+        if std::path::Path::new(path).exists() {
+            return Some(path.clone());
+        }
+    }
+    None
+}
+
+/// Check if SSH agent is available for git network operations.
+/// Returns `true` if `SSH_AUTH_SOCK` is set (env or fallback path).
+/// When unavailable, all SSH git ops (fetch, push) will fail — skip them early.
+fn ssh_available() -> bool {
+    std::env::var("SSH_AUTH_SOCK").is_ok() || find_ssh_auth_sock_fallback().is_some()
 }
 
 // ---------------------------------------------------------------------------
@@ -1928,19 +1956,35 @@ fn read_identity_from_config(app: &tauri::AppHandle) -> Option<(String, String)>
 /// Used by both `crear_checkpoint` (Tauri command) and `do_checkpoint`
 /// (close-handler helper) so the commit logic lives in one place.
 fn perform_commit(project_path: &Path) -> Result<String, String> {
-    let git_path = find_git()?;
+    // Best-effort: never returns Err. On failure, logs via eprintln! and
+    // returns Ok with a status message so callers never skip push.
+    let git_path = match find_git() {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("[perform_commit] find_git error: {}", e);
+            return Ok("Git no está disponible.".to_string());
+        }
+    };
 
     // Stage all changes
-    let add_output = system_command(&git_path)
+    let add_output = match system_command(&git_path)
         .arg("add")
         .arg(".")
         .current_dir(project_path)
         .output()
-        .map_err(|e| format!("Error al ejecutar git add: {}", e))?;
+    {
+        Ok(o) => o,
+        Err(e) => {
+            eprintln!("[perform_commit] git add error: {}", e);
+            return Ok(format!("Error al ejecutar git add: {}", e));
+        }
+    };
 
     if !add_output.status.success() {
         let stderr = String::from_utf8_lossy(&add_output.stderr);
-        return Err(format!("Error en git add: {}", stderr.trim()));
+        let msg = format!("Error en git add: {}", stderr.trim());
+        eprintln!("[perform_commit] {}", msg);
+        return Ok(msg);
     }
 
     // Count words in chapter files for the commit message
@@ -1952,22 +1996,34 @@ fn perform_commit(project_path: &Path) -> Result<String, String> {
     );
 
     // Commit
-    let commit_output = system_command(&git_path)
+    let commit_output = match system_command(&git_path)
         .arg("commit")
         .arg("-m")
         .arg(&commit_msg)
         .current_dir(project_path)
         .output()
-        .map_err(|e| format!("Error al ejecutar git commit: {}", e))?;
+    {
+        Ok(o) => o,
+        Err(e) => {
+            eprintln!("[perform_commit] git commit error: {}", e);
+            return Ok(format!("Error al ejecutar git commit: {}", e));
+        }
+    };
 
     if commit_output.status.success() {
         // Retrieve the commit hash
-        let hash_output = system_command(&git_path)
+        let hash_output = match system_command(&git_path)
             .arg("rev-parse")
             .arg("HEAD")
             .current_dir(project_path)
             .output()
-            .map_err(|e| format!("Error al obtener el hash del commit: {}", e))?;
+        {
+            Ok(o) => o,
+            Err(e) => {
+                eprintln!("[perform_commit] git rev-parse error: {}", e);
+                return Ok("Commit realizado, pero no se pudo obtener el hash.".to_string());
+            }
+        };
 
         let hash = String::from_utf8_lossy(&hash_output.stdout)
             .trim()
@@ -1985,29 +2041,28 @@ fn perform_commit(project_path: &Path) -> Result<String, String> {
         {
             Ok("Sin cambios para guardar.".to_string())
         } else {
-            Err(format!(
+            let msg = format!(
                 "Error en git commit: {}",
                 combined.trim().lines().last().unwrap_or("")
-            ))
+            );
+            eprintln!("[perform_commit] {}", msg);
+            Ok(msg)
         }
     }
 }
 
 /// Internal helper: attempt to push to the configured remote.
 ///
-/// Reads push state from the project's `.config/metadata.json`. If push is
-/// disabled or no URL is configured, returns `Ok("")` (no-op).
+/// Reads the remote URL from git, runs `git push`, and implements the
+/// 3-strike rule (disables push after 3 consecutive failures).
 ///
-/// Implements 3-strike auto-disable: after 3 consecutive failures,
-/// `push_enabled` is set to `false` and the user is notified via a
-/// warning string.
-///
-/// **NOT a Tauri command** — called internally by `crear_checkpoint`
-/// and `do_checkpoint`.
+/// Called by `do_checkpoint` (close) and `push_ahora` (button).
+/// Does NOT check `push_enabled` — both callers are explicit user actions
+/// that should always attempt push when ahead of remote.
 fn sincronizar_checkpoint(_app: &tauri::AppHandle, path: &str) -> Result<String, String> {
     let project_path = Path::new(path);
 
-    // Read push state from project metadata
+    // Read state from project metadata (for 3-strike counter)
     let meta_path = project_path.join(".config").join("metadata.json");
     if !meta_path.exists() {
         return Ok("".to_string());
@@ -2022,10 +2077,6 @@ fn sincronizar_checkpoint(_app: &tauri::AppHandle, path: &str) -> Result<String,
         Ok(m) => m,
         Err(_) => return Ok("".to_string()),
     };
-
-    if !meta.push_enabled {
-        return Ok("".to_string());
-    }
 
     // Read remote URL from git
     let git_path = find_git()?;
@@ -2056,15 +2107,9 @@ fn sincronizar_checkpoint(_app: &tauri::AppHandle, path: &str) -> Result<String,
     eprintln!("git push output (sincronizar_checkpoint): {:?}", push_output);
 
     if push_output.status.success() {
-        // Success: reset counter
+        // Success: reset counter and re-enable (in case it was 3-strike disabled)
         meta.consecutive_failures = 0;
-        meta.last_modified = Local::now().to_rfc3339();
-        let json = serde_json::to_string_pretty(&meta)
-            .map_err(|e| format!("Error serializing metadata: {}", e))?;
-        std::fs::write(&meta_path, json)
-            .map_err(|e| format!("Error writing metadata: {}", e))?;
-
-        Ok("".to_string())
+        meta.push_enabled = true;
     } else {
         // Failure: increment counter, apply 3-strike rule
         meta.consecutive_failures += 1;
@@ -2086,7 +2131,152 @@ fn sincronizar_checkpoint(_app: &tauri::AppHandle, path: &str) -> Result<String,
         std::fs::write(&meta_path, json)
             .map_err(|e| format!("Error writing metadata: {}", e))?;
 
-        Ok(warning)
+        // Commit metadata changes so git status stays clean
+        commit_metadata_file(project_path, &git_path);
+        return Ok(warning);
+    }
+
+    // Common: write metadata after push success
+    meta.last_modified = Local::now().to_rfc3339();
+    let json = serde_json::to_string_pretty(&meta)
+        .map_err(|e| format!("Error serializing metadata: {}", e))?;
+    std::fs::write(&meta_path, json)
+        .map_err(|e| format!("Error writing metadata: {}", e))?;
+
+    // Commit metadata changes so git status stays clean
+    commit_metadata_file(project_path, &git_path);
+
+    Ok("".to_string())
+}
+
+/// Stage and commit the `.config/metadata.json` file after a push state update.
+/// This keeps the working tree clean — metadata changes are always versioned
+/// alongside the content changes they describe.
+fn commit_metadata_file(project_path: &Path, git_exe: &str) {
+    // Stage metadata.json
+    let meta_rel = Path::new(".config").join("metadata.json");
+    let add_result = system_command(git_exe)
+        .arg("add")
+        .arg(&meta_rel)
+        .current_dir(project_path)
+        .output();
+    match add_result {
+        Ok(o) if o.status.success() => eprintln!("[commit_metadata] staged OK"),
+        _ => {
+            eprintln!("[commit_metadata] git add failed (non-fatal)");
+            return;
+        }
+    }
+
+    // Commit metadata. If nothing changed (already committed), "nothing to commit" is fine.
+    let commit_result = system_command(git_exe)
+        .arg("commit")
+        .arg("-m")
+        .arg("cron-insta: actualizar estado de sincronización")
+        .current_dir(project_path)
+        .output();
+    match commit_result {
+        Ok(o) if o.status.success() => eprintln!("[commit_metadata] committed OK"),
+        _ => eprintln!("[commit_metadata] git commit skipped (no metadata changes)"),
+    }
+}
+
+/// Sync local branch with remote: fetch → pull (if behind) → push (if ahead).
+///
+/// Handles the full cycle so non-technical users never deal with diverged branches:
+/// - Only behind: fast-forward pull to catch up
+/// - Only ahead: push local commits
+/// - Both ahead and behind: pull first (reduces divergence), then push what remains
+/// - Up to date: nothing
+///
+/// Returns `Ok(warning)` if push produced a warning, `Ok("")` on clean sync.
+/// Returns `Err` only on unexpected errors.
+fn sync_with_remote(app: &tauri::AppHandle, path: &str, project_path: &Path) -> Result<String, String> {
+    let git_path = find_git()?;
+
+    // Check if origin remote exists
+    let url_output = system_command(&git_path)
+        .arg("remote")
+        .arg("get-url")
+        .arg("origin")
+        .current_dir(project_path)
+        .output();
+
+    if !url_output.map(|o| o.status.success()).unwrap_or(false) {
+        return Ok("".to_string()); // No remote — nothing to sync
+    }
+
+    // Fetch (only if SSH agent is available)
+    if ssh_available() {
+        eprintln!("[sync] fetching origin...");
+        let _ = system_command(&git_path)
+            .arg("fetch")
+            .arg("origin")
+            .current_dir(project_path)
+            .output();
+    } else {
+        eprintln!("[sync] no SSH agent, skipping fetch");
+    }
+
+    // Get upstream ref
+    let upstream_ref = {
+        let out = system_command(&git_path)
+            .arg("rev-parse")
+            .arg("--abbrev-ref")
+            .arg("--symbolic-full-name")
+            .arg("@{upstream}")
+            .current_dir(project_path)
+            .output();
+        match out {
+            Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).trim().to_string(),
+            _ => return Ok("".to_string()), // No upstream — nothing to sync
+        }
+    };
+    eprintln!("[sync] upstream: {}", upstream_ref);
+
+    // Get ahead/behind counts
+    let (ahead, behind) = {
+        let out = system_command(&git_path)
+            .arg("rev-list")
+            .arg("--count")
+            .arg("--left-right")
+            .arg(format!("{}...HEAD", upstream_ref))
+            .current_dir(project_path)
+            .output();
+        match out {
+            Ok(o) if o.status.success() => {
+                let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
+                let parts: Vec<&str> = s.split('\t').collect();
+                let ahead: u32 = parts.first().and_then(|p| p.parse().ok()).unwrap_or(0);
+                let behind: u32 = parts.get(1).and_then(|p| p.parse().ok()).unwrap_or(0);
+                (ahead, behind)
+            }
+            _ => (0, 0),
+        }
+    };
+    eprintln!("[sync] ahead={}, behind={}", ahead, behind);
+
+    // If behind, pull first (fast-forward only — safe for non-technical users)
+    if behind > 0 {
+        eprintln!("[sync] behind by {} — pulling...", behind);
+        let pull_out = system_command(&git_path)
+            .arg("pull")
+            .arg("--ff-only")
+            .current_dir(project_path)
+            .output();
+        match pull_out {
+            Ok(o) if o.status.success() => eprintln!("[sync] pull OK (fast-forward)"),
+            _ => eprintln!("[sync] pull failed or not fast-forward (non-fatal)"),
+        }
+    }
+
+    // If still ahead, push
+    if ahead > 0 {
+        eprintln!("[sync] ahead by {} — pushing...", ahead);
+        sincronizar_checkpoint(app, path)
+    } else {
+        eprintln!("[sync] nothing to push");
+        Ok("".to_string())
     }
 }
 
@@ -2117,29 +2307,35 @@ fn count_words_in_chapters(project_path: &Path) -> usize {
 // Application entry point
 // ---------------------------------------------------------------------------
 
-/// Internal checkpoint — same logic as `crear_checkpoint` but callable
-/// from event handlers without going through the IPC layer.
+/// Internal checkpoint for close handler.
 ///
-/// After committing, attempts auto-push via `sincronizar_checkpoint`.
-/// Push warnings are silently dropped (the close handler cannot surface
-/// UI feedback to the user).
+/// Commits local changes (best-effort), then checks if local is ahead of
+/// the remote and pushes if so. Push warnings/errors are logged to stderr
+/// (the close handler cannot surface UI to the user).
 fn do_checkpoint(app: &tauri::AppHandle, project_path: &str) -> Result<String, String> {
     let path_buf = Path::new(project_path);
-    let commit_result = perform_commit(path_buf)?;
+    eprintln!("[do_checkpoint] Starting checkpoint for: {}", project_path);
 
-    // Auto-push if remote is configured
-    match sincronizar_checkpoint(app, project_path) {
+    // 1) Commit local changes (best-effort — never skips sync)
+    let commit_result = perform_commit(path_buf);
+    eprintln!("[do_checkpoint] Commit result: {:?}", commit_result);
+
+    // 2) Sync with remote: fetch → pull (if behind) → push (if ahead)
+    eprintln!("[do_checkpoint] Syncing with remote...");
+    match sync_with_remote(app, project_path, path_buf) {
         Ok(warning) => {
             if !warning.is_empty() {
-                eprintln!("[do_checkpoint] Push warning: {}", warning);
+                eprintln!("[do_checkpoint] Sync warning: {}", warning);
+            } else {
+                eprintln!("[do_checkpoint] Sync completed successfully");
             }
         }
         Err(e) => {
-            eprintln!("[do_checkpoint] Push error: {}", e);
+            eprintln!("[do_checkpoint] Sync error: {}", e);
         }
     }
 
-    Ok(commit_result)
+    commit_result
 }
 
 // ---------------------------------------------------------------------------
@@ -2849,31 +3045,26 @@ fn reintentar_push(_app: tauri::AppHandle, path: String) -> Result<String, Strin
 /// Save a checkpoint and push to the configured remote now.
 ///
 /// Commits all pending changes (same as `crear_checkpoint`) and then
-/// pushes to `origin`. Returns a combined result so the user gets
-/// immediate feedback in the UI.
-///
-/// When `push_enabled` is false or no remote is configured, push is
-/// silently skipped — same behaviour as the close-time `do_checkpoint`.
+/// checks if local is ahead of remote. If ahead, pushes to `origin`.
+/// Returns a combined result so the user gets immediate feedback.
 #[tauri::command]
 fn push_ahora(app: tauri::AppHandle, path: String) -> Result<String, String> {
     let project_path = Path::new(&path);
 
-    // 1) Commit pending changes
-    let commit_result = perform_commit(project_path)?;
+    // 1) Commit pending changes (best-effort — never fails)
+    let commit_msg = perform_commit(project_path).unwrap_or_default();
 
-    // 2) Push
-    match sincronizar_checkpoint(&app, &path) {
+    // 2) Sync with remote: fetch → pull (if behind) → push (if ahead)
+    match sync_with_remote(&app, &path, project_path) {
         Ok(warning) => {
             if warning.is_empty() {
-                Ok(format!("✅ {}\n{}", commit_result, "Sincronizado con el remoto."))
+                Ok(format!("✅ {}\n{}", commit_msg, "Sincronizado con el remoto."))
             } else {
-                // Push produced a warning (e.g. 3-strike message)
-                Ok(format!("⚠️ {}\n{}", commit_result, warning))
+                Ok(format!("⚠️ {}\n{}", commit_msg, warning))
             }
         }
         Err(e) => {
-            // Push failed — the commit already succeeded, report both
-            Err(format!("Commit realizado, pero el push falló: {}", e))
+            Err(format!("Commit realizado, pero la sincronización falló: {}", e))
         }
     }
 }
@@ -3584,18 +3775,19 @@ mod tests {
         // but the checkpoint operation itself is what we're checking
         if find_git().is_ok() {
             eprintln!("INFO: git IS available — cannot fully test git-unavailable path.");
-            eprintln!("This scenario is covered by the find_git() error path in crear_checkpoint.");
+            eprintln!("perform_commit is now best-effort and returns Ok even without git.");
             return;
         }
 
-        // If git is truly unavailable, creating a checkpoint should return Err
+        // If git is truly unavailable, perform_commit returns Ok (best-effort)
+        // with an error message instead of Err, so push is never skipped.
         let result = perform_commit(dir.path());
-        assert!(result.is_err(), "Expected Err when git is unavailable");
-        let err = result.unwrap_err();
+        assert!(result.is_ok(), "Expected Ok (best-effort), got {:?}", result);
+        let msg = result.unwrap();
         assert!(
-            err.contains("Git no está disponible"),
+            msg.contains("Git no está disponible"),
             "Expected git-unavailable message, got: {}",
-            err
+            msg
         );
     }
 
