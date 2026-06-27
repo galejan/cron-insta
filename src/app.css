@@ -1,5 +1,9 @@
 /* ── Base ──────────────────────────────────────────────────────── */
 
+:root {
+  --header-height: 2.75rem; /* 44px — unified tabs + editor header */
+}
+
 html.dark {
   background: #0f172a;
   color: #e2e8f0;

@@ -3453,12 +3453,13 @@
 
   .tabs {
     display: flex;
-    height: 2.5rem;
-    box-shadow: inset 0 -1px 0 0 #e2e8f0;
+    height: var(--header-height, 2.5rem);
+    border-bottom: 1px solid #e2e8f0;
+    align-items: center;
   }
 
   :global(.dark) .tabs {
-    box-shadow: inset 0 -1px 0 0 #334155;
+    border-bottom-color: #334155;
   }
 
   .tab {
@@ -3475,6 +3476,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    height: 100%;
   }
 
   .tab:hover {
@@ -3650,7 +3652,7 @@
     border-bottom: 1px solid #e2e8f0;
     background: #f8fafc;
     flex-shrink: 0;
-    height: 2.5rem;
+    height: var(--header-height, 2.5rem);
   }
 
   :global(.dark) .editor-toolbar {
