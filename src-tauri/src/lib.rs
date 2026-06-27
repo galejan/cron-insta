@@ -91,11 +91,13 @@ pub fn run() {
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 let state = window.state::<ProjectState>();
+                eprintln!("[rust:close] CloseRequested fired");
 
                 let project_path = {
                     let active = state.active_project.lock().unwrap();
                     active.clone()
                 };
+                eprintln!("[rust:close] project_path = {:?}", project_path);
 
                 // Only handle close if there's an active project
                 if let Some(ref path) = project_path {
@@ -132,6 +134,7 @@ pub fn run() {
                     });
                 }
                 // If no active project, don't prevent close — window closes normally
+                eprintln!("[rust:close] No project → letting window close normally");
             }
         })
         .run(tauri::generate_context!())

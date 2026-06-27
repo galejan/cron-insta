@@ -494,14 +494,21 @@
 
     try {
       const w = getCurrentWindow();
-      console.log("[cron-insta:close] Registering onCloseRequested handler");
+      console.log("[close] Registering onCloseRequested handler. Window:", w.label);
 
       w.onCloseRequested((event) => {
         const path = untrack(() => projectPath);
+        console.log("[close] ── Fired! path=%s, typeof=%s, truthy=%s", path, typeof path, !!path);
 
         // No project open — just close
         if (!path) {
-          getCurrentWindow().destroy();
+          console.log("[close] No project → calling destroy()");
+          try {
+            getCurrentWindow().destroy();
+            console.log("[close] destroy() called successfully");
+          } catch (e) {
+            console.error("[close] destroy() FAILED:", e);
+          }
           return;
         }
 
