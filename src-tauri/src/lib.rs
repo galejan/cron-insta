@@ -2781,8 +2781,8 @@ fn sync_with_remote(app: &tauri::AppHandle, path: &str, project_path: &Path) -> 
             Ok(o) if o.status.success() => {
                 let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
                 let parts: Vec<&str> = s.split('\t').collect();
-                let ahead: u32 = parts.first().and_then(|p| p.parse().ok()).unwrap_or(0);
-                let behind: u32 = parts.get(1).and_then(|p| p.parse().ok()).unwrap_or(0);
+                let behind: u32 = parts.first().and_then(|p| p.parse().ok()).unwrap_or(0);
+                let ahead: u32 = parts.get(1).and_then(|p| p.parse().ok()).unwrap_or(0);
                 (ahead, behind)
             }
             _ => (0, 0),
@@ -2804,9 +2804,29 @@ fn sync_with_remote(app: &tauri::AppHandle, path: &str, project_path: &Path) -> 
         }
     }
 
+    // Recalculate ahead after pull — HEAD may have moved forward
+    let ahead_after_pull = {
+        let out = system_command(&git_path)
+            .arg("rev-list")
+            .arg("--count")
+            .arg("--left-right")
+            .arg(format!("{}...HEAD", upstream_ref))
+            .current_dir(project_path)
+            .output();
+        match out {
+            Ok(o) if o.status.success() => {
+                let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
+                let parts: Vec<&str> = s.split('\t').collect();
+                parts.get(1).and_then(|p| p.parse().ok()).unwrap_or(0)
+            }
+            _ => 0,
+        }
+    };
+    eprintln!("[sync] ahead after pull={}", ahead_after_pull);
+
     // If still ahead, push
-    if ahead > 0 {
-        eprintln!("[sync] ahead by {} — pushing...", ahead);
+    if ahead_after_pull > 0 {
+        eprintln!("[sync] ahead by {} — pushing...", ahead_after_pull);
         sincronizar_checkpoint(app, path)
     } else {
         eprintln!("[sync] nothing to push");
