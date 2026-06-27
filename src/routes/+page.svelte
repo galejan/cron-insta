@@ -503,12 +503,7 @@
 
         if (!path || !gitOk) {
           console.log("[cron-insta:close] → no project or no git, closing immediately");
-          event.preventDefault();
-          try {
-            getCurrentWindow().destroy();
-          } catch (e) {
-            console.error("[cron-insta:close]   destroy FAILED:", e);
-          }
+          // Don't prevent close — let the window close naturally
           return;
         }
 
