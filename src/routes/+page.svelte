@@ -4063,6 +4063,7 @@
     overflow-y: auto;
     overscroll-behavior: contain;
     min-width: 0;
+    background: var(--bg-editor, #f8fafc);
   }
 
   /* ── Chapter navigation footer ──────────────────────────────── */
