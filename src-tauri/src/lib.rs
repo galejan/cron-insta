@@ -599,6 +599,13 @@ fn crear_proyecto(app: tauri::AppHandle, path: String, nombre: String, font_fami
     std::fs::write(base.join(".config/timeline.json"), "[]")
         .map_err(|e| format!("Error al escribir timeline.json: {}", e))?;
 
+    // Write stats.json (empty seed)
+    let stats = SessionStats::default();
+    let stats_json = serde_json::to_string_pretty(&stats)
+        .map_err(|e| format!("Error al serializar stats: {}", e))?;
+    std::fs::write(base.join(".config/stats.json"), stats_json)
+        .map_err(|e| format!("Error al escribir stats.json: {}", e))?;
+
     // Write SCHEMA.md — data model description for AI agent consumption
     let schema = generate_schema(&nombre);
     std::fs::write(base.join("SCHEMA.md"), schema)
@@ -962,6 +969,50 @@ fn set_active_project(
 ) -> Result<(), String> {
     let mut active = state.active_project.lock().map_err(|e| e.to_string())?;
     *active = path;
+    Ok(())
+}
+
+/// Start a writing session timer for the given chapter.
+///
+/// Reads the chapter file, counts words via `count_words_in_html`,
+/// and records the start time. If another session was already active,
+/// accumulates the previous chapter's elapsed time into `chapter_times`
+/// and switches to the new chapter (timer continues).
+///
+/// The session timer remains active until `do_checkpoint()` calls
+/// `finalizar_sesion_escritura` on project close.
+#[tauri::command]
+fn iniciar_sesion_escritura(
+    state: tauri::State<ProjectState>,
+    path: String,
+    chapter_filename: String,
+) -> Result<(), String> {
+    let mut tracker = state.session_tracker.lock()
+        .map_err(|e| format!("Error al acceder al tracker de sesión: {}", e))?;
+
+    let project_path = Path::new(&path);
+
+    // Read current chapter and count words
+    let word_count = word_count_chapter(project_path, &chapter_filename);
+
+    // If we were already tracking a chapter, accumulate its elapsed time
+    if tracker.chapter_start.is_some() && tracker.chapter_filename.is_some() {
+        let ch_file = tracker.chapter_filename.clone().unwrap();
+        let ch_start = tracker.chapter_start.unwrap();
+        let elapsed = ch_start.elapsed().as_secs();
+        let accum = tracker.chapter_times.entry(ch_file).or_insert(0);
+        *accum += elapsed;
+    }
+
+    // Set or reset session state
+    let now = std::time::Instant::now();
+    if tracker.start_time.is_none() {
+        tracker.start_time = Some(now);
+    }
+    tracker.chapter_start = Some(now);
+    tracker.chapter_filename = Some(chapter_filename);
+    tracker.initial_word_count = Some(word_count);
+
     Ok(())
 }
 
@@ -2543,11 +2594,135 @@ fn count_words_in_chapters(project_path: &Path) -> usize {
 // Application entry point
 // ---------------------------------------------------------------------------
 
+/// Compute and persist session statistics.
+///
+/// Best-effort — all errors are logged to `eprintln!` and the function
+/// never panics.  On completion the tracker is reset to defaults so the
+/// next project open starts fresh.
+///
+/// Steps:
+///   1. Compute elapsed time since `start_time`
+///   2. Accumulate current chapter time into `chapter_times`
+///   3. Re-count words in the current chapter, diff against initial
+///   4. Read or initialise `stats.json`
+///   5. Update totals, per-chapter stats, and append session record
+///   6. Write `stats.json` back to disk
+///   7. Stage and commit `stats.json` via `system_command`
+fn finalizar_sesion_escritura(tracker: &mut SessionTracker, project_path: &Path) {
+    let start_time = match tracker.start_time {
+        Some(t) => t,
+        None => return, // No active session — nothing to collect
+    };
+
+    let total_elapsed = start_time.elapsed().as_secs();
+
+    // Accumulate current chapter time before computing diffs
+    if tracker.chapter_start.is_some() && tracker.chapter_filename.is_some() {
+        let ch_file = tracker.chapter_filename.clone().unwrap();
+        let ch_start = tracker.chapter_start.unwrap();
+        let chapter_elapsed = ch_start.elapsed().as_secs();
+        let accum = tracker.chapter_times.entry(ch_file).or_insert(0);
+        *accum += chapter_elapsed;
+    }
+
+    // Compute words added for the current chapter
+    let words_added = if let Some(ref filename) = tracker.chapter_filename {
+        let current_words = word_count_chapter(project_path, filename);
+        let initial = tracker.initial_word_count.unwrap_or(0);
+        if current_words >= initial {
+            current_words - initial
+        } else {
+            // File was edited outside the editor or truncated; count whatever exists
+            current_words
+        }
+    } else {
+        0
+    };
+
+    // ── Read or initialise stats.json ──────────────────────────
+    let stats_path = project_path.join(".config").join("stats.json");
+    let mut stats: SessionStats = if stats_path.exists() {
+        std::fs::read_to_string(&stats_path)
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_else(|| {
+                eprintln!("[stats] Corrupt stats.json — regenerating default");
+                SessionStats::default()
+            })
+    } else {
+        SessionStats::default()
+    };
+
+    // ── Update cumulative totals ────────────────────────────────
+    stats.total_time_seconds += total_elapsed;
+    stats.total_words += words_added;
+
+    // ── Update per-chapter stats ────────────────────────────────
+    if let Some(ref filename) = tracker.chapter_filename {
+        let ch_time = tracker.chapter_times.get(filename).copied().unwrap_or(total_elapsed);
+        let ch_stats = stats.chapters.entry(filename.clone()).or_default();
+        ch_stats.words += words_added;
+        ch_stats.time_seconds += ch_time;
+    }
+
+    // ── Append session record ──────────────────────────────────
+    let session = StatsSession {
+        date: Local::now().format("%Y-%m-%d").to_string(),
+        duration_seconds: total_elapsed,
+        words_added,
+        chapter_id: tracker.chapter_filename.clone().unwrap_or_default(),
+    };
+    stats.sessions.push(session);
+
+    // ── Write stats.json ───────────────────────────────────────
+    let json = match serde_json::to_string_pretty(&stats) {
+        Ok(j) => j,
+        Err(e) => {
+            eprintln!("[stats] Error serializing stats.json: {}", e);
+            *tracker = SessionTracker::default();
+            return;
+        }
+    };
+    if let Err(e) = std::fs::write(&stats_path, &json) {
+        eprintln!("[stats] Error writing stats.json: {}", e);
+        *tracker = SessionTracker::default();
+        return;
+    }
+
+    // ── Git add + commit (best-effort) ─────────────────────────
+    let git_path = match find_git() {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("[stats] find_git error (non-fatal): {}", e);
+            *tracker = SessionTracker::default();
+            return;
+        }
+    };
+
+    let stats_rel = Path::new(".config").join("stats.json");
+    let _ = system_command(&git_path)
+        .arg("add")
+        .arg(&stats_rel)
+        .current_dir(project_path)
+        .output();
+
+    let _ = system_command(&git_path)
+        .arg("commit")
+        .arg("-m")
+        .arg("cron-insta: actualizar estadísticas de sesión")
+        .current_dir(project_path)
+        .output();
+
+    // Reset tracker for the next project open
+    *tracker = SessionTracker::default();
+}
+
 /// Internal checkpoint for close handler.
 ///
-/// Commits local changes (best-effort), then checks if local is ahead of
-/// the remote and pushes if so. Push warnings/errors are logged to stderr
-/// (the close handler cannot surface UI to the user).
+/// Commits local changes (best-effort), then collects session stats,
+/// then checks if local is ahead of the remote and pushes if so.
+/// Push warnings/errors are logged to stderr (the close handler cannot
+/// surface UI to the user).
 fn do_checkpoint(app: &tauri::AppHandle, project_path: &str) -> Result<String, String> {
     let path_buf = Path::new(project_path);
     eprintln!("[do_checkpoint] Starting checkpoint for: {}", project_path);
@@ -2556,7 +2731,16 @@ fn do_checkpoint(app: &tauri::AppHandle, project_path: &str) -> Result<String, S
     let commit_result = perform_commit(path_buf);
     eprintln!("[do_checkpoint] Commit result: {:?}", commit_result);
 
-    // 2) Sync with remote: fetch → pull (if behind) → push (if ahead)
+    // 2) Collect session stats (best-effort — never blocks sync)
+    {
+        let state = app.state::<ProjectState>();
+        let lock = state.session_tracker.lock();
+        if let Ok(mut tracker) = lock {
+            finalizar_sesion_escritura(&mut tracker, path_buf);
+        }
+    }
+
+    // 3) Sync with remote: fetch → pull (if behind) → push (if ahead)
     eprintln!("[do_checkpoint] Syncing with remote...");
     match sync_with_remote(app, project_path, path_buf) {
         Ok(warning) => {
@@ -3435,6 +3619,7 @@ pub fn run() {
         .manage(ProjectState {
             active_project: Mutex::new(None),
             closing: Mutex::new(false),
+            session_tracker: Mutex::new(SessionTracker::default()),
         })
         .invoke_handler(tauri::generate_handler![
             crear_proyecto,
@@ -3446,6 +3631,7 @@ pub fn run() {
             detectar_git,
             detectar_config_git,
             set_active_project,
+            iniciar_sesion_escritura,
             guardar_capitulo,
             crear_checkpoint,
             cargar_indice,
@@ -3615,6 +3801,12 @@ mod tests {
             .map_err(|e| format!("Error al escribir metadata.json: {}", e))?;
         std::fs::write(base.join(".config/timeline.json"), "[]")
             .map_err(|e| format!("Error al escribir timeline.json: {}", e))?;
+        // Seed stats.json (empty)
+        let stats = SessionStats::default();
+        let stats_json = serde_json::to_string_pretty(&stats)
+            .map_err(|e| format!("Error al serializar stats: {}", e))?;
+        std::fs::write(base.join(".config/stats.json"), stats_json)
+            .map_err(|e| format!("Error al escribir stats.json: {}", e))?;
         let _ = init_git_for_test(&path);
         Ok(format!("Proyecto '{}' creado en {}", nombre, path))
     }
@@ -6174,6 +6366,201 @@ mod tests {
         assert_eq!(meta.font_family, "serif");
         assert!(meta.visible_tabs.chapters, "visible_tabs should survive");
         assert_eq!(meta.auto_save_interval_minutes, 5, "auto_save_interval should survive");
+    }
+
+    // ========================================================================
+    // session-stats tests
+    // ========================================================================
+
+    // --- count_words_in_html ---
+
+    #[test]
+    fn test_count_words_in_html_empty() {
+        assert_eq!(count_words_in_html(""), 0);
+        assert_eq!(count_words_in_html("   "), 0);
+    }
+
+    #[test]
+    fn test_count_words_in_html_plain_text() {
+        assert_eq!(count_words_in_html("Hola mundo"), 2);
+        assert_eq!(count_words_in_html("uno dos tres cuatro"), 4);
+    }
+
+    #[test]
+    fn test_count_words_in_html_html_only() {
+        assert_eq!(count_words_in_html("<p></p>"), 0);
+        assert_eq!(count_words_in_html("<div><span></span></div>"), 0);
+    }
+
+    #[test]
+    fn test_count_words_in_html_mixed_markdown() {
+        let input = "# Título\n<p>Texto del <em>capítulo</em>.</p>";
+        // After stripping tags: # Título\nTexto del capítulo.
+        // Tokens: #, Título, Texto, del, capítulo.
+        assert_eq!(count_words_in_html(input), 5);
+    }
+
+    #[test]
+    fn test_count_words_in_html_entities() {
+        let input = "<p>&amp; &lt; &gt;</p>";
+        // After stripping tags: &amp; &lt; &gt;
+        // Tokens: &amp;, &lt;, &gt;
+        assert_eq!(count_words_in_html(input), 3);
+    }
+
+    #[test]
+    fn test_count_words_in_html_nested_tags() {
+        let input = "<div><p>Hola <strong>mundo</strong></p></div>";
+        assert_eq!(count_words_in_html(input), 2);
+    }
+
+    // --- SessionStats serialization ---
+
+    #[test]
+    fn test_session_stats_default() {
+        let stats = SessionStats::default();
+        assert_eq!(stats.total_time_seconds, 0);
+        assert_eq!(stats.total_words, 0);
+        assert!(stats.chapters.is_empty());
+        assert!(stats.sessions.is_empty());
+    }
+
+    #[test]
+    fn test_session_stats_serialize_roundtrip() {
+        let mut stats = SessionStats::default();
+        stats.total_time_seconds = 600;
+        stats.total_words = 150;
+        stats.chapters.insert(
+            "0001.md".to_string(),
+            StatsChapter { words: 150, time_seconds: 600 },
+        );
+        stats.sessions.push(StatsSession {
+            date: "2026-06-27".to_string(),
+            duration_seconds: 600,
+            words_added: 150,
+            chapter_id: "0001.md".to_string(),
+        });
+
+        let json = serde_json::to_string_pretty(&stats).expect("serialize");
+        let parsed: SessionStats = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.total_time_seconds, 600);
+        assert_eq!(parsed.total_words, 150);
+        assert_eq!(parsed.chapters["0001.md"].words, 150);
+        assert_eq!(parsed.sessions[0].date, "2026-06-27");
+    }
+
+    #[test]
+    fn test_session_stats_corrupt_json_recovers() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let config_dir = dir.path().join(".config");
+        fs::create_dir_all(&config_dir).unwrap();
+        fs::write(config_dir.join("stats.json"), "esto no es json {{{").unwrap();
+
+        // Reading corrupt file should produce default
+        let raw = fs::read_to_string(config_dir.join("stats.json")).unwrap();
+        let parsed: Option<SessionStats> = serde_json::from_str(&raw).ok();
+        assert!(parsed.is_none(), "corrupt JSON should fail to parse");
+        let fallback = SessionStats::default();
+        assert_eq!(fallback.total_time_seconds, 0);
+    }
+
+    // --- crear_proyecto seeds stats.json ---
+
+    #[test]
+    fn test_crear_proyecto_seeds_stats_json() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        let _ = create_project_for_test(path.clone(), "Stats Test".to_string(), None);
+
+        let stats_path = dir.path().join(".config").join("stats.json");
+        assert!(stats_path.exists(), "stats.json should be seeded by crear_proyecto");
+
+        let content = fs::read_to_string(&stats_path).expect("failed to read stats.json");
+        let stats: SessionStats = serde_json::from_str(&content).expect("invalid stats.json");
+        assert_eq!(stats.total_time_seconds, 0);
+        assert_eq!(stats.total_words, 0);
+        assert!(stats.chapters.is_empty());
+        assert!(stats.sessions.is_empty());
+    }
+
+    // --- Integration: start session → close → verify stats.json ---
+
+    #[test]
+    fn test_session_stats_full_flow() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path_str = dir.path().to_str().unwrap().to_string();
+
+        // Create project with a chapter
+        create_project_for_test(path_str.clone(), "Integration Test".to_string(), None).unwrap();
+
+        let chapter_content = "<p>Hola mundo</p>";
+        let cap_dir = dir.path().join("capitulos");
+        fs::create_dir_all(&cap_dir).unwrap();
+        fs::write(cap_dir.join("0001.md"), chapter_content).unwrap();
+
+        // Simulate session start: count words, record time
+        let word_count = count_words_in_html(chapter_content);
+        assert_eq!(word_count, 2, "expected 2 words in 'Hola mundo'");
+
+        let mut tracker = SessionTracker::default();
+        tracker.start_time = Some(std::time::Instant::now() - std::time::Duration::from_secs(300));
+        tracker.chapter_start = Some(std::time::Instant::now() - std::time::Duration::from_secs(300));
+        tracker.chapter_filename = Some("0001.md".to_string());
+        tracker.initial_word_count = Some(2);
+
+        // Add more content to the chapter
+        let updated_content = "<p>Hola mundo cruel</p>";
+        fs::write(cap_dir.join("0001.md"), updated_content).unwrap();
+
+        // End session — should write stats.json
+        finalizar_sesion_escritura(&mut tracker, dir.path());
+
+        // Verify stats.json exists and has correct data
+        let stats_path = dir.path().join(".config").join("stats.json");
+        assert!(stats_path.exists(), "stats.json should exist after session close");
+
+        let raw = fs::read_to_string(&stats_path).unwrap();
+        let stats: SessionStats = serde_json::from_str(&raw).unwrap();
+
+        // 3 words in updated chapter, started at 2 → +1 word added
+        // elapsed ≈ 300 seconds
+        assert!(
+            stats.total_time_seconds >= 300,
+            "total_time_seconds should be at least 300, got {}",
+            stats.total_time_seconds
+        );
+        assert_eq!(stats.total_words, 1, "1 word added (cruel)");
+
+        let ch = stats.chapters.get("0001.md").expect("chapter 0001.md should exist");
+        assert_eq!(ch.words, 1, "1 word added for chapter");
+        assert!(
+            ch.time_seconds >= 300,
+            "chapter time should be at least 300s, got {}",
+            ch.time_seconds
+        );
+
+        assert_eq!(stats.sessions.len(), 1, "should have one session record");
+        let s = &stats.sessions[0];
+        assert_eq!(s.words_added, 1);
+        assert_eq!(s.chapter_id, "0001.md");
+        assert!(
+            s.duration_seconds >= 300,
+            "session duration should be at least 300s, got {}",
+            s.duration_seconds
+        );
+    }
+
+    #[test]
+    fn test_session_stats_no_active_session_skips() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+
+        let mut tracker = SessionTracker::default(); // No start_time
+        finalizar_sesion_escritura(&mut tracker, dir.path());
+
+        // Should NOT create stats.json when there's no active session
+        let stats_path = dir.path().join(".config").join("stats.json");
+        assert!(!stats_path.exists(), "stats.json should not be created for inactive session");
     }
 
     // ========================================================================
