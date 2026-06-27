@@ -150,7 +150,7 @@
       <!-- Actions -->
       <div class="modal-actions">
         <button class="btn-primary" onclick={closeDialog}>
-          {lang.current === "es" ? "Cerrar" : "Close"}
+          {lang.current === "es" ? "Aceptar" : "Accept"}
         </button>
       </div>
     </div>
