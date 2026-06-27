@@ -46,6 +46,7 @@
     guardarIdentidadGit,
     importarProyecto,
     inicializarGit,
+    iniciarSesionEscritura,
     listarLugares,
     listarNotas,
     listarPersonajes,
@@ -527,6 +528,15 @@
       activeChapter = filename;
       editorContent = content;
       saveStatus = "saved";
+
+      // Start writing session tracking
+      try {
+        await iniciarSesionEscritura(projectPath, filename);
+        console.log("[cron-insta] Writing session started for:", filename);
+      } catch (e) {
+        console.error("[cron-insta] Failed to start writing session:", e);
+      }
+
       console.log("[cron-insta] Load OK:", filename, `(${content.length} chars)`);
     } catch (e) {
       console.error("[cron-insta] Failed to load chapter:", e);

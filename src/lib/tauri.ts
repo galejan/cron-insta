@@ -350,3 +350,11 @@ export async function importarProyecto(zipPath: string, destino: string): Promis
 export async function eliminarDirectorioGit(path: string): Promise<void> {
   return invoke("eliminar_directorio_git", { path });
 }
+
+/** Start a writing session timer for the given chapter. */
+export async function iniciarSesionEscritura(
+  path: string,
+  chapterFilename: string,
+): Promise<void> {
+  return invoke("iniciar_sesion_escritura", { path, chapterFilename });
+}
