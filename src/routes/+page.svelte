@@ -496,46 +496,34 @@
       const w = getCurrentWindow();
       console.log("[cron-insta:close] Registering onCloseRequested handler");
 
-      w.onCloseRequested(async (event) => {
-        try {
-          const path = untrack(() => projectPath);
-          const gitOk = untrack(() => gitEnabled);
+      w.onCloseRequested((event) => {
+        const path = untrack(() => projectPath);
 
-          console.log("[cron-insta:close] ── Close requested ──");
-          console.log("[cron-insta:close]   projectPath:", path || "(none)");
-          console.log("[cron-insta:close]   gitEnabled:", gitOk);
+        // No project open — just close
+        if (!path) {
+          getCurrentWindow().destroy();
+          return;
+        }
 
-          // No project open — let the window close naturally
-          if (!path) {
-            console.log("[cron-insta:close] → no project, closing immediately");
-            return;
-          }
+        // Project is open — handle asynchronously
+        const gitOk = untrack(() => gitEnabled);
+        if (!gitOk || untrack(() => closing)) {
+          return;
+        }
 
-          if (untrack(() => closing)) {
-            console.log("[cron-insta:close] → already closing, letting through");
-            return;
-          }
+        closing = true;
+        closeStep = "Cerrando aplicación...";
+        event.preventDefault();
 
-          closing = true;
-          closeStep = "Cerrando aplicación...";
-          console.log("[cron-insta:close] → showing overlay, Rust handles checkpoint");
-
-          event.preventDefault(); // Keep window alive while overlay shows
-
-          // Brief pause so user sees the overlay
+        // Spawn async cleanup without blocking the event
+        (async () => {
           await new Promise(r => setTimeout(r, 500));
-
-          // Force-close
-          console.log("[cron-insta:close] → destroying window");
           try {
             getCurrentWindow().destroy();
           } catch (e) {
-            console.error("[cron-insta:close]   destroy FAILED:", e);
+            console.error("[cron-insta:close] destroy FAILED:", e);
           }
-        } catch (err) {
-          console.error("[cron-insta:close] Handler error:", err);
-          // If anything fails, let the window close
-        }
+        })();
       });
     } catch (err) {
       console.error("[cron-insta:close] Not in Tauri:", err);
@@ -3230,6 +3218,12 @@
             onclick={importarProyectoHandler}
           >
             {t("import.button")}
+          </button>
+          <button
+            class="btn-secondary"
+            onclick={() => getCurrentWindow().destroy()}
+          >
+            ✕ {t("setup.closeApp")}
           </button>
         </div>
       </div>
