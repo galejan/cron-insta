@@ -146,6 +146,13 @@
           </div>
         {/if}
       </div>
+
+      <!-- Actions -->
+      <div class="modal-actions">
+        <button class="btn-primary" onclick={closeDialog}>
+          {lang.current === "es" ? "Cerrar" : "Close"}
+        </button>
+      </div>
     </div>
   </div>
 {/if}
@@ -342,5 +349,27 @@
   @keyframes fadeIn {
     from { opacity: 0; }
     to   { opacity: 1; }
+  }
+
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0 1.5rem 1.25rem;
+  }
+
+  .btn-primary {
+    padding: 0.5rem 1.5rem;
+    border: none;
+    border-radius: 0.375rem;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 120ms;
+  }
+
+  .btn-primary:hover {
+    background: var(--accent-hover);
   }
 </style>
