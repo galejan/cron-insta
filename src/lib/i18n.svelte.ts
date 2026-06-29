@@ -250,6 +250,10 @@ const translations: Record<Lang, Record<string, string>> = {
     // ── Help panel ─────────────────────────────────────────
     "help.ariaLabel": "Ayuda de Cron-Insta",
     "help.createdBy": "creado por",
+    "help.groupWriting": "Escritura y contenido",
+    "help.groupMedia": "Recursos multimedia",
+    "help.groupAppearance": "Apariencia y configuración",
+    "help.groupManagement": "Gestión del proyecto",
     "help.editorTitle": "Editor",
     "help.editorDesc":
       "El texto se guarda automáticamente cada 20 segundos. El tipo de letra se elige al crear el proyecto, pero puede cambiarse después desde el botón ⚙️ Configuración. Con Ctrl+↑ y Ctrl+↓ se cambia el nivel de título.",
@@ -268,15 +272,33 @@ const translations: Record<Lang, Record<string, string>> = {
     "help.placesTitle": "Lugares",
     "help.placesDesc":
       "Creá fichas de lugares (ciudades, edificios, escenarios). Cada lugar tiene nombre y descripción. Podés agregar texto del editor como descripción desde el menú contextual.",
+    "help.tramasTitle": "Tramas",
+    "help.tramasDesc":
+      "Organizá los capítulos en líneas argumentales (tramas) arrastrando y soltando. Creá tramas desde el botón «+ Nueva trama» en la pestaña Capítulos. Al crear un capítulo podés asignarlo a una trama existente, a una nueva o dejarlo sin asignar.",
+    "help.mediaTitle": "Galería multimedia",
+    "help.mediaDesc":
+      "Subí imágenes (JPG, PNG) a la carpeta media/ del proyecto. Las imágenes se muestran como miniaturas en la galería y podés pinearlas junto al editor con Ctrl+Enter.",
+    "help.statsTitle": "Estadísticas de sesión",
+    "help.statsDesc":
+      "Cron-Insta registra automáticamente el tiempo de escritura, las palabras añadidas y las sesiones diarias. Las estadísticas se muestran en el panel inferior al abrir un proyecto.",
+    "help.themesTitle": "Temas visuales",
+    "help.themesDesc":
+      "Cuatro temas integrados: Nórdico oscuro, Amatista oscuro, Nórdico claro y Sepia claro. Cambiá de tema desde Ajustes globales (icono ⚙️ en la barra superior). El tema se aplica al instante y se recuerda entre sesiones.",
+    "help.repairTitle": "Reparar proyecto",
+    "help.repairDesc":
+      "Si algún índice se corrompe o falta, usá el botón ✨ Reparar proyecto del panel de herramientas. Reconstruye los índices de personajes, lugares y notas desde los archivos reales del disco, y limpia referencias huérfanas.",
+    "help.shortcutsLinkTitle": "Atajos de teclado",
+    "help.shortcutsLinkDesc":
+      "Todos los atajos están disponibles en la <strong>página dedicada de atajos</strong>. Pulsá el icono ⌨️ de la barra del editor para abrirla. (<kbd>F1</kbd> o <kbd>?</kbd> abren esta ayuda).",
     "help.versioningTitle": "Versionado",
     "help.versioningDesc":
       "Cron-Insta usa Git para mantener un historial de cambios. Al cerrar la aplicación se crea un checkpoint automático. El indicador en el panel lateral muestra el estado: verde (activo), naranja (sin inicializar), rojo (Git no instalado). La identidad Git y el repositorio remoto pueden editarse desde ⚙️ Configuración.",
-    "help.settingsTitle": "Configuración",
+    "help.settingsTitle": "Configuración del proyecto",
     "help.settingsDesc":
-      "El botón ⚙️ del panel de herramientas abre la configuración del proyecto. Desde ahí podés cambiar la tipografía, la identidad Git y la URL del repositorio remoto en cualquier momento, sin necesidad de crear un proyecto nuevo.",
+      "El botón ⚙️ del panel de herramientas abre la configuración del proyecto: tipografía, pestañas visibles, autoguardado, identidad Git y repositorio remoto. Los ajustes globales (idioma y tema) se encuentran en el icono ⚙️ de la barra superior del editor.",
     "help.exportTitle": "Exportar y compartir",
     "help.exportDesc":
-      "Desde el panel de herramientas podés exportar el proyecto completo en .zip (incluye personajes, notas y Git) o compartir solo los capítulos en un archivo .md. Ambos se guardan en la carpeta exportaciones/ dentro del proyecto.",
+      "Desde el panel de herramientas podés exportar el proyecto completo en .zip (incluye personajes, notas, lugares, imágenes, configuración y SCHEMA.md) o compartir solo los capítulos en un archivo .md. Ambos se guardan en la carpeta exportaciones/ dentro del proyecto.",
     "help.dialogDashTitle": "Guion de diálogo",
     "help.dialogDashDesc":
       "Con Ctrl+D se inserta un par de guiones largos (—) y el cursor queda en el medio, listo para escribir el diálogo.",
@@ -300,6 +322,17 @@ const translations: Record<Lang, Record<string, string>> = {
     "help.shortcuts.fullSidebar": "Panel lateral a pantalla completa (referencia)",
     "help.shortcuts.dockCharacter": "Pinear elemento activo (personaje, nota, lugar o imagen)",
     "help.shortcuts.importProject": "Importar proyecto desde ZIP",
+
+    "shortcuts.resetDefaults": "Restaurar valores por defecto",
+    "shortcuts.conflictWarning": "Este atajo ya está asignado a <strong>{name}</strong>. ¿Qué querés hacer?",
+    "shortcuts.swap": "Intercambiar",
+    "shortcuts.overwrite": "Sobrescribir",
+
+    "shortcuts.groupEditing": "Edición",
+    "shortcuts.groupNavigation": "Navegación",
+    "shortcuts.groupProject": "Proyecto",
+    "shortcuts.groupCreation": "Entidades",
+    "shortcuts.groupInterface": "Interfaz",
 
     // ── Dialogs (prompts and confirmations) ────────────────
     "dialog.selectCreateFolder":
@@ -330,6 +363,8 @@ const translations: Record<Lang, Record<string, string>> = {
     "common.cancel": "Cancelar",
     "common.accept": "Aceptar",
     "common.delete": "Eliminar",
+    "common.edit": "Editar",
+    "common.pressKeys": "Pulsa las nuevas teclas...",
 
     // ── Git ────────────────────────────────────────────────
     "git.notInstalled": "Git no está instalado",
@@ -467,6 +502,18 @@ const translations: Record<Lang, Record<string, string>> = {
     "context.characterNotFound": "Personaje \"{name}\" no encontrado",
     "context.addToPlace": "Agregar a lugar",
     "context.placePrompt": "¿A qué lugar? (nombre exacto)",
+
+    // ── Project Repair ──────────────────────────────────────
+    "repair.title": "Reparar proyecto",
+    "repair.description": "Reconstruye índices y corrige inconsistencias desde los ficheros del proyecto.",
+    "repair.button": "Reparar proyecto",
+    "repair.running": "Reparando proyecto...",
+    "repair.success": "Proyecto reparado correctamente.",
+    "repair.repaired": "Reparado",
+    "repair.recreated": "Recreado",
+    "repair.cleaned": "Limpiado",
+    "repair.lost": "Perdido",
+    "repair.nothing": "No se encontraron problemas.",
   },
 
   en: {
@@ -682,6 +729,10 @@ const translations: Record<Lang, Record<string, string>> = {
     // ── Help panel ─────────────────────────────────────────
     "help.ariaLabel": "Cron-Insta Help",
     "help.createdBy": "created by",
+    "help.groupWriting": "Writing & Content",
+    "help.groupMedia": "Media Resources",
+    "help.groupAppearance": "Appearance & Settings",
+    "help.groupManagement": "Project Management",
     "help.editorTitle": "Editor",
     "help.editorDesc":
       "Text is auto-saved every 20 seconds. The font is chosen when creating the project, but can be changed later from the ⚙️ Settings button. Use Ctrl+↑ and Ctrl+↓ to change heading levels.",
@@ -700,15 +751,33 @@ const translations: Record<Lang, Record<string, string>> = {
     "help.placesTitle": "Places",
     "help.placesDesc":
       "Create place cards (cities, buildings, settings). Each place has a name and description. You can add editor text as a description from the context menu.",
+    "help.tramasTitle": "Plotlines",
+    "help.tramasDesc":
+      "Organise chapters into plotlines (tramas) by dragging and dropping. Create plotlines from the «+ New Plotline» button in the Chapters tab. When creating a chapter you can assign it to an existing plotline, a new one, or leave it unassigned.",
+    "help.mediaTitle": "Media Gallery",
+    "help.mediaDesc":
+      "Upload images (JPG, PNG) to the project's media/ folder. Images appear as thumbnails in the gallery and can be docked next to the editor with Ctrl+Enter.",
+    "help.statsTitle": "Session Stats",
+    "help.statsDesc":
+      "Cron-Insta automatically tracks writing time, words added, and daily sessions. Stats are shown in the bottom panel when a project is open.",
+    "help.themesTitle": "Visual Themes",
+    "help.themesDesc":
+      "Four built-in themes: Dark Nordic, Dark Amethyst, Light Nordic, and Light Sepia. Switch themes from Global Settings (⚙️ icon in the top toolbar). The theme applies instantly and is remembered across sessions.",
+    "help.repairTitle": "Repair Project",
+    "help.repairDesc":
+      "If any index gets corrupted or goes missing, use the ✨ Repair Project button in the tools panel. It rebuilds character, place, and note indices from actual files on disk, and cleans up orphan references.",
+    "help.shortcutsLinkTitle": "Keyboard Shortcuts",
+    "help.shortcutsLinkDesc":
+      "All shortcuts are available on the <strong>dedicated shortcuts page</strong>. Click the ⌨️ icon in the editor toolbar to open it. (<kbd>F1</kbd> or <kbd>?</kbd> open this help panel).",
     "help.versioningTitle": "Versioning",
     "help.versioningDesc":
       "Cron-Insta uses Git to keep a change history. An automatic checkpoint is created when closing the app. The indicator in the sidebar shows status: green (active), orange (not initialized), red (Git not installed). Git identity and remote repo can be edited from ⚙️ Settings.",
-    "help.settingsTitle": "Settings",
+    "help.settingsTitle": "Project Settings",
     "help.settingsDesc":
-      "The ⚙️ button in the tools panel opens the project settings. From there you can change the font, Git identity, and remote repository URL at any time — no need to create a new project.",
+      "The ⚙️ button in the tools panel opens the project settings: font, visible tabs, auto-save, Git identity, and remote repository. Global settings (language and theme) are in the ⚙️ icon on the editor's top toolbar.",
     "help.exportTitle": "Export & share",
     "help.exportDesc":
-      "From the tools panel you can export the full project as .zip (includes characters, notes, and Git) or share just the chapters as a single .md file. Both are saved in the exportaciones/ folder inside the project.",
+      "From the tools panel you can export the full project as .zip (includes characters, notes, places, images, config, and SCHEMA.md) or share just the chapters as a single .md file. Both are saved in the exportaciones/ folder inside the project.",
     "help.dialogDashTitle": "Dialogue dash",
     "help.dialogDashDesc":
       "Ctrl+D inserts a pair of em dashes (—) with the cursor in the middle, ready to type dialogue.",
@@ -732,6 +801,17 @@ const translations: Record<Lang, Record<string, string>> = {
     "help.shortcuts.fullSidebar": "Full-width sidebar (reference mode)",
     "help.shortcuts.dockCharacter": "Dock/undock active element (character, note, place or image)",
     "help.shortcuts.importProject": "Import project from ZIP",
+
+    "shortcuts.resetDefaults": "Restore defaults",
+    "shortcuts.conflictWarning": "This shortcut is already assigned to <strong>{name}</strong>. What would you like to do?",
+    "shortcuts.swap": "Swap",
+    "shortcuts.overwrite": "Overwrite",
+
+    "shortcuts.groupEditing": "Editing",
+    "shortcuts.groupNavigation": "Navigation",
+    "shortcuts.groupProject": "Project",
+    "shortcuts.groupCreation": "Entities",
+    "shortcuts.groupInterface": "Interface",
 
     // ── Dialogs (prompts and confirmations) ────────────────
     "dialog.selectCreateFolder":
@@ -762,6 +842,8 @@ const translations: Record<Lang, Record<string, string>> = {
     "common.cancel": "Cancel",
     "common.accept": "Accept",
     "common.delete": "Delete",
+    "common.edit": "Edit",
+    "common.pressKeys": "Press new keys...",
 
     // ── Git ────────────────────────────────────────────────
     "git.notInstalled": "Git is not installed",
@@ -899,6 +981,18 @@ const translations: Record<Lang, Record<string, string>> = {
     "context.characterNotFound": "Character \"{name}\" not found",
     "context.addToPlace": "Add to place",
     "context.placePrompt": "Which place? (exact name)",
+
+    // ── Project Repair ──────────────────────────────────────
+    "repair.title": "Repair project",
+    "repair.description": "Rebuild indices and fix inconsistencies from project files.",
+    "repair.button": "Repair project",
+    "repair.running": "Repairing project...",
+    "repair.success": "Project repaired successfully.",
+    "repair.repaired": "Repaired",
+    "repair.recreated": "Recreated",
+    "repair.cleaned": "Cleaned",
+    "repair.lost": "Lost",
+    "repair.nothing": "No issues found.",
   },
 };
 

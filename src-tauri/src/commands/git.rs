@@ -988,7 +988,7 @@ pub fn read_identity_from_config(app: &tauri::AppHandle) -> Option<(String, Stri
 /// Uses Tauri's platform-standard `app_config_dir()` under a `cron-insta/`
 /// subdirectory. Returns `None` when the platform cannot determine the
 /// config directory.
-pub fn get_config_path(app: &tauri::AppHandle) -> Option<PathBuf> {
+pub(crate) fn get_config_path(app: &tauri::AppHandle) -> Option<PathBuf> {
     app.path()
         .app_config_dir()
         .ok()

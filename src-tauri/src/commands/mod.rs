@@ -16,6 +16,8 @@ pub mod git;
 pub mod config;
 pub mod stats;
 pub mod export;
+pub mod repair;
+pub mod shortcuts;
 // Re-export all public items so crate::commands::* gives access to commands
 pub use project::*;
 pub use chapters::*;
@@ -29,3 +31,5 @@ pub use git::*;
 pub use config::*;
 pub use stats::*;
 pub use export::*;
+pub use repair::*;
+pub use shortcuts::*;

@@ -87,6 +87,11 @@ pub fn run() {
             push_ahora,
             verificar_remoto,
             traer_cambios,
+            reparar_proyecto,
+            recrear_metadata,
+            cargar_atajos,
+            guardar_atajo,
+            restaurar_atajos,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -197,8 +202,15 @@ mod tests {
         // Seed lugares/index.json (empty array)
         std::fs::write(base.join("lugares/index.json"), "[]")
             .map_err(|e| format!("Error al escribir lugares/index.json: {}", e))?;
+        // Seed personajes/index.json (empty array)
+        std::fs::write(base.join("personajes/index.json"), "[]")
+            .map_err(|e| format!("Error al escribir personajes/index.json: {}", e))?;
+        // Seed notas/index.json (empty array)
+        std::fs::write(base.join("notas/index.json"), "[]")
+            .map_err(|e| format!("Error al escribir notas/index.json: {}", e))?;
 
         let metadata = Metadata {
+            version: 1,
             project_name: nombre.clone(),
             last_modified: Local::now().to_rfc3339(),
             chapters_order: vec![],
@@ -3282,6 +3294,439 @@ mod tests {
         let raw = std::fs::read_to_string(&meta_path).unwrap();
         let meta: Metadata = serde_json::from_str(&raw).unwrap();
         assert!(meta.chapter_tramas.is_empty(), "chapter_tramas should be empty after chapter deletion");
+    }
+
+    // ========================================================================
+    // repair — project repair/recovery tests
+    // ========================================================================
+
+    // Helper: create a project without using create_project_for_test (so we
+    // can precisely control which files exist).
+    fn create_minimal_project_structure(dir: &std::path::Path, name: &str) {
+        std::fs::create_dir_all(dir.join(".config")).unwrap();
+        std::fs::create_dir_all(dir.join("capitulos")).unwrap();
+        std::fs::create_dir_all(dir.join("personajes")).unwrap();
+        std::fs::create_dir_all(dir.join("notas")).unwrap();
+        std::fs::create_dir_all(dir.join("lugares")).unwrap();
+
+        let metadata = Metadata {
+            version: 1,
+            project_name: name.to_string(),
+            last_modified: Local::now().to_rfc3339(),
+            chapters_order: vec![],
+            characters_index: vec![],
+            places_index: vec![],
+            font_family: "monospace".to_string(),
+            push_enabled: false,
+            consecutive_failures: 0,
+            visible_tabs: VisibleTabs::default(),
+            auto_save_interval_minutes: 5,
+            tramas: vec![],
+            chapter_tramas: vec![],
+        };
+        std::fs::write(
+            dir.join(".config").join("metadata.json"),
+            serde_json::to_string_pretty(&metadata).unwrap(),
+        )
+        .unwrap();
+        std::fs::write(dir.join(".config").join("timeline.json"), "[]").unwrap();
+    }
+
+    #[test]
+    fn test_reparar_proyecto_rebuilds_personajes_index() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        create_minimal_project_structure(dir.path(), "Test");
+
+        // Create a character file
+        let char_json = r#"{"id":"frodo","name":"Frodo Bolsón"}"#;
+        std::fs::write(dir.path().join("personajes").join("frodo.json"), char_json).unwrap();
+        // Write wrong index.json
+        std::fs::write(
+            dir.path().join("personajes").join("index.json"),
+            r#"[{"id":"wrong","name":"Wrong"}]"#,
+        )
+        .unwrap();
+
+        let result = reparar_proyecto(dir.path().to_str().unwrap().to_string());
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+
+        // Verify index.json was rebuilt
+        let index_raw = std::fs::read_to_string(dir.path().join("personajes").join("index.json")).unwrap();
+        let index: Vec<CharacterIndexItem> = serde_json::from_str(&index_raw).unwrap();
+        assert_eq!(index.len(), 1);
+        assert_eq!(index[0].id, "frodo");
+        assert_eq!(index[0].name, "Frodo Bolsón");
+
+        // Verify metadata characters_index was updated
+        let meta_raw = std::fs::read_to_string(dir.path().join(".config").join("metadata.json")).unwrap();
+        let meta: Metadata = serde_json::from_str(&meta_raw).unwrap();
+        assert_eq!(meta.characters_index.len(), 1);
+        assert_eq!(meta.characters_index[0].id, "frodo");
+        assert_eq!(meta.characters_index[0].file, "frodo.json");
+    }
+
+    #[test]
+    fn test_reparar_proyecto_rebuilds_lugares_index() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        create_minimal_project_structure(dir.path(), "Test");
+
+        let lugar_json = r#"{"id":"torre","name":"Torre Norte","description":""}"#;
+        std::fs::write(dir.path().join("lugares").join("torre.json"), lugar_json).unwrap();
+        // Corrupt index.json
+        std::fs::write(dir.path().join("lugares").join("index.json"), "garbage").unwrap();
+
+        let result = reparar_proyecto(dir.path().to_str().unwrap().to_string());
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+
+        let index_raw = std::fs::read_to_string(dir.path().join("lugares").join("index.json")).unwrap();
+        let index: Vec<LugarIndexItem> = serde_json::from_str(&index_raw).unwrap();
+        assert_eq!(index.len(), 1);
+        assert_eq!(index[0].id, "torre");
+        assert_eq!(index[0].name, "Torre Norte");
+
+        let meta_raw = std::fs::read_to_string(dir.path().join(".config").join("metadata.json")).unwrap();
+        let meta: Metadata = serde_json::from_str(&meta_raw).unwrap();
+        assert_eq!(meta.places_index.len(), 1);
+        assert_eq!(meta.places_index[0].id, "torre");
+    }
+
+    #[test]
+    fn test_reparar_proyecto_rebuilds_notas_index_with_title() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        create_minimal_project_structure(dir.path(), "Test");
+
+        std::fs::write(
+            dir.path().join("notas").join("idea-1.md"),
+            "# My Note Title\n\nSome content here.",
+        )
+        .unwrap();
+
+        let result = reparar_proyecto(dir.path().to_str().unwrap().to_string());
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+
+        let index_raw = std::fs::read_to_string(dir.path().join("notas").join("index.json")).unwrap();
+        let index: Vec<NoteIndexItem> = serde_json::from_str(&index_raw).unwrap();
+        assert_eq!(index.len(), 1);
+        assert_eq!(index[0].id, "idea-1");
+        assert_eq!(index[0].title, "My Note Title");
+    }
+
+    #[test]
+    fn test_reparar_proyecto_notas_no_heading_fallback() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        create_minimal_project_structure(dir.path(), "Test");
+
+        std::fs::write(
+            dir.path().join("notas").join("no-heading.md"),
+            "Just some text without a heading.\n\nAnother line.",
+        )
+        .unwrap();
+
+        let result = reparar_proyecto(dir.path().to_str().unwrap().to_string());
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+
+        let index_raw = std::fs::read_to_string(dir.path().join("notas").join("index.json")).unwrap();
+        let index: Vec<NoteIndexItem> = serde_json::from_str(&index_raw).unwrap();
+        assert_eq!(index.len(), 1);
+        assert_eq!(index[0].id, "no-heading");
+        // Title should fallback to id (filename without .md)
+        assert_eq!(index[0].title, "no-heading");
+    }
+
+    #[test]
+    fn test_reparar_proyecto_recovers_chapters_order() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        create_minimal_project_structure(dir.path(), "Test");
+
+        // Create chapter files
+        std::fs::write(dir.path().join("capitulos").join("0002.md"), "# Cap 2\n\n").unwrap();
+        std::fs::write(dir.path().join("capitulos").join("0001.md"), "# Cap 1\n\n").unwrap();
+        std::fs::write(dir.path().join("capitulos").join("0010.md"), "# Cap 10\n\n").unwrap();
+
+        // chapters_order is already empty from create_minimal_project_structure
+        let result = reparar_proyecto(dir.path().to_str().unwrap().to_string());
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+
+        let meta_raw = std::fs::read_to_string(dir.path().join(".config").join("metadata.json")).unwrap();
+        let meta: Metadata = serde_json::from_str(&meta_raw).unwrap();
+        assert_eq!(meta.chapters_order.len(), 3);
+        // Should be naturally sorted: 0001 < 0002 < 0010
+        assert_eq!(meta.chapters_order[0], "0001.md");
+        assert_eq!(meta.chapters_order[1], "0002.md");
+        assert_eq!(meta.chapters_order[2], "0010.md");
+    }
+
+    #[test]
+    fn test_reparar_proyecto_preserves_existing_order() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        create_minimal_project_structure(dir.path(), "Test");
+
+        // Manually set a custom chapters_order
+        let meta_path = dir.path().join(".config").join("metadata.json");
+        {
+            let raw = std::fs::read_to_string(&meta_path).unwrap();
+            let mut meta: Metadata = serde_json::from_str(&raw).unwrap();
+            meta.chapters_order = vec!["z.md".to_string(), "a.md".to_string(), "m.md".to_string()];
+            std::fs::write(&meta_path, serde_json::to_string_pretty(&meta).unwrap()).unwrap();
+        }
+
+        // Create corresponding chapter files
+        std::fs::create_dir_all(dir.path().join("capitulos")).unwrap();
+        std::fs::write(dir.path().join("capitulos").join("a.md"), "").unwrap();
+        std::fs::write(dir.path().join("capitulos").join("m.md"), "").unwrap();
+        std::fs::write(dir.path().join("capitulos").join("z.md"), "").unwrap();
+
+        let result = reparar_proyecto(dir.path().to_str().unwrap().to_string());
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+
+        let raw = std::fs::read_to_string(&meta_path).unwrap();
+        let meta: Metadata = serde_json::from_str(&raw).unwrap();
+        // Order must be preserved exactly
+        assert_eq!(meta.chapters_order, vec!["z.md", "a.md", "m.md"]);
+    }
+
+    #[test]
+    fn test_reparar_proyecto_cleans_timeline_orphans() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        create_minimal_project_structure(dir.path(), "Test");
+
+        // Create a character that exists
+        let char_json = r#"{"id":"gandalf","name":"Gandalf"}"#;
+        std::fs::write(dir.path().join("personajes").join("gandalf.json"), char_json).unwrap();
+
+        // Create a timeline with orphan references
+        let timeline = vec![serde_json::json!({
+            "id": "evt-1",
+            "date": "2020-01-01",
+            "title": "Test Event",
+            "description": "",
+            "relatedCharacters": ["gandalf", "ghost-char"],
+            "relatedChapters": ["ghost-chapter.md"],
+            "relatedPlaces": ["ghost-place"]
+        })];
+        std::fs::write(
+            dir.path().join(".config").join("timeline.json"),
+            serde_json::to_string_pretty(&timeline).unwrap(),
+        )
+        .unwrap();
+
+        let result = reparar_proyecto(dir.path().to_str().unwrap().to_string());
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+
+        // Verify orphans were removed
+        let raw = std::fs::read_to_string(dir.path().join(".config").join("timeline.json")).unwrap();
+        let events: Vec<TimelineEvent> = serde_json::from_str(&raw).unwrap();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].relatedCharacters, vec!["gandalf"]);
+        assert!(events[0].relatedChapters.is_empty());
+        assert!(events[0].relatedPlaces.is_empty());
+    }
+
+    #[test]
+    fn test_reparar_proyecto_rejects_missing_metadata() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        // No .config/metadata.json
+        let result = reparar_proyecto(dir.path().to_str().unwrap().to_string());
+        assert!(result.is_err(), "Expected Err for missing metadata");
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("metadata.json") || err.contains("recrear_metadata"),
+            "Error should mention metadata.json, got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_recrear_metadata_creates_fresh_structure() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        // Create capitulos/ with chapter files but no metadata
+        std::fs::create_dir_all(dir.path().join("capitulos")).unwrap();
+        std::fs::create_dir_all(dir.path().join("personajes")).unwrap();
+        std::fs::create_dir_all(dir.path().join("lugares")).unwrap();
+        std::fs::create_dir_all(dir.path().join("notas")).unwrap();
+        std::fs::write(dir.path().join("capitulos").join("0001.md"), "# Cap 1\n\nContent").unwrap();
+
+        // Create a character file
+        let char_json = r#"{"id":"frodo","name":"Frodo"}"#;
+        std::fs::write(dir.path().join("personajes").join("frodo.json"), char_json).unwrap();
+
+        let config = RecreateMetadataConfig {
+            project_name: "Recreated Project".to_string(),
+            font_family: "serif".to_string(),
+            visible_tabs: None,
+            auto_save_interval_minutes: 10,
+        };
+
+        let result = recrear_metadata(path.clone(), config);
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+
+        // Verify metadata.json exists and has correct values
+        let meta_raw = std::fs::read_to_string(dir.path().join(".config").join("metadata.json")).unwrap();
+        let meta: Metadata = serde_json::from_str(&meta_raw).unwrap();
+        assert_eq!(meta.project_name, "Recreated Project");
+        assert_eq!(meta.font_family, "serif");
+        assert_eq!(meta.auto_save_interval_minutes, 10);
+        assert_eq!(meta.version, 1);
+        assert!(!meta.push_enabled);
+        assert_eq!(meta.consecutive_failures, 0);
+
+        // Verify indices were rebuilt by reparar_proyecto (called internally)
+        assert_eq!(meta.characters_index.len(), 1);
+        assert_eq!(meta.characters_index[0].id, "frodo");
+        assert_eq!(meta.chapters_order, vec!["0001.md"]);
+
+        // Verify timeline.json and stats.json exist
+        assert!(dir.path().join(".config").join("timeline.json").exists());
+        assert!(dir.path().join(".config").join("stats.json").exists());
+
+        // Verify SCHEMA.md exists
+        assert!(dir.path().join("SCHEMA.md").exists());
+    }
+
+    #[test]
+    fn test_recrear_metadata_rejects_invalid_font() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        std::fs::create_dir_all(dir.path().join("capitulos")).unwrap();
+
+        let config = RecreateMetadataConfig {
+            project_name: "Test".to_string(),
+            font_family: "comic-sans".to_string(),
+            visible_tabs: None,
+            auto_save_interval_minutes: 5,
+        };
+
+        let result = recrear_metadata(path, config);
+        assert!(result.is_err(), "Expected Err for invalid font");
+    }
+
+    #[test]
+    fn test_recrear_metadata_rejects_missing_capitulos() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().to_str().unwrap().to_string();
+
+        // No capitulos/ directory at all
+        let config = RecreateMetadataConfig {
+            project_name: "Test".to_string(),
+            font_family: "monospace".to_string(),
+            visible_tabs: None,
+            auto_save_interval_minutes: 5,
+        };
+
+        let result = recrear_metadata(path, config);
+        assert!(result.is_err(), "Expected Err for missing capitulos/");
+        let err = result.unwrap_err();
+        assert!(err.contains("capitulos"), "Should mention capitulos: {}", err);
+    }
+
+    #[test]
+    fn test_reparar_proyecto_idempotent() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        create_minimal_project_structure(dir.path(), "Test");
+
+        // Create actual data
+        let char_json = r#"{"id":"sam","name":"Samwise"}"#;
+        std::fs::write(dir.path().join("personajes").join("sam.json"), char_json).unwrap();
+        std::fs::write(dir.path().join("capitulos").join("0001.md"), "# Intro\n\n").unwrap();
+
+        let path_str = dir.path().to_str().unwrap().to_string();
+
+        // First run — repairs indices from files
+        let report1 = reparar_proyecto(path_str.clone()).unwrap();
+
+        // Second run — everything should already be consistent, nothing new to repair
+        let report2 = reparar_proyecto(path_str.clone()).unwrap();
+
+        // Second run should find zero repaired items (all indices already rebuilt)
+        assert_eq!(report2.repaired.len(), 0,
+            "Second run should find nothing to repair, got: {:?}", report2.repaired);
+        assert_eq!(report2.cleaned.len(), 0,
+            "Second run should find nothing to clean, got: {:?}", report2.cleaned);
+
+        // Verify metadata.json is stable between runs
+        let meta1 = std::fs::read_to_string(dir.path().join(".config").join("metadata.json")).unwrap();
+        // Run again and compare
+        let _ = reparar_proyecto(path_str).unwrap();
+        let meta2 = std::fs::read_to_string(dir.path().join(".config").join("metadata.json")).unwrap();
+        // last_modified will differ, compare semantic content
+        let v1: serde_json::Value = serde_json::from_str(&meta1).unwrap();
+        let v2: serde_json::Value = serde_json::from_str(&meta2).unwrap();
+        assert_eq!(v1["project_name"], v2["project_name"]);
+        assert_eq!(v1["characters_index"], v2["characters_index"]);
+        assert_eq!(v1["chapters_order"], v2["chapters_order"]);
+    }
+
+    #[test]
+    fn test_reparar_proyecto_initializes_chapter_tramas() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        create_minimal_project_structure(dir.path(), "Test");
+
+        // Create chapters but no chapter_tramas
+        std::fs::write(dir.path().join("capitulos").join("c1.md"), "# C1\n\n").unwrap();
+        std::fs::write(dir.path().join("capitulos").join("c2.md"), "# C2\n\n").unwrap();
+
+        // Set chapters_order manually
+        let meta_path = dir.path().join(".config").join("metadata.json");
+        {
+            let raw = std::fs::read_to_string(&meta_path).unwrap();
+            let mut meta: Metadata = serde_json::from_str(&raw).unwrap();
+            meta.chapters_order = vec!["c1.md".to_string(), "c2.md".to_string()];
+            meta.chapter_tramas = vec![]; // empty
+            std::fs::write(&meta_path, serde_json::to_string_pretty(&meta).unwrap()).unwrap();
+        }
+
+        let result = reparar_proyecto(dir.path().to_str().unwrap().to_string());
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+
+        let raw = std::fs::read_to_string(&meta_path).unwrap();
+        let meta: Metadata = serde_json::from_str(&raw).unwrap();
+        assert_eq!(meta.chapter_tramas.len(), 2);
+        assert!(meta.chapter_tramas.iter().all(|ct| ct.trama_id.is_none()));
+    }
+
+    #[test]
+    fn test_reparar_proyecto_fills_missing_chapter_tramas() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        create_minimal_project_structure(dir.path(), "Test");
+
+        std::fs::write(dir.path().join("capitulos").join("c1.md"), "# C1\n\n").unwrap();
+        std::fs::write(dir.path().join("capitulos").join("c2.md"), "# C2\n\n").unwrap();
+        std::fs::write(dir.path().join("capitulos").join("c3.md"), "# C3\n\n").unwrap();
+
+        // chapters_order has 3, but chapter_tramas only has 1
+        let meta_path = dir.path().join(".config").join("metadata.json");
+        {
+            let raw = std::fs::read_to_string(&meta_path).unwrap();
+            let mut meta: Metadata = serde_json::from_str(&raw).unwrap();
+            meta.chapters_order = vec![
+                "c1.md".to_string(),
+                "c2.md".to_string(),
+                "c3.md".to_string(),
+            ];
+            meta.chapter_tramas = vec![ChapterTrama {
+                filename: "c1.md".to_string(),
+                trama_id: Some("trama-x".to_string()),
+            }];
+            std::fs::write(&meta_path, serde_json::to_string_pretty(&meta).unwrap()).unwrap();
+        }
+
+        let result = reparar_proyecto(dir.path().to_str().unwrap().to_string());
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+
+        let raw = std::fs::read_to_string(&meta_path).unwrap();
+        let meta: Metadata = serde_json::from_str(&raw).unwrap();
+        assert_eq!(meta.chapter_tramas.len(), 3);
+        // c1 preserves its trama assignment
+        let c1 = meta.chapter_tramas.iter().find(|ct| ct.filename == "c1.md").unwrap();
+        assert_eq!(c1.trama_id.as_deref(), Some("trama-x"));
+        // c2 and c3 are new, unassigned
+        let c2 = meta.chapter_tramas.iter().find(|ct| ct.filename == "c2.md").unwrap();
+        assert!(c2.trama_id.is_none());
+        let c3 = meta.chapter_tramas.iter().find(|ct| ct.filename == "c3.md").unwrap();
+        assert!(c3.trama_id.is_none());
     }
 
     // ========================================================================

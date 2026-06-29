@@ -13,13 +13,13 @@ export default defineConfig(async () => ({
   clearScreen: false,
   // 2. desktop app — large SPA chunks are expected, not a problem
   build: {
-    chunkSizeWarningLimit: 600,
+    chunkSizeWarningLimit: 500,
     rollupOptions: {
       output: {
         manualChunks(id: string) {
-          if (id.includes("phosphor-svelte")) {
-            return "phosphor-icons";
-          }
+          if (id.includes("phosphor-svelte")) return "phosphor-icons";
+          if (id.includes("prosemirror")) return "prosemirror";
+          if (id.includes("@tiptap")) return "tiptap";
         },
       },
     },

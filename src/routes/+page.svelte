@@ -69,6 +69,12 @@
     setActiveProject,
     sincronizarRemoto,
     verificarGitInicializado,
+    repararProyecto,
+    type RepairReport,
+    cargarAtajos,
+    guardarAtajo,
+    restaurarAtajos,
+    type ShortcutBinding,
   } from "$lib/tauri";
   import type { GitLogEntry } from "$lib/tauri";
   import type { Trama, ChapterTrama } from "$lib/tauri";
@@ -83,11 +89,12 @@
   // ── Phosphor Icons (direct-path imports for tree-shaking) ─────
   import ArrowRight from "phosphor-svelte/lib/ArrowRight";
   import BookOpen from "phosphor-svelte/lib/BookOpen";
+  import Broom from "phosphor-svelte/lib/Broom";
   import CaretDown from "phosphor-svelte/lib/CaretDown";
   import CaretLeft from "phosphor-svelte/lib/CaretLeft";
   import CaretRight from "phosphor-svelte/lib/CaretRight";
   import CaretUp from "phosphor-svelte/lib/CaretUp";
-  import ChatText from "phosphor-svelte/lib/ChatText";
+  import ChartBar from "phosphor-svelte/lib/ChartBar";
   import CheckCircle from "phosphor-svelte/lib/CheckCircle";
   import Clock from "phosphor-svelte/lib/Clock";
   import DownloadSimple from "phosphor-svelte/lib/DownloadSimple";
@@ -105,6 +112,7 @@
   import NotePencil from "phosphor-svelte/lib/NotePencil";
   import Notepad from "phosphor-svelte/lib/Notepad";
   import Package from "phosphor-svelte/lib/Package";
+  import Palette from "phosphor-svelte/lib/Palette";
   import PaperPlaneTilt from "phosphor-svelte/lib/PaperPlaneTilt";
   import PencilSimple from "phosphor-svelte/lib/PencilSimple";
   import Question from "phosphor-svelte/lib/Question";
@@ -122,7 +130,33 @@
   let sidebarCollapsed = $state(false); // derived for CSS class
   let globalSettingsOpen = $state(false);
   let helpMode = $state(false);
+  // Accordion groups for the help panel — all open by default
+  let helpGroups = $state({
+    writing: false,
+    media: false,
+    appearance: false,
+    management: false,
+  });
   let shortcutsOpen = $state(false);
+  let shortcuts = $state<ShortcutBinding[]>([]);
+  let editingShortcutId = $state<string | null>(null);
+  let resettingShortcuts = $state(false);
+  let shortcutConflict = $state<{ binding: ShortcutBinding; conflictingId: string } | null>(null);
+  let shortcutGroups = $state<Record<string, boolean>>({
+    editing: false,
+    navigation: false,
+    project: false,
+    creation: false,
+    interface: false,
+  });
+  // Ordered groups: group.id → array of shortcut IDs in display order
+  const SHORTCUT_GROUP_DEFS: { id: string; titleKey: string; shortcutIds: string[] }[] = [
+    { id: 'editing', titleKey: 'shortcuts.groupEditing', shortcutIds: ['save', 'heading-up', 'heading-down', 'zoom-in', 'zoom-out', 'dialogue-dash'] },
+    { id: 'navigation', titleKey: 'shortcuts.groupNavigation', shortcutIds: ['sidebar-collapse', 'sidebar-expand', 'sidebar-shrink', 'sidebar-grow', 'cycle-tabs', 'prev-chapter', 'next-chapter'] },
+    { id: 'project', titleKey: 'shortcuts.groupProject', shortcutIds: ['new-chapter', 'open-project', 'new-project', 'import-project', 'close-project', 'export-zip', 'export-md', 'project-settings', 'global-settings', 'repair-project'] },
+    { id: 'creation', titleKey: 'shortcuts.groupCreation', shortcutIds: ['new-character', 'new-place', 'new-note', 'new-event', 'new-trama'] },
+    { id: 'interface', titleKey: 'shortcuts.groupInterface', shortcutIds: ['dock', 'toggle-footer', 'toggle-help', 'help-question', 'toggle-fullscreen'] },
+  ];
 
   // ── Set window title (hide dev URL) ──────────────────────────
   $effect(() => {
@@ -278,6 +312,11 @@
 
   // ── Project Settings dialog ──────────────────────────────────
   let settingsOpen = $state(false);
+
+  // ── Project Repair ──────────────────────────────────────────
+  let repairOpen = $state(false);
+  let repairing = $state(false);
+  let repairReport = $state<RepairReport | null>(null);
 
   // ── Toast notifications ─────────────────────────────────────
   let toast = $state<{message: string, type: "warning" | "error", action?: {label: string, onClick: () => void}, icon?: Component} | null>(null);
@@ -1509,6 +1548,27 @@
     });
   }
 
+  /** Repair the current project by rebuilding indices from files. */
+  async function handleRepairProject(): Promise<void> {
+    if (!projectPath) return;
+    repairing = true;
+    repairReport = null;
+    try {
+      repairReport = await repararProyecto(projectPath);
+      // Refresh all sidebar data after repair
+      await refreshChapters();
+      refreshPersonajes();
+      refreshNotas();
+      refreshTimeline();
+      refreshLugares();
+    } catch (e) {
+      console.error("[cron-insta] Repair failed:", e);
+      await message(`${t("common.error")}: ${e}`);
+    } finally {
+      repairing = false;
+    }
+  }
+
   /** Show the export modal. */
   function abrirExportModal(): void {
     console.log("[cron-insta] Opening export modal");
@@ -1984,253 +2044,285 @@
       });
   });
 
-  // ── Keyboard shortcuts ──────────────────────────────────────
+  // ── Load shortcut bindings on mount ──────────────────────────
+  $effect(() => {
+    cargarAtajos().then(data => { shortcuts = data; }).catch(() => {});
+  });
+
+  // ── Keyboard shortcuts (config-driven) ───────────────────────
   function handleKeydown(e: KeyboardEvent) {
-    // Ctrl+Shift+Left — collapse sidebar
-    if (e.ctrlKey && e.shiftKey && e.key === "ArrowLeft") {
-      e.preventDefault();
-      sidebarSaved = sidebarPct;
-      sidebarPct = 0;
-      sidebarCollapsed = true;
-      return;
-    }
+    // Ignore shortcuts when meta key is pressed (system shortcuts)
+    if (e.metaKey) return;
 
-    // Ctrl+Shift+Right — expand sidebar to full width (reference mode)
-    if (e.ctrlKey && e.shiftKey && e.key === "ArrowRight") {
-      e.preventDefault();
-      sidebarSaved = sidebarPct;
-      sidebarCollapsed = false;
-      sidebarPct = 100;
-      return;
-    }
-
-    // Ctrl+Left — shrink sidebar by 5 % (min 20 %)
-    if (e.ctrlKey && !e.shiftKey && e.key === "ArrowLeft") {
-      e.preventDefault();
-      sidebarCollapsed = false;
-      sidebarPct = Math.max(20, sidebarPct - 5);
-      sidebarSaved = sidebarPct;
-      return;
-    }
-
-    // Ctrl+Right — grow sidebar by 5 % (max 100 %)
-    if (e.ctrlKey && !e.shiftKey && e.key === "ArrowRight") {
-      e.preventDefault();
-      sidebarCollapsed = false;
-      sidebarPct = Math.min(100, sidebarPct + 5);
-      sidebarSaved = sidebarPct;
-      return;
-    }
-
-    // Alt+Left — previous chapter
-    if (e.altKey && !e.ctrlKey && !e.shiftKey && e.key === "ArrowLeft") {
-      if (!projectPath || !activeChapter) return;
-      e.preventDefault();
-      capituloAnterior();
-      return;
-    }
-
-    // Alt+Right — next chapter (or new chapter if at the end)
-    if (e.altKey && !e.ctrlKey && !e.shiftKey && e.key === "ArrowRight") {
-      if (!projectPath || !activeChapter) return;
-      e.preventDefault();
-      capituloSiguiente();
-      return;
-    }
-
-    // Ctrl+S — manual save
-    if (e.ctrlKey && !e.shiftKey && e.key === "s") {
-      e.preventDefault();
-      saveStatus = "saving";
-      saveTrigger.trigger();
-      return;
-    }
-
-    // Ctrl+N — new chapter
-    if (e.ctrlKey && !e.shiftKey && e.key === "n") {
-      e.preventDefault();
-      crearCapituloNuevo();
-      return;
-    }
-
-    // Ctrl+O — open project
-    if (e.ctrlKey && !e.shiftKey && e.key === "o") {
-      e.preventDefault();
-      abrirProyecto();
-      return;
-    }
-
-    // Ctrl+Shift+N — new project (close current, then new)
-    if (e.ctrlKey && e.shiftKey && e.key === "N") {
-      e.preventDefault();
-      cerrarProyecto().then(() => {
-        localStorage.removeItem("cron-insta-last-project");
-        crearCapituloNuevo();
-      });
-      return;
-    }
-
-    // F11 — fullscreen toggle
-    if (e.key === "F11") {
-      e.preventDefault();
-      if (document.fullscreenElement) {
-        document.exitFullscreen();
-      } else {
-        document.documentElement.requestFullscreen();
-      }
-      return;
-    }
-
-    // F1 — help toggle
-    if (e.key === "F1") {
-      e.preventDefault();
-      helpMode = !helpMode;
-      return;
-    }
-
-    // Ctrl+P — toggle footer panel
-    if (e.ctrlKey && !e.shiftKey && e.key === "p") {
-      e.preventDefault();
-      footerExpanded = !footerExpanded;
-      return;
-    }
-
-    // Ctrl+= (Ctrl++) — zoom in
-    if (e.ctrlKey && !e.shiftKey && (e.key === "=" || e.key === "+")) {
-      e.preventDefault();
-      zoomLevel = Math.min(2, zoomLevel + 1);
-      localStorage.setItem("cron-insta-zoom", String(zoomLevel));
-      return;
-    }
-
-    // Ctrl+- — zoom out
-    if (e.ctrlKey && !e.shiftKey && e.key === "-") {
-      e.preventDefault();
-      zoomLevel = Math.max(0, zoomLevel - 1);
-      localStorage.setItem("cron-insta-zoom", String(zoomLevel));
-      return;
-    }
-
-    // ? — help toggle (without shift, plain key, only when not typing)
-    if (!e.ctrlKey && !e.altKey && !e.metaKey && e.key === "?") {
-      if (!editorRef?.isFocused()) {
-        e.preventDefault();
-        helpMode = !helpMode;
-        return;
-      }
-    }
-
-    // Ctrl+Up — increase heading level (paragraph → H2 → H1)
-    if (e.ctrlKey && !e.shiftKey && e.key === "ArrowUp") {
-      e.preventDefault();
-      editorRef?.increaseHeading();
-      return;
-    }
-
-    // Ctrl+Down — decrease heading level (H1 → H2 → paragraph)
-    if (e.ctrlKey && !e.shiftKey && e.key === "ArrowDown") {
-      e.preventDefault();
-      editorRef?.decreaseHeading();
-      return;
-    }
-
-    // Ctrl+T — cycle visible sidebar tabs (skips hidden tabs)
-    if (e.ctrlKey && !e.shiftKey && (e.key === "t" || e.key === "T")) {
-      e.preventDefault();
-      type TabName = "capitulos" | "personajes" | "notas" | "timeline" | "lugares" | "media";
-      const fullOrder: Record<TabName, TabName[]> = {
-        capitulos: ["capitulos", "personajes", "notas", "timeline", "lugares", "media"],
-        personajes: ["personajes", "notas", "timeline", "lugares", "media", "capitulos"],
-        notas: ["notas", "timeline", "lugares", "media", "capitulos", "personajes"],
-        timeline: ["timeline", "lugares", "media", "capitulos", "personajes", "notas"],
-        lugares: ["lugares", "media", "capitulos", "personajes", "notas", "timeline"],
-        media: ["media", "capitulos", "personajes", "notas", "timeline", "lugares"],
-      };
-      const candidates = fullOrder[activeTab] || fullOrder["capitulos"];
-      const tabKeyMap: Record<TabName, string> = {
-        capitulos: "chapters",
-        personajes: "characters",
-        notas: "notes",
-        timeline: "timeline",
-        lugares: "places",
-        media: "media",
-      };
-      let next: TabName = activeTab;
-      for (const candidate of candidates) {
-        const vk = tabKeyMap[candidate];
-        if (!vk || vk === "chapters" || visibleTabs[vk] !== false) {
-          next = candidate;
-          break;
+    for (const s of shortcuts) {
+      if (
+        e.key === s.key &&
+        e.ctrlKey === s.ctrl &&
+        e.shiftKey === s.shift &&
+        e.altKey === s.alt
+      ) {
+        // ? key: only fire when editor is NOT focused (special case)
+        if (s.id === "help-question" && editorRef?.isFocused()) {
+          continue;
         }
+        // dialogue-dash: only fire when editor IS focused
+        if (s.id === "dialogue-dash" && !editorRef?.isFocused()) {
+          continue;
+        }
+        e.preventDefault();
+        executeShortcutAction(s.id);
+        return;
       }
-      activeTab = next;
-      setTimeout(() => {
-        const firstBtn = document.querySelector<HTMLElement>(".sidebar-content button.chapter-link");
-        firstBtn?.focus();
-      }, 0);
+    }
+  }
+
+  function executeShortcutAction(id: string) {
+    switch (id) {
+      // ── Sidebar ──────────────────────────────────────────
+      case "sidebar-collapse": sidebarSaved = sidebarPct; sidebarPct = 0; sidebarCollapsed = true; break;
+      case "sidebar-expand": sidebarSaved = sidebarPct; sidebarCollapsed = false; sidebarPct = 100; break;
+      case "sidebar-shrink": sidebarCollapsed = false; sidebarPct = Math.max(20, sidebarPct - 5); sidebarSaved = sidebarPct; break;
+      case "sidebar-grow": sidebarCollapsed = false; sidebarPct = Math.min(100, sidebarPct + 5); sidebarSaved = sidebarPct; break;
+      // ── Navigation ───────────────────────────────────────
+      case "prev-chapter": if (projectPath && activeChapter) capituloAnterior(); break;
+      case "next-chapter": if (projectPath && activeChapter) capituloSiguiente(); break;
+      case "cycle-tabs": cycleVisibleTab(); break;
+      // ── Editor ───────────────────────────────────────────
+      case "save": saveStatus = "saving"; saveTrigger.trigger(); break;
+      case "heading-up": editorRef?.increaseHeading(); break;
+      case "heading-down": editorRef?.decreaseHeading(); break;
+      case "zoom-in": zoomLevel = Math.min(2, zoomLevel + 1); localStorage.setItem("cron-insta-zoom", String(zoomLevel)); break;
+      case "zoom-out": zoomLevel = Math.max(0, zoomLevel - 1); localStorage.setItem("cron-insta-zoom", String(zoomLevel)); break;
+      case "dialogue-dash": editorRef?.insertPair("—", "—"); break;
+      // ── Project operations ───────────────────────────────
+      case "new-chapter": crearCapituloNuevo(); break;
+      case "open-project": abrirProyecto(); break;
+      case "new-project": cerrarProyecto().then(() => { localStorage.removeItem("cron-insta-last-project"); crearCapituloNuevo(); }); break;
+      case "import-project": importarProyectoHandler(); break;
+      case "close-project": cerrarProyecto(); break;
+      case "export-zip": exportarProyectoZipHandler(); break;
+      case "export-md": exportarProyectoMdHandler(); break;
+      case "project-settings": settingsOpen = true; break;
+      case "global-settings": globalSettingsOpen = true; break;
+      case "repair-project": repairOpen = true; repairReport = null; break;
+      // ── Create entities ──────────────────────────────────
+      case "new-character": personajeFormVisible = true; setTimeout(() => document.querySelector<HTMLElement>(".inline-form .field-input")?.focus(), 50); break;
+      case "new-place": lugarFormVisible = true; setTimeout(() => document.querySelector<HTMLElement>(".inline-form .field-input")?.focus(), 50); break;
+      case "new-note": notaFormVisible = true; setTimeout(() => document.querySelector<HTMLElement>(".inline-form .field-input")?.focus(), 50); break;
+      case "new-event": eventoFormVisible = true; setTimeout(() => document.getElementById("evt-title")?.focus(), 50); break;
+      case "new-trama": handleNuevaTrama(); break;
+      // ── UI toggles ───────────────────────────────────────
+      case "dock": toggleDock(); break;
+      case "toggle-footer": footerExpanded = !footerExpanded; break;
+      case "toggle-help":
+      case "help-question": helpMode = !helpMode; break;
+      case "toggle-fullscreen": if (document.fullscreenElement) { document.exitFullscreen(); } else { document.documentElement.requestFullscreen(); } break;
+    }
+  }
+
+  function cycleVisibleTab(): void {
+    type TabName = "capitulos" | "personajes" | "notas" | "timeline" | "lugares" | "media";
+    const fullOrder: Record<TabName, TabName[]> = {
+      capitulos: ["capitulos", "personajes", "notas", "timeline", "lugares", "media"],
+      personajes: ["personajes", "notas", "timeline", "lugares", "media", "capitulos"],
+      notas: ["notas", "timeline", "lugares", "media", "capitulos", "personajes"],
+      timeline: ["timeline", "lugares", "media", "capitulos", "personajes", "notas"],
+      lugares: ["lugares", "media", "capitulos", "personajes", "notas", "timeline"],
+      media: ["media", "capitulos", "personajes", "notas", "timeline", "lugares"],
+    };
+    const tabKeyMap: Record<TabName, string> = {
+      capitulos: "chapters", personajes: "characters", notas: "notes",
+      timeline: "timeline", lugares: "places", media: "media",
+    };
+    const candidates = fullOrder[activeTab] || fullOrder["capitulos"];
+    let next: TabName = activeTab;
+    for (const candidate of candidates) {
+      const vk = tabKeyMap[candidate];
+      if (!vk || vk === "chapters" || visibleTabs[vk] !== false) {
+        next = candidate; break;
+      }
+    }
+    activeTab = next;
+    setTimeout(() => {
+      document.querySelector<HTMLElement>(".sidebar-content button.chapter-link")?.focus();
+    }, 0);
+  }
+
+  function toggleDock(): void {
+    // Undock if anything is already docked
+    if (characterDocked) { characterDocked = null; return; }
+    if (noteDocked) { noteDocked = null; return; }
+    if (placeDocked) { placeDocked = null; return; }
+    // Dock active element
+    if (personajeEditando && personajeExpandido) {
+      characterDocked = {
+        id: personajeExpandido,
+        name: personajeEditando.name,
+        physicalDescription: personajeEditando.physicalDescription,
+        personality: personajeEditando.personality,
+        traumas: personajeEditando.traumas,
+        relationships: personajeEditando.relationships || [],
+      };
       return;
     }
-
-    // Ctrl+Enter — dock/undock the active element (character, note, or place)
-    if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key === "Enter") {
-      // Undock if anything is already docked
-      if (characterDocked) { characterDocked = null; return; }
-      if (noteDocked) { noteDocked = null; return; }
-      if (placeDocked) { placeDocked = null; return; }
-
-      // Dock whichever element is currently active/expanded
-      if (personajeEditando && personajeExpandido) {
-        e.preventDefault();
-        characterDocked = {
-          id: personajeExpandido,
-          name: personajeEditando.name,
-          physicalDescription: personajeEditando.physicalDescription,
-          personality: personajeEditando.personality,
-          traumas: personajeEditando.traumas,
-          relationships: personajeEditando.relationships || [],
-        };
-        return;
-      }
-      if (activeNote) {
-        e.preventDefault();
-        cargarNota(projectPath, activeNote).then(raw => {
-          const nota = JSON.parse(raw);
-          noteDocked = { id: activeNote, title: nota.title || activeNote, content: nota.content || "" };
-        }).catch(() => {});
-        return;
-      }
-      if (lugarExpandido) {
-        e.preventDefault();
-        const placeId = lugarExpandido;
-        cargarLugar(projectPath, placeId).then(raw => {
-          const lugar = JSON.parse(raw);
-          placeDocked = { id: placeId, name: lugar.name || placeId, description: lugar.description || "", notes: lugar.notes || "" };
-        }).catch(() => {});
-        return;
-      }
-      if (mediaViewer) {
-        e.preventDefault();
-        mediaDocked = mediaViewer;
-        mediaViewer = null;
-        return;
-      }
-    }
-
-    // Ctrl+I — import project from ZIP
-    if (e.ctrlKey && !e.shiftKey && (e.key === "i" || e.key === "I")) {
-      e.preventDefault();
-      importarProyectoHandler();
+    if (activeNote) {
+      cargarNota(projectPath, activeNote).then(raw => {
+        const nota = JSON.parse(raw);
+        noteDocked = { id: activeNote, title: nota.title || activeNote, content: nota.content || "" };
+      }).catch(() => {});
       return;
     }
+    if (lugarExpandido) {
+      const placeId = lugarExpandido;
+      cargarLugar(projectPath, placeId).then(raw => {
+        const lugar = JSON.parse(raw);
+        placeDocked = { id: placeId, name: lugar.name || placeId, description: lugar.description || "", notes: lugar.notes || "" };
+      }).catch(() => {});
+      return;
+    }
+    if (mediaViewer) {
+      mediaDocked = mediaViewer;
+      mediaViewer = null;
+    }
+  }
 
-    // ── Editor inserts ─────────────────────────────────────────
-    // Ctrl+D → dialogue dash pair: —|— (cursor between dashes)
-    if (e.ctrlKey && !e.shiftKey && (e.key === "d" || e.key === "D")) {
-      if (editorRef?.isFocused()) {
-        e.preventDefault();
-        editorRef.insertPair("—", "—");
-        return;
-      }
+  async function exportarProyectoZipHandler(): Promise<void> {
+    if (!projectPath) return;
+    try {
+      const result = await exportarProyectoZip(projectPath);
+      await message(t("export.zipSuccess") + "\n" + result);
+    } catch (e) {
+      await message(t("export.error") + " " + e);
+    }
+  }
+
+  async function exportarProyectoMdHandler(): Promise<void> {
+    if (!projectPath) return;
+    try {
+      const result = await exportarProyectoMd(projectPath);
+      await message(t("export.mdSuccess") + "\n" + result);
+    } catch (e) {
+      await message(t("export.error") + " " + e);
+    }
+  }
+
+  // ── Shortcut editing ─────────────────────────────────────────
+
+  function startEditingShortcut(id: string) {
+    editingShortcutId = id;
+    // Focus a hidden input so we can capture keydown globally
+    setTimeout(() => document.getElementById("shortcut-capture")?.focus(), 50);
+  }
+
+  function cancelEditing() {
+    editingShortcutId = null;
+  }
+
+  async function saveShortcut(binding: ShortcutBinding) {
+    try {
+      await guardarAtajo(binding);
+      // Update local state
+      shortcuts = shortcuts.map(s => s.id === binding.id ? binding : s);
+    } catch (e) {
+      console.error("[cron-insta] Failed to save shortcut:", e);
+    }
+    editingShortcutId = null;
+  }
+
+  function handleShortcutCapture(e: KeyboardEvent) {
+    if (!editingShortcutId) return;
+    // Ignore standalone modifier keys
+    if (["Control", "Shift", "Alt", "Meta"].includes(e.key)) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const original = shortcuts.find(s => s.id === editingShortcutId);
+    if (!original) { editingShortcutId = null; return; }
+
+    const binding: ShortcutBinding = {
+      ...original,
+      key: e.key,
+      ctrl: e.ctrlKey,
+      shift: e.shiftKey,
+      alt: e.altKey,
+    };
+
+    // Check for conflicts with other shortcuts (exclude self and ? help toggle)
+    const conflict = shortcuts.find(s =>
+      s.id !== editingShortcutId &&
+      s.id !== "help-question" && // ? key is special — allowed to coexist
+      s.key === binding.key &&
+      s.ctrl === binding.ctrl &&
+      s.shift === binding.shift &&
+      s.alt === binding.alt
+    );
+
+    if (conflict) {
+      shortcutConflict = { binding, conflictingId: conflict.id };
+    } else {
+      saveShortcut(binding);
+    }
+  }
+
+  async function acceptConflictOverwrite() {
+    if (!shortcutConflict) return;
+    const { binding, conflictingId } = shortcutConflict;
+    // Unbind the conflicting shortcut (set to a no-op key)
+    const conflicting = shortcuts.find(s => s.id === conflictingId);
+    if (conflicting) {
+      await guardarAtajo({ ...conflicting, key: "Escape", ctrl: false, shift: false, alt: false });
+    }
+    await saveShortcut(binding);
+    // Reload to get clean state
+    const data = await cargarAtajos();
+    shortcuts = data;
+    shortcutConflict = null;
+  }
+
+  async function acceptConflictSwap() {
+    if (!shortcutConflict) return;
+    const { binding, conflictingId } = shortcutConflict;
+    const other = shortcuts.find(s => s.id === conflictingId);
+    const mine = shortcuts.find(s => s.id === editingShortcutId);
+    if (!other || !mine) { shortcutConflict = null; return; }
+
+    // Swap: save my new binding, and give the other my old binding
+    await guardarAtajo(binding);
+    await guardarAtajo({
+      ...other,
+      key: mine.key,
+      ctrl: mine.ctrl,
+      shift: mine.shift,
+      alt: mine.alt,
+    });
+    const data = await cargarAtajos();
+    shortcuts = data;
+    editingShortcutId = null;
+    shortcutConflict = null;
+  }
+
+  function getConflictDisplayName(): string {
+    const c = shortcutConflict;
+    if (!c) return "";
+    return lang.current === "es"
+      ? (shortcuts.find(s => s.id === c.conflictingId)?.label_es || c.conflictingId)
+      : (shortcuts.find(s => s.id === c.conflictingId)?.label_en || c.conflictingId);
+  }
+
+  function dismissConflict() {
+    shortcutConflict = null;
+  }
+
+  async function resetAllShortcuts() {
+    resettingShortcuts = true;
+    try {
+      await restaurarAtajos();
+      const data = await cargarAtajos();
+      shortcuts = data;
+    } catch (e) {
+      console.error("[cron-insta] Failed to reset shortcuts:", e);
+    } finally {
+      resettingShortcuts = false;
     }
   }
 
@@ -3011,6 +3103,9 @@
             <button class="footer-btn" onclick={() => (settingsOpen = true)} title={t("settings.settings")}>
               <Gear size={18} weight="light" color="currentColor" /> {t("settings.settings")}
             </button>
+            <button class="footer-btn" onclick={() => { repairOpen = true; repairReport = null; }} title={t("repair.title")}>
+              <Sparkle size={18} weight="light" color="currentColor" /> {t("repair.button")}
+            </button>
             <span class="footer-sep"></span>
             <button class="footer-btn" onclick={async () => {
               console.log("[cron-insta] Export button clicked");
@@ -3298,79 +3393,116 @@
 
       <p class="help-creator">{t("help.createdBy")} <a href="mailto:galejan@gmail.com">galejan@gmail.com</a></p>
 
-      <div class="help-section">
-        <h3><BookOpen size={16} weight="light" color="currentColor" aria-hidden="true" /> {t("help.editorTitle")}</h3>
-        <p>{t("help.editorDesc")}</p>
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <!-- GROUP 1: Writing & Content                             -->
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <div class="help-group" class:help-group-open={helpGroups.writing}>
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div class="help-group-header" onclick={() => (helpGroups.writing = !helpGroups.writing)} onkeydown={(e) => e.key === 'Enter' && (helpGroups.writing = !helpGroups.writing)}>
+          <span class="help-group-caret"><CaretDown size={14} weight="light" color="currentColor" /></span>
+          <span>{t("help.groupWriting")}</span>
+        </div>
+        <div class="help-group-body">
+          <div class="help-section">
+            <h4><BookOpen size={14} weight="light" color="currentColor" aria-hidden="true" /> {t("help.editorTitle")}</h4>
+            <p>{t("help.editorDesc")}</p>
+          </div>
+          <div class="help-section">
+            <h4><FolderOpen size={14} weight="light" color="currentColor" aria-hidden="true" /> {t("help.chaptersTitle")}</h4>
+            <p>{@html t("help.chaptersDesc")}</p>
+          </div>
+          <div class="help-section">
+            <h4><Scroll size={14} weight="light" color="currentColor" aria-hidden="true" /> {t("help.tramasTitle")}</h4>
+            <p>{t("help.tramasDesc")}</p>
+          </div>
+          <div class="help-section">
+            <h4><User size={14} weight="light" color="currentColor" aria-hidden="true" /> {t("help.charactersTitle")}</h4>
+            <p>{t("help.charactersDesc")}</p>
+          </div>
+          <div class="help-section">
+            <h4><MapTrifold size={14} weight="light" color="currentColor" aria-hidden="true" /> {t("help.placesTitle")}</h4>
+            <p>{t("help.placesDesc")}</p>
+          </div>
+          <div class="help-section">
+            <h4><NotePencil size={14} weight="light" color="currentColor" aria-hidden="true" /> {t("help.notesTitle")}</h4>
+            <p>{t("help.notesDesc")}</p>
+          </div>
+          <div class="help-section">
+            <h4><Clock size={14} weight="light" color="currentColor" aria-hidden="true" /> {t("help.timelineTitle")}</h4>
+            <p>{t("help.timelineDesc")}</p>
+          </div>
+        </div>
       </div>
 
-      <div class="help-section">
-        <h3><FolderOpen size={16} weight="light" color="currentColor" aria-hidden="true" /> {t("help.chaptersTitle")}</h3>
-        <p>{@html t("help.chaptersDesc")}</p>
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <!-- GROUP 2: Media Resources                               -->
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <div class="help-group" class:help-group-open={helpGroups.media}>
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div class="help-group-header" onclick={() => (helpGroups.media = !helpGroups.media)} onkeydown={(e) => e.key === 'Enter' && (helpGroups.media = !helpGroups.media)}>
+          <span class="help-group-caret"><CaretDown size={14} weight="light" color="currentColor" /></span>
+          <span>{t("help.groupMedia")}</span>
+        </div>
+        <div class="help-group-body">
+          <div class="help-section">
+            <h4><Image size={14} weight="light" color="currentColor" aria-hidden="true" /> {t("help.mediaTitle")}</h4>
+            <p>{t("help.mediaDesc")}</p>
+          </div>
+        </div>
       </div>
 
-      <div class="help-section">
-        <h3><User size={16} weight="light" color="currentColor" aria-hidden="true" /> {t("help.charactersTitle")}</h3>
-        <p>{t("help.charactersDesc")}</p>
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <!-- GROUP 3: Appearance & Settings                         -->
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <div class="help-group" class:help-group-open={helpGroups.appearance}>
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div class="help-group-header" onclick={() => (helpGroups.appearance = !helpGroups.appearance)} onkeydown={(e) => e.key === 'Enter' && (helpGroups.appearance = !helpGroups.appearance)}>
+          <span class="help-group-caret"><CaretDown size={14} weight="light" color="currentColor" /></span>
+          <span>{t("help.groupAppearance")}</span>
+        </div>
+        <div class="help-group-body">
+          <div class="help-section">
+            <h4><Gear size={14} weight="light" color="currentColor" aria-hidden="true" /> {t("help.settingsTitle")}</h4>
+            <p>{t("help.settingsDesc")}</p>
+          </div>
+          <div class="help-section">
+            <h4><Palette size={14} weight="light" color="currentColor" aria-hidden="true" /> {t("help.themesTitle")}</h4>
+            <p>{t("help.themesDesc")}</p>
+          </div>
+          <div class="help-section">
+            <h4><ChartBar size={14} weight="light" color="currentColor" aria-hidden="true" /> {t("help.statsTitle")}</h4>
+            <p>{t("help.statsDesc")}</p>
+          </div>
+        </div>
       </div>
 
-      <div class="help-section">
-        <h3><NotePencil size={16} weight="light" color="currentColor" aria-hidden="true" /> {t("help.notesTitle")}</h3>
-        <p>{t("help.notesDesc")}</p>
-      </div>
-
-      <div class="help-section">
-        <h3><Clock size={16} weight="light" color="currentColor" aria-hidden="true" /> {t("help.timelineTitle")}</h3>
-        <p>{t("help.timelineDesc")}</p>
-      </div>
-
-      <div class="help-section">
-        <h3><MapTrifold size={16} weight="light" color="currentColor" aria-hidden="true" /> {t("help.placesTitle")}</h3>
-        <p>{t("help.placesDesc")}</p>
-      </div>
-
-      <div class="help-section">
-        <h3><GitBranch size={16} weight="light" color="currentColor" aria-hidden="true" /> {t("help.versioningTitle")}</h3>
-        <p>{t("help.versioningDesc")}</p>
-      </div>
-
-      <div class="help-section">
-        <h3><Gear size={16} weight="light" color="currentColor" aria-hidden="true" /> {t("help.settingsTitle")}</h3>
-        <p>{t("help.settingsDesc")}</p>
-      </div>
-
-      <div class="help-section">
-        <h3><Package size={16} weight="light" color="currentColor" aria-hidden="true" /> {t("help.exportTitle")}</h3>
-        <p>{t("help.exportDesc")}</p>
-      </div>
-
-      <div class="help-section">
-        <h3><ChatText size={16} weight="light" color="currentColor" aria-hidden="true" /> {t("help.dialogDashTitle")}</h3>
-        <p>{t("help.dialogDashDesc")}</p>
-      </div>
-
-      <div class="help-section">
-        <h3><Keyboard size={16} weight="light" color="currentColor" aria-hidden="true" /> {t("help.shortcutsTitle")}</h3>
-        <table class="help-shortcuts">
-          <tbody>
-          <tr><td><kbd>Ctrl+Shift+←</kbd></td><td>{t("help.shortcuts.toggleSidebar")}</td></tr>
-          <tr><td><kbd>Ctrl+Shift+→</kbd></td><td>{t("help.shortcuts.fullSidebar")}</td></tr>
-          <tr><td><kbd>Ctrl+←</kbd> / <kbd>Ctrl+→</kbd></td><td>{t("help.shortcuts.resizeSidebar")}</td></tr>
-          <tr><td><kbd>Ctrl+P</kbd></td><td>{t("help.shortcuts.toggleFooter")}</td></tr>
-          <tr><td><kbd>Ctrl+S</kbd></td><td>{t("help.shortcuts.saveNow")}</td></tr>
-          <tr><td><kbd>Ctrl+N</kbd></td><td>{t("help.shortcuts.newChapter")}</td></tr>
-          <tr><td><kbd>Alt+←</kbd> / <kbd>Alt+→</kbd></td><td>{t("help.shortcuts.prevNextChapter")}</td></tr>
-          <tr><td><kbd>Ctrl+O</kbd></td><td>{t("help.shortcuts.openProject")}</td></tr>
-          <tr><td><kbd>Ctrl+Shift+N</kbd></td><td>{t("help.shortcuts.newProject")}</td></tr>
-          <tr><td><kbd>Ctrl+T</kbd></td><td>{t("help.shortcuts.cycleTabs")}</td></tr>
-          <tr><td><kbd>Ctrl+Enter</kbd></td><td>{t("help.shortcuts.dockCharacter")}</td></tr>
-          <tr><td><kbd>Ctrl+I</kbd></td><td>{t("help.shortcuts.importProject")}</td></tr>
-          <tr><td><kbd>Ctrl+↑</kbd> / <kbd>Ctrl+↓</kbd></td><td>{t("help.shortcuts.applyHeading")}</td></tr>
-          <tr><td><kbd>Ctrl+D</kbd></td><td>{t("help.shortcuts.dialogDash")}</td></tr>
-          <tr><td><kbd>Ctrl++</kbd> / <kbd>Ctrl+-</kbd></td><td>{t("help.shortcuts.zoomIn")} / {t("help.shortcuts.zoomOut")}</td></tr>
-          <tr><td><kbd>F11</kbd></td><td>{t("help.shortcuts.fullscreen")}</td></tr>
-          <tr><td><kbd>F1</kbd> o <kbd>?</kbd></td><td>{t("help.shortcuts.toggleHelp")}</td></tr>
-          </tbody>
-        </table>
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <!-- GROUP 4: Project Management                            -->
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <div class="help-group" class:help-group-open={helpGroups.management}>
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div class="help-group-header" onclick={() => (helpGroups.management = !helpGroups.management)} onkeydown={(e) => e.key === 'Enter' && (helpGroups.management = !helpGroups.management)}>
+          <span class="help-group-caret"><CaretDown size={14} weight="light" color="currentColor" /></span>
+          <span>{t("help.groupManagement")}</span>
+        </div>
+        <div class="help-group-body">
+          <div class="help-section">
+            <h4><GitBranch size={14} weight="light" color="currentColor" aria-hidden="true" /> {t("help.versioningTitle")}</h4>
+            <p>{t("help.versioningDesc")}</p>
+          </div>
+          <div class="help-section">
+            <h4><Package size={14} weight="light" color="currentColor" aria-hidden="true" /> {t("help.exportTitle")}</h4>
+            <p>{t("help.exportDesc")}</p>
+          </div>
+          <div class="help-section">
+            <h4><Broom size={14} weight="light" color="currentColor" aria-hidden="true" /> {t("help.repairTitle")}</h4>
+            <p>{t("help.repairDesc")}</p>
+          </div>
+          <div class="help-section">
+            <h4><Keyboard size={14} weight="light" color="currentColor" aria-hidden="true" /> {t("help.shortcutsLinkTitle")}</h4>
+            <p>{@html t("help.shortcutsLinkDesc")}</p>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -3407,27 +3539,67 @@
         <button class="help-close" onclick={() => (shortcutsOpen = false)} title={t("common.cancel")}><X size={16} weight="light" color="currentColor" /></button>
       </div>
       <div class="help-body">
-        <table class="help-shortcuts">
-          <tbody>
-            <tr><td><kbd>Ctrl+Shift+←</kbd></td><td>{t("help.shortcuts.toggleSidebar")}</td></tr>
-            <tr><td><kbd>Ctrl+Shift+→</kbd></td><td>{t("help.shortcuts.fullSidebar")}</td></tr>
-            <tr><td><kbd>Ctrl+←</kbd> / <kbd>Ctrl+→</kbd></td><td>{t("help.shortcuts.resizeSidebar")}</td></tr>
-            <tr><td><kbd>Ctrl+P</kbd></td><td>{t("help.shortcuts.toggleFooter")}</td></tr>
-            <tr><td><kbd>Ctrl+S</kbd></td><td>{t("help.shortcuts.saveNow")}</td></tr>
-            <tr><td><kbd>Ctrl+N</kbd></td><td>{t("help.shortcuts.newChapter")}</td></tr>
-            <tr><td><kbd>Alt+←</kbd> / <kbd>Alt+→</kbd></td><td>{t("help.shortcuts.prevNextChapter")}</td></tr>
-            <tr><td><kbd>Ctrl+O</kbd></td><td>{t("help.shortcuts.openProject")}</td></tr>
-            <tr><td><kbd>Ctrl+Shift+N</kbd></td><td>{t("help.shortcuts.newProject")}</td></tr>
-            <tr><td><kbd>Ctrl+T</kbd></td><td>{t("help.shortcuts.cycleTabs")}</td></tr>
-            <tr><td><kbd>Ctrl+Enter</kbd></td><td>{t("help.shortcuts.dockCharacter")}</td></tr>
-            <tr><td><kbd>Ctrl+I</kbd></td><td>{t("help.shortcuts.importProject")}</td></tr>
-            <tr><td><kbd>Ctrl+↑</kbd> / <kbd>Ctrl+↓</kbd></td><td>{t("help.shortcuts.applyHeading")}</td></tr>
-            <tr><td><kbd>Ctrl+D</kbd></td><td>{t("help.shortcuts.dialogDash")}</td></tr>
-            <tr><td><kbd>Ctrl++</kbd> / <kbd>Ctrl+-</kbd></td><td>{t("help.shortcuts.zoomIn")} / {t("help.shortcuts.zoomOut")}</td></tr>
-            <tr><td><kbd>F11</kbd></td><td>{t("help.shortcuts.fullscreen")}</td></tr>
-            <tr><td><kbd>F1</kbd> o <kbd>?</kbd></td><td>{t("help.shortcuts.toggleHelp")}</td></tr>
-          </tbody>
-        </table>
+        <!-- Hidden input to capture key presses during shortcut editing -->
+        <input
+          id="shortcut-capture"
+          class="shortcut-capture-input"
+          onkeydown={handleShortcutCapture}
+          onblur={() => { editingShortcutId = null; }}
+          tabindex="-1"
+        />
+        {#each SHORTCUT_GROUP_DEFS as group}
+          <div class="help-group" class:help-group-open={shortcutGroups[group.id]}>
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div class="help-group-header" onclick={() => (shortcutGroups[group.id] = !shortcutGroups[group.id])} onkeydown={(e) => e.key === 'Enter' && (shortcutGroups[group.id] = !shortcutGroups[group.id])}>
+              <span class="help-group-caret"><CaretDown size={14} weight="light" color="currentColor" /></span>
+              <span>{t(group.titleKey)}</span>
+            </div>
+            <div class="help-group-body">
+              <table class="help-shortcuts">
+                <tbody>
+                  {#each group.shortcutIds as id}
+                    {@const s = shortcuts.find(s => s.id === id)}
+                    {#if s}
+                      <tr class:shortcut-editing={editingShortcutId === s.id}>
+                        <td>
+                          {#if editingShortcutId === s.id}
+                            <span class="shortcut-capture-hint">{t("common.pressKeys")}</span>
+                          {:else}
+                            <kbd>{s.ctrl ? "Ctrl+" : ""}{s.shift ? "Shift+" : ""}{s.alt ? "Alt+" : ""}{s.key === " " ? "Space" : s.key}</kbd>
+                          {/if}
+                        </td>
+                        <td>{lang.current === "es" ? s.label_es : s.label_en}</td>
+                        <td class="shortcut-actions">
+                          {#if editingShortcutId === s.id}
+                            <button class="shortcut-btn shortcut-cancel" onclick={cancelEditing} title={t("common.cancel")}><X size={12} weight="light" /></button>
+                          {:else}
+                            <button class="shortcut-btn shortcut-edit" onclick={() => startEditingShortcut(s.id)} title={t("common.edit")}><PencilSimple size={12} weight="light" /></button>
+                          {/if}
+                        </td>
+                      </tr>
+                    {/if}
+                  {/each}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        {/each}
+        {#if shortcutConflict}
+          {@const conflictName = getConflictDisplayName()}
+          <div class="shortcut-conflict">
+            <p>{@html t("shortcuts.conflictWarning").replace("{name}", `<strong>${conflictName}</strong>`)}</p>
+            <div class="shortcut-conflict-actions">
+              <button class="shortcut-btn-conflict primary" onclick={acceptConflictSwap}>{t("shortcuts.swap")}</button>
+              <button class="shortcut-btn-conflict" onclick={acceptConflictOverwrite}>{t("shortcuts.overwrite")}</button>
+              <button class="shortcut-btn-conflict" onclick={dismissConflict}>{t("common.cancel")}</button>
+            </div>
+          </div>
+        {/if}
+        <div class="shortcut-reset-row">
+          <button class="shortcut-reset-btn" onclick={resetAllShortcuts} disabled={resettingShortcuts}>
+            {resettingShortcuts ? "…" : t("shortcuts.resetDefaults")}
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -3457,6 +3629,96 @@
     autoSaveInterval = config.auto_save_interval_minutes;
   }}
 />
+
+<!-- Project Repair dialog -->
+{#if repairOpen}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="modal-overlay"
+    role="dialog"
+    tabindex="-1"
+    aria-label={t("repair.title")}
+    onclick={() => { if (!repairing) { repairOpen = false; repairReport = null; } }}
+    onkeydown={(e) => e.key === "Escape" && !repairing && (repairOpen = false)}
+  >
+    <div class="modal-panel" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
+      <h2>{t("repair.title")}</h2>
+      <p class="modal-desc">{t("repair.description")}</p>
+
+      {#if repairing}
+        <p class="repair-status">{t("repair.running")}</p>
+      {:else if repairReport}
+        {@const hasNoIssues = repairReport.repaired.length === 0 &&
+          repairReport.recreated.length === 0 &&
+          repairReport.cleaned.length === 0 &&
+          repairReport.lost.length === 0}
+        {#if hasNoIssues}
+          <p class="repair-nothing">{t("repair.nothing")}</p>
+        {:else}
+          <div class="repair-results">
+            {#if repairReport.repaired.length > 0}
+              <div class="repair-section">
+                <h4>{t("repair.repaired")} ({repairReport.repaired.length})</h4>
+                <ul>
+                  {#each repairReport.repaired as item}
+                    <li><span class="repair-icon">✅</span> {item}</li>
+                  {/each}
+                </ul>
+              </div>
+            {/if}
+            {#if repairReport.recreated.length > 0}
+              <div class="repair-section">
+                <h4>{t("repair.recreated")} ({repairReport.recreated.length})</h4>
+                <ul>
+                  {#each repairReport.recreated as item}
+                    <li><span class="repair-icon">🆕</span> {item}</li>
+                  {/each}
+                </ul>
+              </div>
+            {/if}
+            {#if repairReport.cleaned.length > 0}
+              <div class="repair-section">
+                <h4>{t("repair.cleaned")} ({repairReport.cleaned.length})</h4>
+                <ul>
+                  {#each repairReport.cleaned as item}
+                    <li><span class="repair-icon">🧹</span> {item}</li>
+                  {/each}
+                </ul>
+              </div>
+            {/if}
+            {#if repairReport.lost.length > 0}
+              <div class="repair-section">
+                <h4>{t("repair.lost")} ({repairReport.lost.length})</h4>
+                <ul>
+                  {#each repairReport.lost as item}
+                    <li><span class="repair-icon">⚠️</span> {item}</li>
+                  {/each}
+                </ul>
+              </div>
+            {/if}
+          </div>
+        {/if}
+      {:else}
+        <div class="modal-actions">
+          <button class="btn-secondary" onclick={() => { repairOpen = false; }}>
+            {t("common.cancel")}
+          </button>
+          <button class="btn-primary" onclick={handleRepairProject}>
+            {t("repair.button")}
+          </button>
+        </div>
+      {/if}
+
+      {#if !repairing && repairReport}
+        <div class="modal-actions" style="margin-top: 1rem;">
+          <button class="btn-primary" onclick={() => { repairOpen = false; repairReport = null; }}>
+            {t("common.accept")}
+          </button>
+        </div>
+      {/if}
+    </div>
+  </div>
+{/if}
 
 <!-- Global Settings dialog -->
 <GlobalSettingsDialog bind:open={globalSettingsOpen} />
@@ -4934,7 +5196,7 @@
   }
 
   .help-panel {
-    background: #ffffff;
+    background: var(--bg-app);
     border-radius: 0.75rem;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
     max-width: 520px;
@@ -4942,11 +5204,6 @@
     max-height: 85vh;
     overflow-y: auto;
     padding: 1.5rem;
-  }
-
-  :global(.dark) .help-panel {
-    background: #1e293b;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
   }
 
   .help-header {
@@ -4960,16 +5217,12 @@
     margin: 0;
     font-size: 1.25rem;
     font-weight: 700;
-    color: #1e293b;
-  }
-
-  :global(.dark) .help-header h2 {
-    color: #f1f5f9;
+    color: var(--text-title);
   }
 
   .help-version {
     font-size: 0.75rem;
-    color: #94a3b8;
+    color: var(--text-muted);
     font-weight: 500;
   }
 
@@ -4978,23 +5231,19 @@
     background: none;
     border: none;
     font-size: 1.125rem;
-    color: #94a3b8;
+    color: var(--text-muted);
     cursor: pointer;
     padding: 0.25rem;
     line-height: 1;
   }
 
   .help-close:hover {
-    color: #1e293b;
-  }
-
-  :global(.dark) .help-close:hover {
-    color: #e2e8f0;
+    color: var(--text-main);
   }
 
   .help-creator {
     font-size: 0.8125rem;
-    color: #64748b;
+    color: var(--text-muted);
     margin: 0 0 1.25rem;
   }
 
@@ -5008,29 +5257,78 @@
   }
 
   .help-section {
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
   }
 
-  .help-section h3 {
-    font-size: 0.875rem;
+  .help-section h3,
+  .help-section h4 {
+    font-size: 0.8125rem;
     font-weight: 600;
-    color: #1e293b;
-    margin: 0 0 0.25rem;
-  }
-
-  :global(.dark) .help-section h3 {
-    color: #e2e8f0;
+    color: var(--text-title);
+    margin: 0 0 0.15rem;
   }
 
   .help-section p {
     font-size: 0.8125rem;
-    color: #475569;
+    color: var(--text-main);
     margin: 0;
     line-height: 1.5;
   }
 
-  :global(.dark) .help-section p {
-    color: #94a3b8;
+  /* ── Accordion groups ─────────────────────────────────────── */
+
+  .help-group {
+    margin-bottom: 0.25rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    overflow: hidden;
+  }
+
+  .help-group-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0.75rem;
+    cursor: pointer;
+    user-select: none;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text-main);
+    background: var(--bg-sidebar);
+  }
+
+  .help-group-header:hover {
+    background: var(--bg-active-tab);
+  }
+
+  .help-group-caret {
+    display: inline-flex;
+    align-items: center;
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+    color: var(--text-muted);
+  }
+
+  .help-group-open .help-group-caret {
+    transform: rotate(180deg);
+  }
+
+  .help-group-body {
+    display: none;
+    padding: 0.5rem 0.75rem 0.5rem;
+    background: var(--bg-app);
+  }
+
+  .help-group-open .help-group-body {
+    display: block;
+  }
+
+  /* ── Keyboard shortcuts table ─────────────────────────────── */
+
+  .help-body {
+    max-height: 60vh;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
   }
 
   .help-shortcuts {
@@ -5042,7 +5340,7 @@
   .help-shortcuts td {
     padding: 0.25rem 0;
     vertical-align: top;
-    color: #475569;
+    color: var(--text-main);
   }
 
   .help-shortcuts td:first-child {
@@ -5050,25 +5348,135 @@
     padding-right: 0.75rem;
   }
 
-  :global(.dark) .help-shortcuts td {
-    color: #94a3b8;
-  }
-
   .help-shortcuts kbd {
     display: inline-block;
     padding: 0.125rem 0.375rem;
     font-size: 0.75rem;
     font-family: inherit;
-    background: #f1f5f9;
-    border: 1px solid #e2e8f0;
+    background: var(--bg-sidebar);
+    border: 1px solid var(--border-color);
     border-radius: 0.25rem;
-    color: #1e293b;
+    color: var(--text-title);
   }
 
-  :global(.dark) .help-shortcuts kbd {
-    background: #334155;
-    border-color: #475569;
-    color: #e2e8f0;
+  /* ── Shortcut editing ───────────────────────────────────── */
+
+  .shortcut-capture-input {
+    position: absolute;
+    left: -9999px;
+    opacity: 0;
+  }
+
+  .shortcut-capture-hint {
+    font-size: 0.75rem;
+    color: var(--accent);
+    font-style: italic;
+    animation: pulse 0.8s ease-in-out infinite alternate;
+  }
+
+  @keyframes pulse {
+    from { opacity: 0.5; }
+    to { opacity: 1; }
+  }
+
+  .shortcut-editing {
+    background: var(--bg-active-tab);
+  }
+
+  .shortcut-actions {
+    width: 28px;
+    text-align: center;
+  }
+
+  .shortcut-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.2rem;
+    border-radius: 0.25rem;
+    line-height: 1;
+    color: var(--text-muted);
+  }
+
+  .shortcut-btn:hover {
+    color: var(--text-main);
+  }
+
+  .shortcut-cancel:hover {
+    color: #ef4444;
+  }
+
+  .shortcut-reset-row {
+    margin-top: 0.75rem;
+    text-align: center;
+  }
+
+  .shortcut-reset-btn {
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .shortcut-reset-btn:hover {
+    color: var(--text-main);
+    border-color: var(--text-muted);
+  }
+
+  .shortcut-reset-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  /* ── Shortcut conflict banner ──────────────────────────── */
+
+  .shortcut-conflict {
+    margin-top: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    background: var(--bg-active-tab);
+    border: 1px solid var(--accent);
+    border-radius: 0.375rem;
+  }
+
+  .shortcut-conflict p {
+    margin: 0 0 0.5rem;
+    font-size: 0.8125rem;
+    color: var(--text-main);
+    line-height: 1.4;
+  }
+
+  .shortcut-conflict-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .shortcut-btn-conflict {
+    padding: 0.25rem 0.6rem;
+    font-size: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.25rem;
+    background: var(--bg-app);
+    color: var(--text-main);
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .shortcut-btn-conflict:hover {
+    background: var(--bg-sidebar);
+  }
+
+  .shortcut-btn-conflict.primary {
+    background: var(--accent);
+    color: #ffffff;
+    border-color: var(--accent);
+  }
+
+  .shortcut-btn-conflict.primary:hover {
+    opacity: 0.9;
   }
 
   /* ── Closing overlay ────────────────────────────────────────── */
@@ -5731,6 +6139,70 @@
 
   .toast-action:hover {
     background: rgba(255, 255, 255, 0.3);
+  }
+
+  /* ── Project Repair ──────────────────────────────────────────── */
+  .repair-status {
+    text-align: center;
+    font-size: 0.875rem;
+    color: var(--accent, #3b82f6);
+    padding: 1.5rem 0;
+    font-weight: 500;
+  }
+
+  .repair-nothing {
+    text-align: center;
+    font-size: 0.875rem;
+    color: #64748b;
+    padding: 1rem 0;
+  }
+
+  :global(.dark) .repair-nothing {
+    color: #94a3b8;
+  }
+
+  .repair-results {
+    max-height: 50vh;
+    overflow-y: auto;
+    font-size: 0.8125rem;
+  }
+
+  .repair-section {
+    margin-bottom: 0.75rem;
+  }
+
+  .repair-section h4 {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #1e293b;
+    margin: 0 0 0.25rem 0;
+  }
+
+  :global(.dark) .repair-section h4 {
+    color: #e2e8f0;
+  }
+
+  .repair-section ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+
+  .repair-section li {
+    color: #475569;
+    font-size: 0.8125rem;
+    padding: 0.125rem 0;
+  }
+
+  :global(.dark) .repair-section li {
+    color: #94a3b8;
+  }
+
+  .repair-icon {
+    margin-right: 0.25rem;
   }
 
 </style>

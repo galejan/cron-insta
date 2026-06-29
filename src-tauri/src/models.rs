@@ -146,6 +146,10 @@ pub fn default_auto_save_interval() -> u32 {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Metadata {
+    /// Schema version for backward compatibility. New projects get version 1.
+    /// Old projects without this field deserialize to version 0.
+    #[serde(default)]
+    pub version: u32,
     pub project_name: String,
     pub last_modified: String,
     pub chapters_order: Vec<String>,
@@ -178,7 +182,7 @@ pub fn default_font_family() -> String {
     "monospace".to_string()
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct CharacterIndex {
     pub id: String,
     pub file: String,
@@ -218,7 +222,7 @@ pub struct CharacterIndexItem {
     pub name: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct NoteIndexItem {
     pub id: String,
     pub title: String,
@@ -226,7 +230,7 @@ pub struct NoteIndexItem {
 
 // ── Places — lugares ──────────────────────────────────────────
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct LugarIndexItem {
     pub id: String,
     pub name: String,

@@ -88,11 +88,15 @@ pub fn importar_proyecto(zip_path: String, destino: String) -> Result<String, St
     for i in 0..archive.len() {
         let mut file = archive.by_index(i)
             .map_err(|e| format!("Error al leer entrada del ZIP: {}", e))?;
-        let out_path = match file.enclosed_name() {
-            Some(path) => destino_path.join(path),
-            None => continue,
-        };
-        if file.name().ends_with('/') {
+        // Normalize Windows-style backslash paths for cross-platform compatibility.
+        // ZIP spec mandates forward slashes, but Windows tools often use backslashes.
+        let raw_name = file.name().replace('\\', "/");
+        // Reject entries that attempt path traversal (zip-slip prevention)
+        if raw_name.contains("..") {
+            continue;
+        }
+        let out_path = destino_path.join(&raw_name);
+        if raw_name.ends_with('/') {
             std::fs::create_dir_all(&out_path)
                 .map_err(|e| format!("Error al crear directorio {}: {}", out_path.display(), e))?;
         } else {
@@ -126,11 +130,17 @@ pub fn importar_proyecto(zip_path: String, destino: String) -> Result<String, St
     if !found {
         return Err("El archivo ZIP no parece ser un proyecto de Cron-Insta (falta .config/metadata.json).".to_string());
     }
-    // Read project name for the success message
-    let raw = std::fs::read_to_string(project_root.join(".config").join("metadata.json"))
-        .map_err(|e| format!("Proyecto extraído pero no se pudo leer metadata: {}", e))?;
+    // Structural integrity check: verify metadata.json is valid and project structure is intact
+    let meta_path = project_root.join(".config").join("metadata.json");
+    let raw = std::fs::read_to_string(&meta_path)
+        .map_err(|e| format!("Proyecto extraído pero no se pudo leer metadata.json: {}", e))?;
     let _metadata: Metadata = serde_json::from_str(&raw)
-        .map_err(|e| format!("Proyecto extraído pero metadata.json es inválido: {}", e))?;
+        .map_err(|e| format!("El archivo ZIP no contiene un proyecto válido de Cron-Insta (metadata.json corrupto o inválido): {}", e))?;
+    // Verify required subdirectories exist
+    if !project_root.join("capitulos").is_dir() {
+        return Err("El proyecto importado está incompleto: falta el directorio 'capitulos/'.".to_string());
+    }
+    // Return the project root path
     Ok(project_root.display().to_string())
 }
 /// Recursively add directory contents to a zip writer, under a prefix folder.
@@ -146,13 +156,17 @@ pub fn add_dir_to_zip(
     {
         let entry = entry.map_err(|e| format!("Error: {}", e))?;
         let path = entry.path();
-        // Skip the exportaciones directory itself
-        if path.file_name().map(|n| n == "exportaciones").unwrap_or(false) {
+        // Skip the exportaciones directory and .git directory
+        let fname = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+        if fname == "exportaciones" || fname == ".git" {
             continue;
         }
         let relative = path.strip_prefix(base)
             .map_err(|e| format!("Error: {}", e))?;
-        let name = format!("{}{}", prefix, relative.to_string_lossy());
+        // Always use forward slashes in zip paths (ZIP spec requirement,
+        // and prevents cross-platform breakage when a zip created on Windows
+        // is imported on Linux or macOS).
+        let name = format!("{}{}", prefix, relative.to_string_lossy().replace('\\', "/"));
         if path.is_dir() {
             zip.add_directory(&name, *options)
                 .map_err(|e| format!("Error al añadir directorio: {}", e))?;

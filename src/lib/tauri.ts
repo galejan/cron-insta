@@ -413,3 +413,53 @@ export async function copiarAMedia(projectPath: string, sourcePath: string): Pro
 export async function leerMediaBase64(projectPath: string, filename: string): Promise<string> {
   return invoke("leer_media_base64", { proyectoPath: projectPath, filename });
 }
+
+// ── Project Repair ─────────────────────────────────────────────
+
+export interface RepairReport {
+    repaired: string[];
+    recreated: string[];
+    cleaned: string[];
+    lost: string[];
+}
+
+export interface RecreateMetadataConfig {
+    project_name: string;
+    font_family?: string;
+    visible_tabs?: Record<string, boolean>;
+    auto_save_interval_minutes?: number;
+}
+
+/** Repair a project's indices from actual files on disk */
+export async function repararProyecto(proyectoPath: string): Promise<RepairReport> {
+    return invoke("reparar_proyecto", { proyectoPath });
+}
+
+/** Recreate metadata.json from scratch (when it's missing/corrupt) */
+export async function recrearMetadata(path: string, config: RecreateMetadataConfig): Promise<RepairReport> {
+    return invoke("recrear_metadata", { path, config });
+}
+
+// ── Keyboard Shortcuts ─────────────────────────────────────────
+
+export interface ShortcutBinding {
+    id: string;
+    key: string;
+    ctrl: boolean;
+    shift: boolean;
+    alt: boolean;
+    label_es: string;
+    label_en: string;
+}
+
+export async function cargarAtajos(): Promise<ShortcutBinding[]> {
+    return invoke("cargar_atajos");
+}
+
+export async function guardarAtajo(binding: ShortcutBinding): Promise<void> {
+    return invoke("guardar_atajo", { binding });
+}
+
+export async function restaurarAtajos(): Promise<void> {
+    return invoke("restaurar_atajos");
+}

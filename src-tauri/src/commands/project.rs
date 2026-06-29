@@ -33,7 +33,7 @@ pub fn crear_proyecto(app: tauri::AppHandle, path: String, nombre: String, font_
     std::fs::create_dir_all(base)
         .map_err(|e| format!("No se pudo crear el directorio del proyecto: {}", e))?;
     // Create subdirectories
-    let subdirs = [".config", "capitulos", "personajes", "notas", "lugares"];
+    let subdirs = [".config", "capitulos", "personajes", "notas", "lugares", "media"];
     for sub in &subdirs {
         std::fs::create_dir_all(base.join(sub))
             .map_err(|e| format!("No se pudo crear el directorio {}: {}", sub, e))?;
@@ -41,6 +41,12 @@ pub fn crear_proyecto(app: tauri::AppHandle, path: String, nombre: String, font_
     // Seed lugares/index.json (empty array)
     std::fs::write(base.join("lugares/index.json"), "[]")
         .map_err(|e| format!("Error al escribir lugares/index.json: {}", e))?;
+    // Seed personajes/index.json (empty array)
+    std::fs::write(base.join("personajes/index.json"), "[]")
+        .map_err(|e| format!("Error al escribir personajes/index.json: {}", e))?;
+    // Seed notas/index.json (empty array)
+    std::fs::write(base.join("notas/index.json"), "[]")
+        .map_err(|e| format!("Error al escribir notas/index.json: {}", e))?;
     // Validate interval if provided
     if let Some(interval) = auto_save_interval_minutes {
         validate_auto_save_interval(interval)?;
@@ -51,6 +57,7 @@ pub fn crear_proyecto(app: tauri::AppHandle, path: String, nombre: String, font_
     }
     // Write metadata.json
     let metadata = Metadata {
+        version: 1,
         project_name: nombre.clone(),
         last_modified: Local::now().to_rfc3339(),
         chapters_order: vec![],
@@ -209,6 +216,10 @@ This is a literary writing project managed by **Cron-Insta**, a desktop writing 
   - `name` (string): Place display name
   - `description` (string): Place description
 - **Index**: `lugares/index.json` → array of `{{ id, name }}`
+### Media
+- **Storage**: `media/` directory (flat — no subdirectories)
+- **Format**: Binary files (images, PDFs, audio, etc.) managed by the multimedia gallery
+- **Usage**: Reference images, mood boards, covers, and other project-related media files.
 ### Timeline Event
 - **Storage**: `.config/timeline.json` (single JSON array file)
 - **Fields**:
@@ -244,6 +255,7 @@ Deleting a Trama sets all its assigned chapters' `trama_id` to `null` — chapte
 | Field | Type | Description |
 |-------|------|-------------|
 | `project_name` | string | Display name of the project |
+| `version` | number | Schema version (1 = current). Used for backward compatibility. |
 | `last_modified` | string | ISO 8601 timestamp of last modification |
 | `chapters_order` | string[] | Ordered list of chapter filenames |
 | `characters_index` | object[] | Array of `{{ id, file, name }}` |
@@ -260,7 +272,8 @@ JSON array of TimelineEvent objects (see Entity section above).
 {NOMBRE}/
 ├── .config/
 │   ├── metadata.json
-│   └── timeline.json
+│   ├── timeline.json
+│   └── stats.json
 ├── capitulos/
 │   ├── 0001_prologo.md
 │   └── ...
@@ -275,6 +288,9 @@ JSON array of TimelineEvent objects (see Entity section above).
 ├── lugares/
 │   ├── index.json
 │   ├── {{id}}.json
+│   └── ...
+├── media/
+│   ├── image1.jpg
 │   └── ...
 └── SCHEMA.md          ◀── this file
 ```
