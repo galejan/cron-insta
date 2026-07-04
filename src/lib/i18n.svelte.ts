@@ -189,6 +189,9 @@ const translations: Record<Lang, Record<string, string>> = {
     "characters.saveError": "Error al guardar personaje:",
     "characters.deleteError": "Error al eliminar personaje:",
     "characters.undock": "Desanclar",
+    "characters.image": "Imagen",
+    "characters.imageHint": "Sube la imagen en la pestaña Media y luego enlázala aquí.",
+    "characters.imageNone": "Sin imagen",
 
     // ── Places ─────────────────────────────────────────────
     "places.empty": "Sin lugares aún.",
@@ -204,6 +207,9 @@ const translations: Record<Lang, Record<string, string>> = {
     "places.createError": "Error al crear lugar:",
     "places.saveError": "Error al guardar lugar:",
     "places.deleteError": "Error al eliminar lugar:",
+    "places.image": "Imagen",
+    "places.imageHint": "Sube la imagen en la pestaña Media y luego enlázala aquí.",
+    "places.imageNone": "Sin imagen",
 
     // ── Notes ──────────────────────────────────────────────
     "notes.empty": "Sin notas aún.",
@@ -668,6 +674,9 @@ const translations: Record<Lang, Record<string, string>> = {
     "characters.saveError": "Error saving character:",
     "characters.deleteError": "Error deleting character:",
     "characters.undock": "Undock",
+    "characters.image": "Image",
+    "characters.imageHint": "Upload the image in the Media tab, then pick it here.",
+    "characters.imageNone": "No image",
 
     // ── Places ─────────────────────────────────────────────
     "places.empty": "No places yet.",
@@ -683,6 +692,9 @@ const translations: Record<Lang, Record<string, string>> = {
     "places.createError": "Error creating place:",
     "places.saveError": "Error saving place:",
     "places.deleteError": "Error deleting place:",
+    "places.image": "Image",
+    "places.imageHint": "Upload the image in the Media tab, then pick it here.",
+    "places.imageNone": "No image",
 
     // ── Notes ──────────────────────────────────────────────
     "notes.empty": "No notes yet.",

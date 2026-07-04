@@ -6,11 +6,11 @@
   interface Props {
     characterDocked: {
       id: string; name: string; physicalDescription: string;
-      personality: string; traumas: string;
+      personality: string; traumas: string; image?: string;
       relationships: Array<{targetName: string; type: string; notes: string}>;
     } | null;
     noteDocked: { id: string; title: string; content: string } | null;
-    placeDocked: { id: string; name: string; description: string; notes: string } | null;
+    placeDocked: { id: string; name: string; description: string; notes: string; image?: string } | null;
     mediaDocked: string | null;
     onCloseCharacter: () => void;
     onCloseNote: () => void;
@@ -44,6 +44,15 @@
         title={t("characters.undock")}><XCircle size={16} weight="light" color="currentColor" /></button>
     </div>
     <div class="character-dock-body">
+      {#if characterDocked.image}
+        {@const imgSrc = mediaUrl(characterDocked.image)}
+        {#if imgSrc}
+          <div class="char-dock-image">
+            <img src={imgSrc} alt={characterDocked.name}
+              style="max-width:100%;max-height:200px;object-fit:contain;display:block;border-radius:6px;margin-bottom:0.75rem;" />
+          </div>
+        {/if}
+      {/if}
       {#if characterDocked.physicalDescription}
         <div class="char-dock-field">
           <span class="char-dock-label">{t("characters.physicalDescription")}</span>
@@ -99,6 +108,15 @@
         title={t("characters.undock")}><XCircle size={16} weight="light" color="currentColor" /></button>
     </div>
     <div class="character-dock-body">
+      {#if placeDocked.image}
+        {@const imgSrc = mediaUrl(placeDocked.image)}
+        {#if imgSrc}
+          <div class="char-dock-image">
+            <img src={imgSrc} alt={placeDocked.name}
+              style="max-width:100%;max-height:200px;object-fit:contain;display:block;border-radius:6px;margin-bottom:0.75rem;" />
+          </div>
+        {/if}
+      {/if}
       {#if placeDocked.description}
         <div class="char-dock-field">
           <span class="char-dock-label">{t("places.description")}</span>

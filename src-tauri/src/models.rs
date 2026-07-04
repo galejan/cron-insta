@@ -200,6 +200,9 @@ pub struct Character {
     pub personality: Option<String>,
     #[serde(default)]
     pub traumas: Option<String>,
+    /// Optional image filename from the project's media/ directory.
+    #[serde(default)]
+    pub image: Option<String>,
     #[serde(default)]
     pub relationships: Vec<Relationship>,
 }
@@ -243,6 +246,9 @@ pub struct Lugar {
     pub name: String,
     #[serde(default)]
     pub description: String,
+    /// Optional image filename from the project's media/ directory.
+    #[serde(default)]
+    pub image: Option<String>,
 }
 
 // ── Tramas — plotlines ──────────────────────────────────────

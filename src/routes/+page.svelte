@@ -571,12 +571,12 @@
   let personajeEditando = $state<Record<string, any> | null>(null);
   let characterDocked = $state<{
     id: string; name: string; physicalDescription: string;
-    personality: string; traumas: string;
+    personality: string; traumas: string; image?: string;
     relationships: Array<{targetName: string; type: string; notes: string}>;
   } | null>(null);
 
   let noteDocked = $state<{ id: string; title: string; content: string } | null>(null);
-  let placeDocked = $state<{ id: string; name: string; description: string; notes: string } | null>(null);
+  let placeDocked = $state<{ id: string; name: string; description: string; notes: string; image?: string } | null>(null);
 
   // ── Notes state ─────────────────────────────────────────────
   let notas = $state<{ id: string; title: string }[]>([]);
@@ -620,7 +620,7 @@
         if (!mediaSrcCache[f.name]) {
           try {
             mediaSrcCache[f.name] = await leerMediaBase64(projectPath, f.name);
-          } catch { /* skip broken files */ }
+          } catch (e) { console.error(`[cron-insta] Failed to load media: ${f.name}`, e); }
         }
       }
     } catch { mediaFiles = []; }
@@ -628,6 +628,23 @@
 
   function mediaUrl(filename: string): string {
     return mediaSrcCache[filename] ?? '';
+  }
+
+  /** Image files (by extension) from the current media listing. */
+  function imageFiles(): { name: string; size: number }[] {
+    const imageExts = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp']);
+    return mediaFiles.filter(f => {
+      const ext = f.name.split('.').pop()?.toLowerCase() ?? '';
+      return imageExts.has(ext);
+    });
+  }
+
+  /** Ensure a media image is loaded into the src cache. */
+  async function ensureImageLoaded(filename: string): Promise<void> {
+    if (!filename || mediaSrcCache[filename]) return;
+    try {
+      mediaSrcCache[filename] = await leerMediaBase64(projectPath, filename);
+    } catch (e) { console.error(`[cron-insta] Failed to load character image: ${filename}`, e); }
   }
 
   async function subirMedia(): Promise<void> {
@@ -1062,6 +1079,7 @@
           places: config.visible_tabs.places !== false,
           timeline: config.visible_tabs.timeline !== false,
           notes: config.visible_tabs.notes !== false,
+          media: config.visible_tabs.media !== false,
         };
         const msg = await crearProyecto(path, name.trim(), fontFamily, visibleTabsForRust, autoSaveInterval);
         console.log("[cron-insta] Project created:", msg);
@@ -1414,6 +1432,8 @@
     characterDocked = null;
     gitEnabled = false;
     gitStatus = "unknown";
+    mediaSrcCache = {};
+    mediaFiles = [];
 
     // Keep last project for auto-reopen on next launch
     // (deliberately NOT removing from localStorage)
@@ -1607,6 +1627,7 @@
       physicalDescription: "",
       personality: "",
       traumas: "",
+      image: null,
       relationships: [],
     };
     try {
@@ -1632,6 +1653,10 @@
       const raw = await cargarPersonaje(projectPath, id);
       personajeEditando = JSON.parse(raw);
       personajeExpandido = id;
+      // Preload character image if set
+      if (personajeEditando?.image) await ensureImageLoaded(personajeEditando.image);
+      // Ensure media list is loaded for the image selector
+      refreshMedia();
     } catch (e) {
       console.error("[cron-insta] Load character failed:", e);
     }
@@ -1875,6 +1900,7 @@
       id,
       name: lugarNuevoNombre.trim(),
       description: lugarNuevaDescripcion.trim(),
+      image: null,
     };
     try {
       await crearLugar(projectPath, JSON.stringify(lugar));
@@ -1898,7 +1924,13 @@
     try {
       const raw = await cargarLugar(projectPath, id);
       lugarEditando = JSON.parse(raw);
+      // Normalize image for old places that lack the field
+      if (lugarEditando && lugarEditando.image === undefined) lugarEditando.image = null;
       lugarExpandido = id;
+      // Preload place image if set
+      if (lugarEditando?.image) await ensureImageLoaded(lugarEditando.image);
+      // Ensure media list is loaded for the image selector
+      refreshMedia();
     } catch (e) {
       console.error("[cron-insta] Load place failed:", e);
     }
@@ -1912,6 +1944,7 @@
         lugarEditando.id,
         JSON.stringify(lugarEditando),
       );
+      if (lugarEditando.image) ensureImageLoaded(lugarEditando.image);
       lugarExpandido = null;
       lugarEditando = null;
       await refreshLugares();
@@ -2161,8 +2194,10 @@
         physicalDescription: personajeEditando.physicalDescription,
         personality: personajeEditando.personality,
         traumas: personajeEditando.traumas,
+        image: personajeEditando.image || undefined,
         relationships: personajeEditando.relationships || [],
       };
+      if (personajeEditando.image) ensureImageLoaded(personajeEditando.image);
       return;
     }
     if (activeNote) {
@@ -2176,7 +2211,8 @@
       const placeId = lugarExpandido;
       cargarLugar(projectPath, placeId).then(raw => {
         const lugar = JSON.parse(raw);
-        placeDocked = { id: placeId, name: lugar.name || placeId, description: lugar.description || "", notes: lugar.notes || "" };
+        placeDocked = { id: placeId, name: lugar.name || placeId, description: lugar.description || "", notes: lugar.notes || "", image: lugar.image || undefined };
+        if (lugar.image) ensureImageLoaded(lugar.image);
       }).catch(() => {});
       return;
     }
@@ -2593,6 +2629,33 @@
                         rows="2"
                       ></textarea>
 
+                      <label class="field-label" for="char-img-{p.id}">{t("characters.image")}</label>
+                      {#if imageFiles().length > 0}
+                        <select
+                          id="char-img-{p.id}"
+                          class="field-input"
+                          bind:value={personajeEditando!.image}
+                          onchange={() => {
+                            const img = personajeEditando?.image;
+                            if (img) ensureImageLoaded(img);
+                          }}
+                        >
+                          <option value="">{t("characters.imageNone")}</option>
+                          {#each imageFiles() as img}
+                            <option value={img.name}>{img.name}</option>
+                          {/each}
+                        </select>
+                        {#if personajeEditando.image}
+                          {@const imgSrc = mediaUrl(personajeEditando.image)}
+                          {#if imgSrc}
+                            <img src={imgSrc} alt={personajeEditando.name}
+                              style="max-width:100%;max-height:160px;object-fit:contain;margin-top:0.5rem;border-radius:4px;display:block;" />
+                          {/if}
+                        {/if}
+                      {:else}
+                        <p class="field-hint">{t("characters.imageHint")}</p>
+                      {/if}
+
                       <label class="field-label" for="char-pers-{p.id}">{t("characters.personality")}</label>
                       <textarea
                         id="char-pers-{p.id}"
@@ -3000,6 +3063,33 @@
                         placeholder={t("places.descriptionPlaceholder")}
                       ></textarea>
 
+                      <label class="field-label" for="place-img-{l.id}">{t("places.image")}</label>
+                      {#if imageFiles().length > 0}
+                        <select
+                          id="place-img-{l.id}"
+                          class="field-input"
+                          bind:value={lugarEditando!.image}
+                          onchange={() => {
+                            const img = lugarEditando?.image;
+                            if (img) ensureImageLoaded(img);
+                          }}
+                        >
+                          <option value="">{t("places.imageNone")}</option>
+                          {#each imageFiles() as img}
+                            <option value={img.name}>{img.name}</option>
+                          {/each}
+                        </select>
+                        {#if lugarEditando.image}
+                          {@const imgSrc = mediaUrl(lugarEditando.image)}
+                          {#if imgSrc}
+                            <img src={imgSrc} alt={lugarEditando.name}
+                              style="max-width:100%;max-height:160px;object-fit:contain;margin-top:0.5rem;border-radius:4px;display:block;" />
+                          {/if}
+                        {/if}
+                      {:else}
+                        <p class="field-hint">{t("places.imageHint")}</p>
+                      {/if}
+
                       <div class="form-actions">
                         <button class="btn-sm btn-primary" onclick={guardarLugarHandler}>{t("places.save")}</button>
                         <button class="btn-sm btn-danger" onclick={() => eliminarLugarHandler(l.id)}>{t("places.delete")}</button>
@@ -3048,15 +3138,15 @@
             <Image size={16} weight="light" color="currentColor" /> {t("media.upload")}
           </button>
           {#if mediaFiles.length > 0}
-            <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.5rem;">
+            <div class="media-gallery">
               {#each mediaFiles as f}
                 <button
-                  style="width:calc(50% - 0.25rem);cursor:pointer;border-radius:4px;overflow:hidden;border:none;background:transparent;padding:0;text-align:left;"
+                  class="media-card"
                   onclick={() => mediaViewer = f.name}
                 >
                   <img src={mediaUrl(f.name)} alt={f.name}
-                    style="width:100%;height:80px;object-fit:cover;display:block;" />
-                  <span style="font-size:0.625rem;color:#64748b;padding:0.125rem 0.25rem;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{f.name}</span>
+                    style="width:100%;height:auto;display:block;" />
+                  <span class="media-filename">{f.name}</span>
                 </button>
               {/each}
             </div>
@@ -4546,6 +4636,18 @@
     color: #64748b;
   }
 
+  .field-hint {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    font-style: italic;
+    margin: 0.25rem 0 0.5rem 0;
+    line-height: 1.4;
+  }
+
+  :global(.dark) .field-hint {
+    color: #64748b;
+  }
+
   /* ── Chapter row with delete ───────────────────────────────── */
   .chapter-row,
   .note-row {
@@ -5017,6 +5119,59 @@
   :global(.dark) .btn-add:hover {
     background: var(--accent-soft);
     border-color: var(--accent);
+  }
+
+  /* ── Media gallery — responsive grid, aspect-ratio preserving ─── */
+  .media-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+
+  .media-card {
+    cursor: pointer;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    padding: 0;
+    text-align: left;
+    transition: border-color 120ms, box-shadow 120ms;
+  }
+
+  .media-card:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent-soft);
+  }
+
+  .media-card img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .media-filename {
+    font-size: 0.625rem;
+    color: #64748b;
+    padding: 0.25rem 0.375rem;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  :global(.dark) .media-card {
+    border-color: #334155;
+    background: #0f172a;
+  }
+
+  :global(.dark) .media-card:hover {
+    border-color: var(--accent);
+  }
+
+  :global(.dark) .media-filename {
+    color: #94a3b8;
   }
 
   /* ── Relationship rows ─────────────────────────────────────── */

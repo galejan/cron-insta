@@ -417,7 +417,7 @@
                 <input type="checkbox" checked disabled />
                 <span class="tab-checkbox-text">{t("config.tabsChapters")}</span>
               </label>
-              {#each [{key: "characters", label: t("config.tabsCharacters")}, {key: "places", label: t("config.tabsPlaces")}, {key: "timeline", label: t("config.tabsTimeline")}, {key: "notes", label: t("config.tabsNotes")}] as tab}
+              {#each [{key: "characters", label: t("config.tabsCharacters")}, {key: "places", label: t("config.tabsPlaces")}, {key: "timeline", label: t("config.tabsTimeline")}, {key: "notes", label: t("config.tabsNotes")}, {key: "media", label: t("config.tabsMedia")}] as tab}
                 <label class="tab-checkbox-label">
                   <input
                     type="checkbox"

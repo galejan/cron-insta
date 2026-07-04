@@ -48,16 +48,55 @@ pub fn copiar_a_media(proyecto_path: String, source_path: String) -> Result<Stri
     Ok(dest.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string())
 }
 /// Read a media file and return it as a base64 data URL.
+///
+/// Tries an exact filename match first.  If that fails, falls back to a
+/// case-insensitive lookup in the media directory — this protects against
+/// cross-platform case-sensitivity differences (Windows/macOS are
+/// case-insensitive; Linux is case-sensitive).
 #[tauri::command]
 pub fn leer_media_base64(proyecto_path: String, filename: String) -> Result<String, String> {
     use std::io::Read;
-    let path = Path::new(&proyecto_path).join("media").join(&filename);
-    let mut file = std::fs::File::open(&path)
+    let media_dir = Path::new(&proyecto_path).join("media");
+
+    // 1) Exact match
+    let exact_path = media_dir.join(&filename);
+    let (resolved_path, resolved_name) = if exact_path.exists() {
+        (exact_path, filename.clone())
+    } else {
+        // 2) Case-insensitive fallback: scan media/ for a matching filename
+        let lower = filename.to_lowercase();
+        let mut found: Option<(std::path::PathBuf, String)> = None;
+        if let Ok(entries) = std::fs::read_dir(&media_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() {
+                    if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                        if name.to_lowercase() == lower {
+                            found = Some((path.clone(), name.to_string()));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        match found {
+            Some((p, n)) => (p, n),
+            None => {
+                // Neither exact nor case-insensitive match found
+                return Err(format!(
+                    "Archivo '{}' no encontrado en media/",
+                    filename
+                ));
+            }
+        }
+    };
+
+    let mut file = std::fs::File::open(&resolved_path)
         .map_err(|e| format!("Error abriendo archivo: {}", e))?;
     let mut bytes = Vec::new();
     file.read_to_end(&mut bytes)
         .map_err(|e| format!("Error leyendo archivo: {}", e))?;
-    let ext = filename.split('.').last().unwrap_or("png").to_lowercase();
+    let ext = resolved_name.split('.').last().unwrap_or("png").to_lowercase();
     let mime = match ext.as_str() {
         "jpg" | "jpeg" => "image/jpeg",
         "gif" => "image/gif",
