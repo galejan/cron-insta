@@ -297,6 +297,7 @@
   let gitHelpModal = $state(false);
   let gitLogVisible = $state(false);
   let gitLogEntries = $state<GitLogEntry[]>([]);
+  let sessionActive = $state(false);
 
   // ── Git Identity & Remote dialog ─────────────────────────────
   let identityDialogOpen = $state(false);
@@ -745,6 +746,7 @@
       // Start writing session tracking
       try {
         await iniciarSesionEscritura(projectPath, filename);
+        sessionActive = true;
         console.log("[cron-insta] Writing session started for:", filename);
       } catch (e) {
         console.error("[cron-insta] Failed to start writing session:", e);
@@ -1400,6 +1402,12 @@
   async function cerrarProyecto(): Promise<void> {
     if (!projectPath) return;
 
+    // Warn if a writing session is active — user may lose tracked time
+    if (sessionActive) {
+      const ok = await ask(t("session.closeWarning"));
+      if (!ok) return;
+    }
+
     // Save current chapter before closing
     if (activeChapter && editorContent) {
       try {
@@ -1434,6 +1442,20 @@
     gitStatus = "unknown";
     mediaSrcCache = {};
     mediaFiles = [];
+
+    // Reset state leaked between projects
+    projectStats = { total_sessions: 0, total_hours: 0, total_words: 0 };
+    noteDocked = null;
+    placeDocked = null;
+    mediaDocked = null;
+    mediaViewer = null;
+    gitLogEntries = [];
+    gitLogVisible = false;
+    dragId = null;
+    dragChapter = null;
+    dragOverTrama = null;
+    cercaDelFinal = false;
+    sessionActive = false;
 
     // Keep last project for auto-reopen on next launch
     // (deliberately NOT removing from localStorage)

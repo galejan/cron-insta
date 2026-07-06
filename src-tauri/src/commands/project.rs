@@ -4,6 +4,7 @@ use std::path::Path;
 use crate::models::*;
 use crate::utils::*;
 use crate::commands::git::inicializar_git;
+use crate::commands::stats::finalizar_sesion_escritura;
 
 /// Create a new Cron-Insta literary project.
 ///
@@ -160,13 +161,33 @@ pub fn marcar_proyecto_cron_insta(app: tauri::AppHandle, path: String) -> Result
 /// Tell the Rust backend which project is currently open in the frontend.
 ///
 /// Called when a project is opened (path = Some) or closed (path = None).
-/// The backend uses this to run a git checkpoint when the window is closed,
-/// avoiding the JS→Rust IPC deadlock during `onCloseRequested`.
+/// When deactivating (path = None), flushes the writing session stats to
+/// the departing project's `stats.json` before clearing the tracker, so the
+/// next project starts with a fresh `SessionTracker`.
 #[tauri::command]
 pub fn set_active_project(
     state: tauri::State<ProjectState>,
     path: Option<String>,
 ) -> Result<(), String> {
+    // Capture old path before mutation
+    let old_path = {
+        let active = state.active_project.lock().map_err(|e| e.to_string())?;
+        active.clone()
+    };
+
+    // Flush session on project deactivation (path is None, old path exists)
+    if path.is_none() {
+        if let Some(ref old) = old_path {
+            let mut tracker = state.session_tracker.lock().map_err(|e| e.to_string())?;
+            if tracker.start_time.is_some() {
+                finalizar_sesion_escritura(&mut tracker, Path::new(old));
+            } else {
+                *tracker = SessionTracker::default();
+            }
+        }
+    }
+
+    // Set new path (or None)
     let mut active = state.active_project.lock().map_err(|e| e.to_string())?;
     *active = path;
     Ok(())

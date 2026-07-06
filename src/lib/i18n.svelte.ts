@@ -520,6 +520,7 @@ const translations: Record<Lang, Record<string, string>> = {
     "repair.cleaned": "Limpiado",
     "repair.lost": "Perdido",
     "repair.nothing": "No se encontraron problemas.",
+    "session.closeWarning": "Tu sesión de escritura actual se finalizará. ¿Continuar?",
   },
 
   en: {
@@ -1005,6 +1006,7 @@ const translations: Record<Lang, Record<string, string>> = {
     "repair.cleaned": "Cleaned",
     "repair.lost": "Lost",
     "repair.nothing": "No issues found.",
+    "session.closeWarning": "Your current writing session will be finalized. Continue?",
   },
 };
 
