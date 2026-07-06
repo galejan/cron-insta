@@ -2051,6 +2051,7 @@
       refreshNotas();
       refreshTimeline();
       refreshLugares();
+      cargarStatsPanel();
     }
   });
 
