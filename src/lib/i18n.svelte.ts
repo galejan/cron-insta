@@ -334,10 +334,11 @@ const translations: Record<Lang, Record<string, string>> = {
     "shortcuts.swap": "Intercambiar",
     "shortcuts.overwrite": "Sobrescribir",
 
+    "shortcuts.groupSidebar": "Panel lateral",
     "shortcuts.groupEditing": "Edición",
     "shortcuts.groupNavigation": "Navegación",
     "shortcuts.groupProject": "Proyecto",
-    "shortcuts.groupCreation": "Entidades",
+    "shortcuts.groupTabs": "Pestañas",
     "shortcuts.groupInterface": "Interfaz",
 
     // ── Dialogs (prompts and confirmations) ────────────────
@@ -822,10 +823,11 @@ const translations: Record<Lang, Record<string, string>> = {
     "shortcuts.swap": "Swap",
     "shortcuts.overwrite": "Overwrite",
 
+    "shortcuts.groupSidebar": "Sidebar",
     "shortcuts.groupEditing": "Editing",
     "shortcuts.groupNavigation": "Navigation",
     "shortcuts.groupProject": "Project",
-    "shortcuts.groupCreation": "Entities",
+    "shortcuts.groupTabs": "Tabs",
     "shortcuts.groupInterface": "Interface",
 
     // ── Dialogs (prompts and confirmations) ────────────────

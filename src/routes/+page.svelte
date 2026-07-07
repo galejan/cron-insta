@@ -141,6 +141,11 @@
   let shortcuts = $state<ShortcutBinding[]>([]);
   let editingShortcutId = $state<string | null>(null);
   let resettingShortcuts = $state(false);
+
+  // ── Platform-aware modifier ──────────────────────────────────
+  const isMac = /Mac/i.test(typeof navigator !== 'undefined' ? navigator.platform : '');
+  // Sidebar shortcuts MUST use literal Ctrl (never Cmd on macOS)
+  const LITERAL_CTRL_IDS = new Set(['sidebar-shrink', 'sidebar-grow', 'sidebar-collapse', 'sidebar-expand']);
   let shortcutConflict = $state<{ binding: ShortcutBinding; conflictingId: string } | null>(null);
   let shortcutGroups = $state<Record<string, boolean>>({
     editing: false,
@@ -149,12 +154,13 @@
     creation: false,
     interface: false,
   });
-  // Ordered groups: group.id → array of shortcut IDs in display order
+  // Ordered groups: grouped by modifier (see design docs)
   const SHORTCUT_GROUP_DEFS: { id: string; titleKey: string; shortcutIds: string[] }[] = [
-    { id: 'editing', titleKey: 'shortcuts.groupEditing', shortcutIds: ['heading-up', 'heading-down', 'bold', 'italic', 'zoom-in', 'zoom-out', 'dialogue-dash'] },
-    { id: 'navigation', titleKey: 'shortcuts.groupNavigation', shortcutIds: ['sidebar-collapse', 'sidebar-expand', 'sidebar-shrink', 'sidebar-grow', 'cycle-tabs', 'prev-chapter', 'next-chapter'] },
-    { id: 'project', titleKey: 'shortcuts.groupProject', shortcutIds: ['save', 'new-chapter', 'open-project', 'new-project', 'import-project', 'close-project', 'export-zip', 'export-md', 'project-settings', 'global-settings', 'repair-project'] },
-    { id: 'creation', titleKey: 'shortcuts.groupCreation', shortcutIds: ['new-character', 'new-place', 'new-note', 'new-event', 'new-trama'] },
+    { id: 'sidebar', titleKey: 'shortcuts.groupSidebar', shortcutIds: ['sidebar-collapse', 'sidebar-expand', 'sidebar-shrink', 'sidebar-grow'] },
+    { id: 'navigation', titleKey: 'shortcuts.groupNavigation', shortcutIds: ['prev-chapter', 'next-chapter'] },
+    { id: 'editing', titleKey: 'shortcuts.groupEditing', shortcutIds: ['bold', 'italic', 'heading-up', 'heading-down', 'zoom-in', 'zoom-out', 'dialogue-dash'] },
+    { id: 'project', titleKey: 'shortcuts.groupProject', shortcutIds: ['save', 'open-project', 'new-project', 'import-project', 'close-project', 'export-zip', 'export-md', 'project-settings', 'global-settings', 'repair-project'] },
+    { id: 'tabs', titleKey: 'shortcuts.groupTabs', shortcutIds: ['tab-chapters', 'tab-characters', 'tab-notes', 'tab-timeline', 'tab-places', 'tab-media'] },
     { id: 'interface', titleKey: 'shortcuts.groupInterface', shortcutIds: ['dock', 'toggle-footer', 'toggle-help', 'help-question', 'toggle-fullscreen'] },
   ];
 
@@ -2105,15 +2111,22 @@
     cargarAtajos().then(data => { shortcuts = data; }).catch(() => {});
   });
 
-  // ── Keyboard shortcuts (config-driven) ───────────────────────
+  // ── Keyboard shortcuts (config-driven, platform-aware) ──
   function handleKeydown(e: KeyboardEvent) {
-    // Ignore shortcuts when meta key is pressed (system shortcuts)
-    if (e.metaKey) return;
-
     for (const s of shortcuts) {
+      // Key matching: digit shortcuts use e.code for cross-browser consistency
+      const keyMatches = /^\d$/.test(s.key)
+        ? e.code === `Digit${s.key}`
+        : e.key === s.key;
+
+      // Modifier: sidebar shortcuts always use literal Ctrl; others use platform primary
+      const modPressed = LITERAL_CTRL_IDS.has(s.id)
+        ? e.ctrlKey
+        : (isMac ? e.metaKey : e.ctrlKey);
+
       if (
-        e.key === s.key &&
-        e.ctrlKey === s.ctrl &&
+        keyMatches &&
+        modPressed === s.ctrl &&
         e.shiftKey === s.shift &&
         e.altKey === s.alt
       ) {
@@ -2129,8 +2142,12 @@
         if (s.id === "bold" || s.id === "italic") {
           continue;
         }
-        // import-project: only fire when editor is NOT focused (Ctrl+I reserved for italic)
-        if (s.id === "import-project" && editorRef?.isFocused()) {
+        // sidebar: only fire when editor is NOT focused (arrows belong to the editor)
+        if (LITERAL_CTRL_IDS.has(s.id) && editorRef?.isFocused()) {
+          continue;
+        }
+        // navigation: only fire when editor is NOT focused (Option+arrow = word nav on macOS)
+        if ((s.id === "prev-chapter" || s.id === "next-chapter") && editorRef?.isFocused()) {
           continue;
         }
         e.preventDefault();
@@ -2150,16 +2167,14 @@
       // ── Navigation ───────────────────────────────────────
       case "prev-chapter": if (projectPath && activeChapter) capituloAnterior(); break;
       case "next-chapter": if (projectPath && activeChapter) capituloSiguiente(); break;
-      case "cycle-tabs": cycleVisibleTab(); break;
       // ── Editor ───────────────────────────────────────────
-      case "save": saveStatus = "saving"; saveTrigger.trigger(); break;
+      case "save": saveStatus = "saving"; saveTrigger.cancel(); doSave(); break;
       case "heading-up": editorRef?.increaseHeading(); break;
       case "heading-down": editorRef?.decreaseHeading(); break;
       case "zoom-in": zoomLevel = Math.min(2, zoomLevel + 1); localStorage.setItem("cron-insta-zoom", String(zoomLevel)); break;
       case "zoom-out": zoomLevel = Math.max(0, zoomLevel - 1); localStorage.setItem("cron-insta-zoom", String(zoomLevel)); break;
       case "dialogue-dash": editorRef?.insertPair("—", "—"); break;
       // ── Project operations ───────────────────────────────
-      case "new-chapter": crearCapituloNuevo(); break;
       case "open-project": abrirProyecto(); break;
       case "new-project": cerrarProyecto().then(() => { localStorage.removeItem("cron-insta-last-project"); crearCapituloNuevo(); }); break;
       case "import-project": importarProyectoHandler(); break;
@@ -2169,12 +2184,13 @@
       case "project-settings": settingsOpen = true; break;
       case "global-settings": globalSettingsOpen = true; break;
       case "repair-project": repairOpen = true; repairReport = null; break;
-      // ── Create entities ──────────────────────────────────
-      case "new-character": personajeFormVisible = true; setTimeout(() => document.querySelector<HTMLElement>(".inline-form .field-input")?.focus(), 50); break;
-      case "new-place": lugarFormVisible = true; setTimeout(() => document.querySelector<HTMLElement>(".inline-form .field-input")?.focus(), 50); break;
-      case "new-note": notaFormVisible = true; setTimeout(() => document.querySelector<HTMLElement>(".inline-form .field-input")?.focus(), 50); break;
-      case "new-event": eventoFormVisible = true; setTimeout(() => document.getElementById("evt-title")?.focus(), 50); break;
-      case "new-trama": handleNuevaTrama(); break;
+      // ── Tabs ────────────────────────────────────────────
+      case "tab-chapters": pendingDelete = null; activeTab = "capitulos"; activeNote = ""; break;
+      case "tab-characters": pendingDelete = null; activeTab = "personajes"; break;
+      case "tab-notes": pendingDelete = null; activeTab = "notas"; break;
+      case "tab-timeline": pendingDelete = null; activeTab = "timeline"; break;
+      case "tab-places": pendingDelete = null; activeTab = "lugares"; break;
+      case "tab-media": pendingDelete = null; activeTab = "media"; refreshMedia(); break;
       // ── UI toggles ───────────────────────────────────────
       case "dock": toggleDock(); break;
       case "toggle-footer": footerExpanded = !footerExpanded; break;
@@ -3686,16 +3702,17 @@
                           {#if editingShortcutId === s.id}
                             <span class="shortcut-capture-hint">{t("common.pressKeys")}</span>
                           {:else}
-                            <kbd>{s.ctrl ? "Ctrl+" : ""}{s.shift ? "Shift+" : ""}{s.alt ? "Alt+" : ""}{s.key === " " ? "Space" : s.key}</kbd>
+                            <kbd>
+                              {s.ctrl ? (LITERAL_CTRL_IDS.has(s.id) ? "Ctrl+" : (isMac ? "Cmd+" : "Ctrl+")) : ""}
+                              {s.shift ? "Shift+" : ""}
+                              {s.alt ? (isMac ? "Opt+" : "Alt+") : ""}
+                              {s.key === " " ? "Space" : s.key}
+                            </kbd>
                           {/if}
                         </td>
                         <td>{lang.current === "es" ? s.label_es : s.label_en}</td>
                         <td class="shortcut-actions">
-                          {#if editingShortcutId === s.id}
-                            <button class="shortcut-btn shortcut-cancel" onclick={cancelEditing} title={t("common.cancel")}><X size={12} weight="light" /></button>
-                          {:else}
-                            <button class="shortcut-btn shortcut-edit" onclick={() => startEditingShortcut(s.id)} title={t("common.edit")}><PencilSimple size={12} weight="light" /></button>
-                          {/if}
+                          <!-- shortcut editing temporarily disabled -->
                         </td>
                       </tr>
                     {/if}

@@ -616,64 +616,63 @@
 <!-- ── Atajos ────────────────────────────────────────── -->
 <section>
   <h2 class="section-title">Sin sacar las manos del teclado</h2>
-  <p class="section-desc">Navega entre capítulos, guarda, crea y organiza sin tocar el ratón.</p>
+  <p class="section-desc">Cada grupo de atajos usa un modificador distinto para que los memorices sin esfuerzo. Navega, edita y organiza tu novela sin tocar el ratón.</p>
 
-  <div class="shortcuts">
-    <div class="shortcut-item">
-      <div class="keys"><kbd>Ctrl</kbd><kbd>N</kbd></div>
-      <span class="label">Nuevo capítulo</span>
+  <div class="shortcuts-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-top: 2rem;">
+    <!-- Sidebar: Ctrl+Shift + arrows -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.25rem;">
+      <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--accent);margin-bottom:0.75rem;font-weight:600;">Panel lateral &nbsp;·&nbsp; Ctrl+Shift</div>
+      <div class="shortcut-item"><div class="keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>←</kbd><kbd>→</kbd></div><span class="label">Reducir / ampliar</span></div>
+      <div class="shortcut-item"><div class="keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>Alt</kbd><kbd>←</kbd></div><span class="label">Colapsar</span></div>
+      <div class="shortcut-item"><div class="keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>Alt</kbd><kbd>→</kbd></div><span class="label">Expandir al máximo</span></div>
     </div>
-    <div class="shortcut-item">
-      <div class="keys"><kbd>Ctrl</kbd><kbd>S</kbd></div>
-      <span class="label">Guardar ahora</span>
+
+    <!-- Navegación: Alt -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.25rem;">
+      <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--accent);margin-bottom:0.75rem;font-weight:600;">Navegación &nbsp;·&nbsp; Alt</div>
+      <div class="shortcut-item"><div class="keys"><kbd>Alt</kbd><kbd>←</kbd><kbd>→</kbd></div><span class="label">Capítulo anterior / siguiente</span></div>
     </div>
-    <div class="shortcut-item">
-      <div class="keys"><kbd>Ctrl</kbd><kbd>O</kbd></div>
-      <span class="label">Abrir proyecto</span>
+
+    <!-- Edición: Ctrl -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.25rem;">
+      <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--accent);margin-bottom:0.75rem;font-weight:600;">Edición &nbsp;·&nbsp; Ctrl</div>
+      <div class="shortcut-item"><div class="keys"><kbd>Ctrl</kbd><kbd>S</kbd></div><span class="label">Guardar ahora</span></div>
+      <div class="shortcut-item"><div class="keys"><kbd>Ctrl</kbd><kbd>B</kbd></div><span class="label">Negrita</span></div>
+      <div class="shortcut-item"><div class="keys"><kbd>Ctrl</kbd><kbd>I</kbd></div><span class="label">Cursiva</span></div>
+      <div class="shortcut-item"><div class="keys"><kbd>Ctrl</kbd><kbd>↑</kbd><kbd>↓</kbd></div><span class="label">Subir / bajar título</span></div>
+      <div class="shortcut-item"><div class="keys"><kbd>Ctrl</kbd><kbd>+</kbd><kbd>-</kbd></div><span class="label">Zoom</span></div>
+      <div class="shortcut-item"><div class="keys"><kbd>Ctrl</kbd><kbd>D</kbd></div><span class="label">Insertar guion (—)</span></div>
     </div>
-    <div class="shortcut-item">
-      <div class="keys"><kbd>Alt</kbd><kbd>←</kbd> <kbd>→</kbd></div>
-      <span class="label">Capítulo anterior / siguiente</span>
+
+    <!-- Proyecto: Ctrl+Alt -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.25rem;">
+      <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--accent);margin-bottom:0.75rem;font-weight:600;">Proyecto &nbsp;·&nbsp; Ctrl+Alt</div>
+      <div class="shortcut-item"><div class="keys"><kbd>Ctrl</kbd><kbd>Alt</kbd><kbd>O</kbd></div><span class="label">Abrir proyecto</span></div>
+      <div class="shortcut-item"><div class="keys"><kbd>Ctrl</kbd><kbd>Alt</kbd><kbd>W</kbd></div><span class="label">Cerrar proyecto</span></div>
+      <div class="shortcut-item"><div class="keys"><kbd>Ctrl</kbd><kbd>Alt</kbd><kbd>E</kbd></div><span class="label">Exportar ZIP</span></div>
+      <div class="shortcut-item"><div class="keys"><kbd>Ctrl</kbd><kbd>Alt</kbd><kbd>R</kbd></div><span class="label">Reparar proyecto</span></div>
+      <div class="shortcut-item"><div class="keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>I</kbd></div><span class="label">Importar proyecto</span></div>
     </div>
-    <div class="shortcut-item">
-      <div class="keys"><kbd>Ctrl</kbd><kbd>↑</kbd> <kbd>↓</kbd></div>
-      <span class="label">Subir / bajar nivel de título</span>
+
+    <!-- Tabs: Ctrl+Shift + número -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.25rem;">
+      <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--accent);margin-bottom:0.75rem;font-weight:600;">Pestañas &nbsp;·&nbsp; Ctrl+Shift + nº</div>
+      <div class="shortcut-item"><div class="keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>1</kbd></div><span class="label">Capítulos</span></div>
+      <div class="shortcut-item"><div class="keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>2</kbd></div><span class="label">Personajes</span></div>
+      <div class="shortcut-item"><div class="keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>3</kbd></div><span class="label">Notas</span></div>
+      <div class="shortcut-item"><div class="keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>4</kbd></div><span class="label">Línea de tiempo</span></div>
+      <div class="shortcut-item"><div class="keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>5</kbd></div><span class="label">Lugares</span></div>
+      <div class="shortcut-item"><div class="keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>6</kbd></div><span class="label">Media</span></div>
     </div>
-    <div class="shortcut-item">
-      <div class="keys"><kbd>Ctrl</kbd><kbd>Enter</kbd></div>
-      <span class="label">Pinear personaje, nota o lugar</span>
-    </div>
-    <div class="shortcut-item">
-      <div class="keys"><kbd>Ctrl</kbd><kbd>T</kbd></div>
-      <span class="label">Ciclar pestañas visibles</span>
-    </div>
-    <div class="shortcut-item">
-      <div class="keys"><kbd>Ctrl</kbd><kbd>D</kbd></div>
-      <span class="label">Insertar guion de diálogo (—)</span>
-    </div>
-    <div class="shortcut-item">
-      <div class="keys"><kbd>Ctrl</kbd><kbd>+</kbd> <kbd>-</kbd></div>
-      <span class="label">Aumentar / reducir zoom</span>
-    </div>
-    <div class="shortcut-item">
-      <div class="keys"><kbd>Ctrl</kbd><kbd>P</kbd></div>
-      <span class="label">Mostrar / ocultar panel lateral</span>
-    </div>
-    <div class="shortcut-item">
-      <div class="keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>←</kbd></div>
-      <span class="label">Ocultar panel lateral</span>
-    </div>
-    <div class="shortcut-item">
-      <div class="keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>→</kbd></div>
-      <span class="label">Expandir panel lateral</span>
-    </div>
-    <div class="shortcut-item">
-      <div class="keys"><kbd>Ctrl</kbd><kbd>I</kbd></div>
-      <span class="label">Importar proyecto .zip</span>
-    </div>
-    <div class="shortcut-item">
-      <div class="keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>N</kbd></div>
-      <span class="label">Nuevo proyecto</span>
+
+    <!-- Interfaz -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.25rem;">
+      <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--accent);margin-bottom:0.75rem;font-weight:600;">Interfaz</div>
+      <div class="shortcut-item"><div class="keys"><kbd>Ctrl</kbd><kbd>Enter</kbd></div><span class="label">Pinear elemento</span></div>
+      <div class="shortcut-item"><div class="keys"><kbd>Ctrl</kbd><kbd>Alt</kbd><kbd>P</kbd></div><span class="label">Panel inferior</span></div>
+      <div class="shortcut-item"><div class="keys"><kbd>F1</kbd></div><span class="label">Ayuda</span></div>
+      <div class="shortcut-item"><div class="keys"><kbd>F11</kbd></div><span class="label">Pantalla completa</span></div>
+      <div class="shortcut-item"><div class="keys"><kbd>Ctrl</kbd><kbd>,</kbd></div><span class="label">Configuración</span></div>
     </div>
   </div>
 </section>
@@ -736,7 +735,7 @@
       </div>
       <h3>Linux</h3>
       <p style="margin:0.5rem 0 1rem">.deb &nbsp;·&nbsp; .rpm &nbsp;·&nbsp; AppImage</p>
-      <a href="https://github.com/galejan/cron-insta/releases/tag/v0.3.3" class="btn btn-primary" style="font-size:0.85rem">Descargar</a>
+      <a href="https://github.com/galejan/cron-insta/releases/tag/v0.3.4" class="btn btn-primary" style="font-size:0.85rem">Descargar</a>
     </div>
     <div class="card dl-card">
       <div class="card-icon">
@@ -744,7 +743,7 @@
       </div>
       <h3>macOS</h3>
       <p style="margin:0.5rem 0 1rem">.dmg &nbsp;·&nbsp; Apple Silicon</p>
-      <a href="https://github.com/galejan/cron-insta/releases/tag/v0.3.3" class="btn btn-primary" style="font-size:0.85rem">Descargar</a>
+      <a href="https://github.com/galejan/cron-insta/releases/tag/v0.3.4" class="btn btn-primary" style="font-size:0.85rem">Descargar</a>
     </div>
     <div class="card dl-card">
       <div class="card-icon">
@@ -752,7 +751,7 @@
       </div>
       <h3>Windows</h3>
       <p style="margin:0.5rem 0 1rem">.msi &nbsp;·&nbsp; .exe</p>
-      <a href="https://github.com/galejan/cron-insta/releases/tag/v0.3.3" class="btn btn-primary" style="font-size:0.85rem">Descargar</a>
+      <a href="https://github.com/galejan/cron-insta/releases/tag/v0.3.4" class="btn btn-primary" style="font-size:0.85rem">Descargar</a>
     </div>
   </div>
 
