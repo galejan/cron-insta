@@ -63,6 +63,16 @@
     return editor.state.doc.textBetween(from, to) || "";
   }
 
+  /** Toggle bold on the current selection. */
+  export function toggleBold(): void {
+    editor?.chain().focus().toggleBold().run();
+  }
+
+  /** Toggle italic on the current selection. */
+  export function toggleItalic(): void {
+    editor?.chain().focus().toggleItalic().run();
+  }
+
   /** Delete the currently selected text and return the deleted content. */
   export function deleteSelection(): string {
     if (!editor) return "";
@@ -78,8 +88,6 @@
       element: editorContainer,
       extensions: [
         StarterKit.configure({
-          bold: false,
-          italic: false,
           strike: false,
           underline: false,
           code: false,

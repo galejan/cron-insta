@@ -8,6 +8,8 @@
     selectedText: string;
     onClose: () => void;
     onCut: () => void;
+    onToggleBold: () => void;
+    onToggleItalic: () => void;
     onSaveAsNote: () => void;
     onSaveAsTrait: () => void;
     onNewChapter: () => void;
@@ -22,6 +24,8 @@
     selectedText = "",
     onClose = () => {},
     onCut = () => {},
+    onToggleBold = () => {},
+    onToggleItalic = () => {},
     onSaveAsNote = () => {},
     onSaveAsTrait = () => {},
     onNewChapter = () => {},
@@ -157,6 +161,14 @@
       <div class="ctx-separator"></div>
       <button class="ctx-item" role="menuitem" onclick={() => handlePaste()}>
         {t("context.paste")}
+      </button>
+
+      <div class="ctx-separator"></div>
+      <button class="ctx-item" role="menuitem" onclick={() => handleAction(onToggleBold)}>
+        {t("context.bold")}
+      </button>
+      <button class="ctx-item" role="menuitem" onclick={() => handleAction(onToggleItalic)}>
+        {t("context.italic")}
       </button>
 
       {#if selectedText}

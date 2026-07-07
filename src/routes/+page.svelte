@@ -151,9 +151,9 @@
   });
   // Ordered groups: group.id → array of shortcut IDs in display order
   const SHORTCUT_GROUP_DEFS: { id: string; titleKey: string; shortcutIds: string[] }[] = [
-    { id: 'editing', titleKey: 'shortcuts.groupEditing', shortcutIds: ['save', 'heading-up', 'heading-down', 'zoom-in', 'zoom-out', 'dialogue-dash'] },
+    { id: 'editing', titleKey: 'shortcuts.groupEditing', shortcutIds: ['heading-up', 'heading-down', 'bold', 'italic', 'zoom-in', 'zoom-out', 'dialogue-dash'] },
     { id: 'navigation', titleKey: 'shortcuts.groupNavigation', shortcutIds: ['sidebar-collapse', 'sidebar-expand', 'sidebar-shrink', 'sidebar-grow', 'cycle-tabs', 'prev-chapter', 'next-chapter'] },
-    { id: 'project', titleKey: 'shortcuts.groupProject', shortcutIds: ['new-chapter', 'open-project', 'new-project', 'import-project', 'close-project', 'export-zip', 'export-md', 'project-settings', 'global-settings', 'repair-project'] },
+    { id: 'project', titleKey: 'shortcuts.groupProject', shortcutIds: ['save', 'new-chapter', 'open-project', 'new-project', 'import-project', 'close-project', 'export-zip', 'export-md', 'project-settings', 'global-settings', 'repair-project'] },
     { id: 'creation', titleKey: 'shortcuts.groupCreation', shortcutIds: ['new-character', 'new-place', 'new-note', 'new-event', 'new-trama'] },
     { id: 'interface', titleKey: 'shortcuts.groupInterface', shortcutIds: ['dock', 'toggle-footer', 'toggle-help', 'help-question', 'toggle-fullscreen'] },
   ];
@@ -2125,6 +2125,14 @@
         if (s.id === "dialogue-dash" && !editorRef?.isFocused()) {
           continue;
         }
+        // bold/italic: handled natively by TipTap editor
+        if (s.id === "bold" || s.id === "italic") {
+          continue;
+        }
+        // import-project: only fire when editor is NOT focused (Ctrl+I reserved for italic)
+        if (s.id === "import-project" && editorRef?.isFocused()) {
+          continue;
+        }
         e.preventDefault();
         executeShortcutAction(s.id);
         return;
@@ -3863,6 +3871,8 @@
   selectedText={contextMenu.selectedText}
   onClose={() => { contextMenu.open = false; }}
   onCut={() => { editorRef?.deleteSelection(); }}
+  onToggleBold={() => { editorRef?.toggleBold(); }}
+  onToggleItalic={() => { editorRef?.toggleItalic(); }}
   onSaveAsNote={handleSaveAsNote}
   onSaveAsTrait={handleSaveAsTrait}
   onNewChapter={handleNewChapterFromContext}
