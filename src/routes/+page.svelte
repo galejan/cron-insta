@@ -1593,6 +1593,7 @@
 
   /** Load git log for the sessions panel. */
   async function cargarGitLog(): Promise<void> {
+    console.log("[cron-insta] cargarGitLog called. projectPath:", projectPath, "gitStatus:", gitStatus);
     if (!projectPath || gitStatus !== "active") return;
     try {
       gitLogEntries = await obtenerGitLog(projectPath, 5);

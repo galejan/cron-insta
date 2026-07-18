@@ -108,13 +108,17 @@ pub fn eliminar_directorio_git(path: String) -> Result<(), String> {
 /// when present, otherwise shown as "—".
 #[tauri::command]
 pub fn obtener_git_log(path: String, limit: usize) -> Result<String, String> {
-    let project_path = Path::new(&path);
+    eprintln!("[cron-insta] obtener_git_log called with path: '{}'", path);
+    let project_path = Path::new(&path)
+        .canonicalize()
+        .unwrap_or_else(|_| Path::new(&path).to_path_buf());
+    eprintln!("[cron-insta] obtener_git_log canonicalized: '{}'", project_path.display());
     let git_path = find_git()?;
     let output = system_command(&git_path)
         .arg("log")
         .arg(format!("--format=%H|%ai|%s"))
         .arg(format!("-{}", limit.max(1).min(20)))
-        .current_dir(project_path)
+        .current_dir(&project_path)
         .output()
         .map_err(|e| format!("Error al leer el historial: {}", e))?;
     if !output.status.success() {
@@ -143,7 +147,7 @@ pub fn obtener_git_log(path: String, limit: usize) -> Result<String, String> {
                 (raw_msg.to_string(), "—".to_string())
             };
             // Get changed .md files for this commit
-            let files = get_changed_md_files(project_path, &git_path, &hash_full);
+            let files = get_changed_md_files(&project_path, &git_path, &hash_full);
             serde_json::json!({
                 "hash": hash,
                 "date": date,
