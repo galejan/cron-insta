@@ -88,7 +88,22 @@ pub fn inicializar_git(app: tauri::AppHandle, path: String) -> Result<String, St
 /// the binary is installed.
 #[tauri::command]
 pub fn verificar_git_inicializado(path: String) -> Result<bool, String> {
-    Ok(Path::new(&path).join(".git").exists())
+    let project_path = Path::new(&path)
+        .canonicalize()
+        .unwrap_or_else(|_| Path::new(&path).to_path_buf());
+    // Use git itself to verify — catches worktrees, submodules,
+    // and corrupt .git dirs that Path::exists() would miss.
+    let git_path = match find_git() {
+        Ok(g) => g,
+        Err(_) => return Ok(Path::new(&path).join(".git").exists()),
+    };
+    let output = system_command(&git_path)
+        .arg("rev-parse")
+        .arg("--is-inside-work-tree")
+        .current_dir(&project_path)
+        .output()
+        .map_err(|e| format!("Error ejecutando git: {}", e))?;
+    Ok(output.status.success() && String::from_utf8_lossy(&output.stdout).trim() == "true")
 }
 /// Remove the .git directory from a project (used when importing a project
 /// and the user wants to start a fresh history).
