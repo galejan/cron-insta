@@ -414,6 +414,11 @@ export async function leerMediaBase64(projectPath: string, filename: string): Pr
   return invoke("leer_media_base64", { proyectoPath: projectPath, filename });
 }
 
+/** Delete a media file and clean up references in character/place JSONs. */
+export async function eliminarMedia(projectPath: string, filename: string): Promise<string> {
+  return invoke("eliminar_media", { proyectoPath: projectPath, filename });
+}
+
 // ── Project Repair ─────────────────────────────────────────────
 
 export interface RepairReport {

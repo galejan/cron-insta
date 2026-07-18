@@ -116,7 +116,7 @@ Si hay problemas de permisos al escribir en la carpeta de destino, se muestra un
 
 ### Descargas
 
-Descargá la última versión desde [GitHub Releases](https://github.com/galejan/cron-insta/releases):
+Descarga la última versión desde [GitHub Releases](https://github.com/galejan/cron-insta/releases):
 
 | Plataforma | Formato |
 |-----------|---------|
@@ -124,7 +124,7 @@ Descargá la última versión desde [GitHub Releases](https://github.com/galejan
 | **macOS** | `.dmg` (Apple Silicon) |
 | **Windows** | `.msi` · `.exe` |
 
-> **Nota macOS:** Al abrir la app por primera vez, hacé *clic derecho → Abrir* para saltar Gatekeeper.
+> **Nota macOS:** Al abrir la app por primera vez, haz *clic derecho → Abrir* para saltar Gatekeeper.
 
 ### Requisitos
 
@@ -208,22 +208,28 @@ Mi Novela/
 
 | Atajo | Acción |
 |-------|--------|
+| <kbd>Ctrl</kbd> + <kbd>←</kbd> / <kbd>→</kbd> | Reducir / ampliar panel lateral |
 | <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>←</kbd> | Colapsar panel lateral (modo escritura) |
-| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>→</kbd> | Panel lateral a pantalla completa (modo referencia) |
-| <kbd>Ctrl</kbd> + <kbd>←</kbd> / <kbd>→</kbd> | Reducir / ampliar panel lateral (20 % – 100 %) |
-| <kbd>Ctrl</kbd> + <kbd>T</kbd> | Navegar pestañas visibles |
-| <kbd>Ctrl</kbd> + <kbd>Enter</kbd> | Pinear/depinear elemento activo (personaje, nota, lugar o imagen) |
-| <kbd>Ctrl</kbd> + <kbd>I</kbd> | Importar proyecto desde ZIP |
-| <kbd>↑</kbd> / <kbd>↓</kbd> / <kbd>Inicio</kbd> / <kbd>Fin</kbd> | Navegar listas del panel lateral |
-| <kbd>Ctrl</kbd> + <kbd>P</kbd> | Mostrar / ocultar panel de herramientas |
+| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>→</kbd> | Expandir panel lateral (modo referencia) |
 | <kbd>Ctrl</kbd> + <kbd>S</kbd> | Guardar ahora |
-| <kbd>Ctrl</kbd> + <kbd>N</kbd> | Nuevo capítulo |
-| <kbd>Alt</kbd> + <kbd>←</kbd> / <kbd>→</kbd> | Capítulo anterior / siguiente |
-| <kbd>Ctrl</kbd> + <kbd>O</kbd> | Abrir otro proyecto |
-| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>N</kbd> | Nuevo proyecto |
+| <kbd>Ctrl</kbd> + <kbd>B</kbd> | Negrita |
+| <kbd>Ctrl</kbd> + <kbd>I</kbd> | Cursiva |
 | <kbd>Ctrl</kbd> + <kbd>↑</kbd> / <kbd>↓</kbd> | Subir / bajar nivel de título |
-| <kbd>Ctrl</kbd> + <kbd>D</kbd> | Insertar guion de diálogo (`—`) |
-| <kbd>Ctrl</kbd> + <kbd>+</kbd> / <kbd>-</kbd> | Aumentar / reducir tamaño de letra |
+| <kbd>Ctrl</kbd> + <kbd>+</kbd> / <kbd>-</kbd> | Aumentar / reducir zoom |
+| <kbd>Ctrl</kbd> + <kbd>Enter</kbd> | Pinear/depinear elemento activo |
+| <kbd>Ctrl</kbd> + <kbd>I</kbd> | Importar proyecto desde ZIP |
+| <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>N</kbd> | Nuevo capítulo |
+| <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>O</kbd> | Abrir otro proyecto |
+| <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>N</kbd> | Nuevo proyecto |
+| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>C</kbd> | Nuevo personaje |
+| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>L</kbd> | Nuevo lugar |
+| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>M</kbd> | Nueva nota |
+| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>E</kbd> | Nuevo evento de timeline |
+| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>D</kbd> | Insertar guion de diálogo (`—`) |
+| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>G</kbd> | Nueva trama |
+| <kbd>Alt</kbd> + <kbd>←</kbd> / <kbd>→</kbd> | Capítulo anterior / siguiente |
+| <kbd>Ctrl</kbd> + <kbd>,</kbd> | Configuración del proyecto |
+| <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>,</kbd> | Configuración global |
 | <kbd>F11</kbd> | Pantalla completa |
 | <kbd>F1</kbd> o <kbd>?</kbd> | Mostrar panel de ayuda |
 
@@ -241,7 +247,7 @@ El backend Rust expone los siguientes comandos Tauri:
 - **Lugares**: `listar_lugares`, `crear_lugar`, `cargar_lugar`, `actualizar_lugar`, `eliminar_lugar`
 - **Tramas**: `crear_trama`, `eliminar_trama`, `asignar_capitulo_trama`
 - **Timeline**: `cargar_timeline`, `agregar_evento_timeline`, `actualizar_evento_timeline`, `reordenar_timeline`, `eliminar_evento_timeline`
-- **Media**: `listar_media`, `copiar_a_media`, `leer_media_base64`
+- **Media**: `listar_media`, `copiar_a_media`, `leer_media_base64`, `eliminar_media`
 - **Estadísticas**: `iniciar_sesion_escritura`, `cargar_estadisticas`
 - **Configuración**: `actualizar_config_proyecto`, `actualizar_fuente_proyecto`
 - **Exportación**: `exportar_proyecto_zip`, `exportar_proyecto_md`, `importar_proyecto`, `eliminar_directorio_git`

@@ -215,6 +215,7 @@ This is a literary writing project managed by **Cron-Insta**, a desktop writing 
   - `physicalDescription` (string, optional): Physical appearance
   - `personality` (string, optional): Personality traits
   - `traumas` (string, optional): Backstory or trauma
+  - `image` (string, optional): Filename of the character's portrait image, stored in `media/`
   - `relationships` (array): List of relationships with other characters
 - **Index**: `personajes/index.json` → array of `{{ id, name }}`
 ### Character Relationship
@@ -236,6 +237,7 @@ This is a literary writing project managed by **Cron-Insta**, a desktop writing 
   - `id` (string): Unique identifier
   - `name` (string): Place display name
   - `description` (string): Place description
+  - `image` (string, optional): Filename of the place's image, stored in `media/`
 - **Index**: `lugares/index.json` → array of `{{ id, name }}`
 ### Media
 - **Storage**: `media/` directory (flat — no subdirectories)
@@ -286,6 +288,8 @@ Deleting a Trama sets all its assigned chapters' `trama_id` to `null` — chapte
 | `font_family` | string | Editor font: `"monospace"`, `"serif"`, or `"sans-serif"` |
 | `push_enabled` | boolean | Whether auto-push to remote is active for this project (default: false) |
 | `consecutive_failures` | number | Consecutive push failure count for the 3-strike auto-disable rule (default: 0) |
+| `visible_tabs` | object | Tab visibility toggles: `{ characters, places, notes, timeline, media }` (all booleans) |
+| `auto_save_interval_minutes` | number | Auto-save interval in minutes (default: 1) |
 ### `.config/timeline.json`
 JSON array of TimelineEvent objects (see Entity section above).
 ## Directory Structure

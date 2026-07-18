@@ -73,6 +73,7 @@ pub fn run() {
             listar_media,
             copiar_a_media,
             leer_media_base64,
+            eliminar_media,
             exportar_proyecto_zip,
             exportar_proyecto_md,
             importar_proyecto,

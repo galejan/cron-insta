@@ -57,6 +57,7 @@
     listarMedia,
     leerMediaBase64,
     copiarAMedia,
+    eliminarMedia,
     listarNotas,
     listarPersonajes,
     marcarProyectoCronInsta,
@@ -669,6 +670,19 @@
       await refreshMedia();
     } catch (e) {
       console.error("[cron-insta] Media upload failed:", e);
+    }
+  }
+
+  async function deleteMedia(filename: string): Promise<void> {
+    if (!projectPath) return;
+    try {
+      await eliminarMedia(projectPath, filename);
+      delete mediaSrcCache[filename];
+      if (mediaViewer === filename) mediaViewer = null;
+      if (mediaDocked === filename) mediaDocked = null;
+      await refreshMedia();
+    } catch (e) {
+      console.error("[cron-insta] Media delete failed:", e);
     }
   }
 
@@ -3874,7 +3888,14 @@
         style="max-width:100%;max-height:85vh;object-fit:contain;display:block;" />
       <div style="display:flex;justify-content:space-between;align-items:center;padding:0.25rem 0.5rem;">
         <span style="font-size:0.75rem;color:#64748b;">{mediaViewer}</span>
-        <button class="btn-sm" onclick={() => mediaViewer = null}>{t("common.cancel")}</button>
+        <div style="display:flex;gap:0.5rem;">
+          <button class="btn-sm" style="background:#ef4444;color:#fff;border-color:#ef4444;"
+            onclick={async () => {
+              const confirmed = confirm(t("media.deleteConfirm"));
+              if (confirmed) { await deleteMedia(mediaViewer!); }
+            }}>{t("media.delete")}</button>
+          <button class="btn-sm" onclick={() => mediaViewer = null}>{t("common.cancel")}</button>
+        </div>
       </div>
     </div>
   </div>

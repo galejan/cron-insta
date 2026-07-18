@@ -137,6 +137,9 @@ const translations: Record<Lang, Record<string, string>> = {
     "media.upload": "+ Subir imágenes",
     "media.empty": "Sin imágenes aún.",
     "media.viewerTitle": "Visor de imagen",
+    "media.delete": "Eliminar",
+    "media.deleteConfirm": "¿Eliminar esta imagen? También se quitará de personajes y lugares que la usen.",
+    "media.deleteError": "Error al eliminar imagen:",
 
     // ── Chapters ───────────────────────────────────────────
     "chapters.label": "Capítulos:",
@@ -627,6 +630,9 @@ const translations: Record<Lang, Record<string, string>> = {
     "media.upload": "+ Upload images",
     "media.empty": "No images yet.",
     "media.viewerTitle": "Image viewer",
+    "media.delete": "Delete",
+    "media.deleteConfirm": "Delete this image? It will also be removed from characters and places that use it.",
+    "media.deleteError": "Error deleting image:",
 
     // ── Chapters ───────────────────────────────────────────
     "chapters.label": "Chapters:",

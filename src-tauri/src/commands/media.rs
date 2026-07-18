@@ -47,6 +47,64 @@ pub fn copiar_a_media(proyecto_path: String, source_path: String) -> Result<Stri
         .map_err(|e| format!("Error copiando archivo: {}", e))?;
     Ok(dest.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string())
 }
+/// Delete a media file and clean up all references in character/place JSONs.
+#[tauri::command]
+pub fn eliminar_media(proyecto_path: String, filename: String) -> Result<String, String> {
+    let media_dir = Path::new(&proyecto_path).join("media");
+    let file_path = media_dir.join(&filename);
+    if !file_path.is_file() {
+        return Err(format!("Archivo '{}' no encontrado en media/", filename));
+    }
+    std::fs::remove_file(&file_path)
+        .map_err(|e| format!("Error eliminando archivo: {}", e))?;
+
+    // Clean up references in character JSONs
+    let personajes_dir = Path::new(&proyecto_path).join("personajes");
+    if personajes_dir.is_dir() {
+        if let Ok(entries) = std::fs::read_dir(&personajes_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|e| e.to_str()) == Some("json")
+                    && path.file_name().and_then(|n| n.to_str()) != Some("index.json")
+                {
+                    if let Ok(content) = std::fs::read_to_string(&path) {
+                        if let Ok(mut val) = serde_json::from_str::<serde_json::Value>(&content) {
+                            if val.get("image").and_then(|v| v.as_str()) == Some(&filename) {
+                                val["image"] = serde_json::Value::Null;
+                                let _ = std::fs::write(&path, serde_json::to_string_pretty(&val).unwrap_or_default());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Clean up references in place JSONs
+    let lugares_dir = Path::new(&proyecto_path).join("lugares");
+    if lugares_dir.is_dir() {
+        if let Ok(entries) = std::fs::read_dir(&lugares_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|e| e.to_str()) == Some("json")
+                    && path.file_name().and_then(|n| n.to_str()) != Some("index.json")
+                {
+                    if let Ok(content) = std::fs::read_to_string(&path) {
+                        if let Ok(mut val) = serde_json::from_str::<serde_json::Value>(&content) {
+                            if val.get("image").and_then(|v| v.as_str()) == Some(&filename) {
+                                val["image"] = serde_json::Value::Null;
+                                let _ = std::fs::write(&path, serde_json::to_string_pretty(&val).unwrap_or_default());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(filename)
+}
+
 /// Read a media file and return it as a base64 data URL.
 ///
 /// Tries an exact filename match first.  If that fails, falls back to a
