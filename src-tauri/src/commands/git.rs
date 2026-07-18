@@ -17,16 +17,27 @@ use crate::commands::stats::finalizar_sesion_escritura;
 /// exists (backward-compatible behaviour).
 #[tauri::command]
 pub fn inicializar_git(app: tauri::AppHandle, path: String) -> Result<String, String> {
-    let project_path = Path::new(&path);
-    // Already initialised → silent success
-    if project_path.join(".git").exists() {
-        return Ok("El repositorio ya estaba inicializado.".to_string());
+    let project_path = Path::new(&path)
+        .canonicalize()
+        .unwrap_or_else(|_| Path::new(&path).to_path_buf());
+    // Check if git already considers this a valid work tree
+    if let Ok(git_path) = find_git() {
+        let check = system_command(&git_path)
+            .arg("rev-parse")
+            .arg("--is-inside-work-tree")
+            .current_dir(&project_path)
+            .output();
+        if let Ok(out) = check {
+            if out.status.success() && String::from_utf8_lossy(&out.stdout).trim() == "true" {
+                return Ok("El repositorio ya estaba inicializado.".to_string());
+            }
+        }
     }
     // Locate git binary (returns Err with user-facing message when absent)
     let git_path = find_git()?;
     let output = system_command(&git_path)
         .arg("init")
-        .current_dir(project_path)
+        .current_dir(&project_path)
         .output()
         .map_err(|e| format!("Error al ejecutar git init: {}", e))?;
     if output.status.success() {
@@ -38,26 +49,26 @@ pub fn inicializar_git(app: tauri::AppHandle, path: String) -> Result<String, St
             .arg("config")
             .arg("user.name")
             .arg(&user_name)
-            .current_dir(project_path)
+            .current_dir(&project_path)
             .output();
         let _ = system_command(&git_path)
             .arg("config")
             .arg("user.email")
             .arg(&user_email)
-            .current_dir(project_path)
+            .current_dir(&project_path)
             .output();
         // First commit — "Primera piedra"
         let _ = system_command(&git_path)
             .arg("add")
             .arg(".")
-            .current_dir(project_path)
+            .current_dir(&project_path)
             .output();
         let commit_msg = "Primera piedra ✍️";
         let commit_output = system_command(&git_path)
             .arg("commit")
             .arg("-m")
             .arg(commit_msg)
-            .current_dir(project_path)
+            .current_dir(&project_path)
             .output()
             .map_err(|e| format!("Error en primer commit: {}", e))?;
         if commit_output.status.success() {
@@ -66,7 +77,7 @@ pub fn inicializar_git(app: tauri::AppHandle, path: String) -> Result<String, St
                 .arg("branch")
                 .arg("-M")
                 .arg("main")
-                .current_dir(project_path)
+                .current_dir(&project_path)
                 .output();
             Ok("Repositorio Git inicializado y primer commit creado.".to_string())
         } else {
