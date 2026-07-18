@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark-nordic">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cron-Insta — Presentación Técnica</title>
+<style>
+  /* ── 4-Theme CSS Custom Properties (from src/app.css) ──────── */
+  html, html[data-theme="dark-nordic"] {
+    --bg-app: #0f172a;
+    --bg-editor: #0c1424;
+    --bg-sidebar: #0f172a;
+    --bg-active-tab: #1e293b;
+    --text-main: #e2e8f0;
+    --text-title: #f1f5f9;
+    --text-muted: #64748b;
+    --border-color: #1e293b;
+    --accent: #3b82f6;
+    --accent-soft: #1e3a5f;
+    --accent-hover: #2563eb;
+    --scrollbar-thumb: #334155;
+  }
+
+  /* ── Presentation Scaffold ─────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg-app);
+    color: var(--text-main);
+    line-height: 1.7;
+    scroll-behavior: smooth;
+    scroll-snap-type: y mandatory;
+    overflow-y: scroll;
+    height: 100vh;
+  }
+
+  /* ── Slides ────────────────────────────────────────────────── */
+  .slide {
+    scroll-snap-align: start;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 4rem 6rem;
+    border-bottom: 1px solid var(--border-color);
+    position: relative;
+  }
+
+  .slide-number {
+    position: absolute;
+    top: 2rem;
+    right: 3rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-family: "SF Mono", "Fira Code", monospace;
+  }
+
+  /* ── Typography ────────────────────────────────────────────── */
+  h1 {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 3.5rem;
+    font-weight: 700;
+    color: var(--text-title);
+    line-height: 1.2;
+    margin-bottom: 0.75rem;
+  }
+
+  h2 {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: var(--text-title);
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--accent);
+    display: inline-block;
+  }
+
+  h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  p, li { font-size: 1.1rem; color: var(--text-main); }
+
+  .subtitle {
+    font-size: 1.3rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+  }
+
+  .tag {
+    display: inline-block;
+    background: var(--accent-soft);
+    color: var(--accent);
+    padding: 0.2rem 0.7rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-right: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  /* ── Code / Terminal Blocks ────────────────────────────────── */
+  pre, .code-block {
+    background: var(--bg-editor);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.25rem 1.5rem;
+    overflow-x: auto;
+    font-family: "SF Mono", "Fira Code", "JetBrains Mono", monospace;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: var(--text-main);
+  }
+
+  .code-block .comment { color: var(--text-muted); }
+  .code-block .keyword { color: var(--accent); }
+  .code-block .string { color: #a5d6a7; }
+  .code-block .number { color: #f48fb1; }
+
+  /* ── Layout Helpers ────────────────────────────────────────── */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-top: 1.5rem;
+  }
+
+  .grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+  }
+
+  .grid-4 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+  }
+
+  .card {
+    background: var(--bg-active-tab);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 1.5rem;
+  }
+
+  .card h3 { margin-bottom: 0.75rem; }
+
+  .card p, .card ul { font-size: 0.95rem; }
+
+  .card ul { padding-left: 1.25rem; }
+
+  .card ul li { margin-bottom: 0.4rem; }
+
+  /* ── Timeline ──────────────────────────────────────────────── */
+  .timeline {
+    position: relative;
+    padding-left: 2rem;
+    margin-top: 1.5rem;
+  }
+
+  .timeline::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--accent);
+  }
+
+  .timeline-entry {
+    position: relative;
+    margin-bottom: 1.5rem;
+    padding-left: 1.5rem;
+  }
+
+  .timeline-entry::before {
+    content: "";
+    position: absolute;
+    left: -2.35rem;
+    top: 0.5rem;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--bg-app);
+  }
+
+  .timeline-entry .version {
+    font-weight: 700;
+    color: var(--accent);
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 0.9rem;
+  }
+
+  .timeline-entry .date {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-left: 0.5rem;
+  }
+
+  /* ── Module tree ───────────────────────────────────────────── */
+  .tree {
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 0.9rem;
+    line-height: 1.8;
+    color: var(--text-muted);
+  }
+
+  .tree .dir  { color: var(--accent); }
+  .tree .file { color: var(--text-main); }
+
+  /* ── Stats row ─────────────────────────────────────────────── */
+  .stats-row {
+    display: flex;
+    gap: 2rem;
+    margin-top: 1.5rem;
+  }
+
+  .stat {
+    text-align: center;
+  }
+
+  .stat .value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--accent);
+    font-family: Georgia, serif;
+  }
+
+  .stat .label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── Principles list ───────────────────────────────────────── */
+  .principle {
+    margin-bottom: 1.25rem;
+  }
+
+  .principle strong {
+    color: var(--accent);
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 0.95rem;
+  }
+
+  .principle p {
+    margin-top: 0.25rem;
+    font-size: 0.95rem;
+    color: var(--text-muted);
+  }
+
+  /* ── Highlight box ─────────────────────────────────────────── */
+  .highlight-box {
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    padding: 1rem 1.5rem;
+    border-radius: 0 8px 8px 0;
+    margin-top: 1rem;
+  }
+
+  .highlight-box p {
+    font-size: 0.95rem;
+  }
+
+  /* ── Footer ────────────────────────────────────────────────── */
+  .footer {
+    position: absolute;
+    bottom: 2rem;
+    left: 6rem;
+    right: 6rem;
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    border-top: 1px solid var(--border-color);
+    padding-top: 0.75rem;
+  }
+
+  /* ── Navigation dots ───────────────────────────────────────── */
+  .nav-dots {
+    position: fixed;
+    right: 2rem;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    z-index: 100;
+  }
+
+  .nav-dots a {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    transition: background 0.2s;
+  }
+
+  .nav-dots a:hover,
+  .nav-dots a.active {
+    background: var(--accent);
+  }
+
+  @media (max-width: 900px) {
+    .slide { padding: 2rem 1.5rem; }
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+    h1 { font-size: 2rem; }
+    h2 { font-size: 1.5rem; }
+    .stats-row { flex-wrap: wrap; gap: 1rem; }
+    .footer { left: 1.5rem; right: 1.5rem; flex-direction: column; gap: 0.5rem; }
+  }
+
+  @media print {
+    body { scroll-snap-type: none; overflow-y: visible; height: auto; }
+    .slide { scroll-snap-align: none; min-height: auto; page-break-after: always; }
+    .nav-dots { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 1 — PORTADA                                                   -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<section class="slide" id="s1">
+  <div class="slide-number">01</div>
+
+  <div style="margin-bottom: 2rem;">
+    <span class="tag">v0.3.3</span>
+    <span class="tag">Tauri v2</span>
+    <span class="tag">Svelte 5</span>
+    <span class="tag">Rust</span>
+  </div>
+
+  <h1>Cron-Insta</h1>
+  <p class="subtitle" style="font-size: 1.5rem; color: var(--text-main); max-width: 700px;">
+    Escritorio literario — una aplicación de escritorio para escritores
+    con control de versiones integrado
+  </p>
+
+  <p style="margin-top: 2rem; color: var(--text-muted); max-width: 600px;">
+    Presentación técnica · Julio 2026
+  </p>
+
+  <div class="footer">
+    <span>Cron-Insta v0.3.3</span>
+    <span>github.com/galejan/cron-insta</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 2 — QUÉ ES + POR QUÉ NACE                                -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<section class="slide" id="s2">
+  <div class="slide-number">02</div>
+
+  <h2>Qué es Cron-Insta</h2>
+
+  <div class="grid-2">
+    <div>
+      <p style="font-size: 1.15rem;">
+        Un <strong>editor literario de escritorio</strong> que integra
+        procesador de texto, worldbuilding y control de versiones en una
+        sola herramienta. No es un procesador genérico: está diseñado
+        específicamente para el flujo de trabajo de un novelista.
+      </p>
+
+      <div class="highlight-box" style="margin-top: 1.5rem;">
+        <p>
+          <strong>Local-first.</strong> Todo ocurre en el disco local.
+          Los datos son tuyos, en formato abierto. Sin nube, sin cuenta,
+          sin dependencia externa.
+        </p>
+      </div>
+    </div>
+
+    <div>
+      <h3>¿Por qué nace?</h3>
+      <p>
+        Las herramientas existentes obligan a elegir: o escribes en un
+        editor sin estructura, o gestionas worldbuilding en apps separadas,
+        o versionas manualmente con Git. <strong>Cron-Insta unifica los
+        tres planos</strong> en una experiencia coherente.
+      </p>
+
+      <ul style="margin-top: 1rem; padding-left: 1.25rem;">
+        <li>El escritor no debería ser administrador de sistemas</li>
+        <li>Git debe ser invisible hasta que se necesite</li>
+        <li>Personajes, lugares y línea temporal viven junto al texto</li>
+        <li>Las sesiones de escritura deben medirse sin fricción</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>Cron-Insta v0.3.3</span>
+    <span>Qué es · Por qué nace</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 3 — PUNTOS FUERTES                                        -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<section class="slide" id="s3">
+  <div class="slide-number">03</div>
+
+  <h2>Puntos fuertes</h2>
+
+  <div class="grid-3">
+    <div class="card">
+      <h3>🎯 Editor completo</h3>
+      <p>
+        TipTap (ProseMirror) como núcleo de edición. Tipografía Georgia
+        a 18px con 80 caractéres por línea. Modo oscuro pensado para
+        sesiones largas. Autoguardado configurable (1/5/10 min).
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>🌍 Worldbuilding integrado</h3>
+      <p>
+        Fichas de personajes (con relaciones), lugares (con imagen),
+        notas de investigación, timeline cronológico y sistema de tramas
+        con drag & drop. Todo indexado y buscable desde el sidebar.
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>🖼️ Galería multimedia</h3>
+      <p>
+        Subida de imágenes de referencia, visor modal con zoom, anclado
+        al editor (dock panel). Fallback case-insensitive cross-platform
+        para compatibilidad Windows/macOS/Linux.
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>📊 Estadísticas de sesión</h3>
+      <p>
+        Tracking silencioso de palabras escritas y tiempo por capítulo.
+        Panel de estadísticas con histórico de sesiones, totales por
+        proyecto y bootstrap desde sesiones anteriores.
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>🎨 4 temas visuales</h3>
+      <p>
+        Sistema de CSS custom properties con 4 temas completos: Nordic
+        Oscuro, Amatista, Nordic Claro y Sepia. Migración automática
+        desde el antiguo sistema binario dark/light.
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>⌨️ Atajos configurables</h3>
+      <p>
+        31 acciones con atajos personalizables desde el panel de
+        configuración. Detección de conflictos con swap/overwrite.
+        5 grupos en acordeones. Compatible con teclados españoles.
+      </p>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>Cron-Insta v0.3.3</span>
+    <span>Puntos fuertes</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 4 — GIT OPCIONAL                                           -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<section class="slide" id="s4">
+  <div class="slide-number">04</div>
+
+  <h2>Control de versiones integrado</h2>
+
+  <div class="grid-2">
+    <div>
+      <p style="font-size: 1.15rem;">
+        Cada proyecto es un <strong>repositorio Git autónomo</strong>.
+        El versionado es <strong>totalmente opcional</strong>: sin Git
+        instalado, la app funciona igual. Si Git está presente, se
+        integra de forma transparente.
+      </p>
+
+      <div style="margin-top: 1.5rem;">
+        <h3>Lo que hace sin preguntar</h3>
+        <ul style="padding-left: 1.25rem;">
+          <li><code>git init</code> al crear proyecto (si Git disponible)</li>
+          <li>Commit "Primera piedra ✍️" automático</li>
+          <li>Checkpoint en cada guardado de capítulo</li>
+          <li>Auto-push programable (si hay remote configurado)</li>
+          <li>Identidad Git configurable por proyecto</li>
+        </ul>
+      </div>
+    </div>
+
+    <div>
+      <h3>El modelo de datos</h3>
+      <pre>proyecto/
+├── <span class="dir">.git/</span>              ← repositorio autónomo
+├── <span class="dir">.config/</span>
+│   ├── metadata.json   ← índice del proyecto
+│   ├── timeline.json   ← eventos cronológicos
+│   └── stats.json      ← estadísticas de sesión
+├── <span class="dir">capitulos/</span>         ← un .md por capítulo
+├── <span class="dir">personajes/</span>        ← un .json por personaje
+├── <span class="dir">lugares/</span>           ← un .json por lugar
+├── <span class="dir">notas/</span>             ← notas de investigación
+└── <span class="dir">media/</span>             ← imágenes de referencia</pre>
+
+      <div class="highlight-box" style="margin-top: 1rem;">
+        <p>
+          <strong>Todo en texto plano.</strong> Markdown para capítulos,
+          JSON para metadatos. Sin base de datos, sin formato propietario.
+          Tus datos sobreviven a la aplicación.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>Cron-Insta v0.3.3</span>
+    <span>Git opcional · Datos en texto plano</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 5 — SOLID — VISIÓN GENERAL                                -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<section class="slide" id="s5">
+  <div class="slide-number">05</div>
+
+  <h2>Arquitectura SOLID</h2>
+
+  <p style="margin-bottom: 1.5rem; max-width: 800px;">
+    En v0.3.0 el backend era un solo archivo de <strong>7370 líneas</strong>
+    (<code>lib.rs</code>). Se aplicó un refactor guiado por principios SOLID
+    para extraer 16 módulos con responsabilidad única.
+  </p>
+
+  <div class="grid-2">
+    <div>
+      <div class="principle">
+        <strong>S — Single Responsibility</strong>
+        <p>
+          Cada archivo en <code>commands/</code> maneja exactamente un
+          dominio: <code>chapters.rs</code> no sabe de personajes,
+          <code>media.rs</code> no toca el timeline. Models, utils y
+          commands son capas separadas.
+        </p>
+      </div>
+
+      <div class="principle">
+        <strong>O — Open/Closed</strong>
+        <p>
+          Añadir un nuevo comando Tauri es añadir un archivo a
+          <code>commands/</code> y una línea en <code>mod.rs</code>.
+          El <code>invoke_handler</code> crece por registro, no por
+          modificación de lógica existente.
+        </p>
+      </div>
+
+      <div class="principle">
+        <strong>L — Liskov Substitution</strong>
+        <p>
+          <code>Models</code> usa <code>#[serde(default)]</code> para
+          backward compatibility. Un <code>metadata.json</code> de v0.2.0
+          se deserializa correctamente en v0.3.3 sin migración.
+        </p>
+      </div>
+    </div>
+
+    <div>
+      <div class="principle">
+        <strong>I — Interface Segregation</strong>
+        <p>
+          Los comandos Tauri exponen interfaces mínimas. El frontend
+          recibe exactamente los datos que necesita. <code>GitDetectedConfig</code>
+          es un struct de solo lectura; <code>VisibleTabs</code> valida
+          invariantes en frontera.
+        </p>
+      </div>
+
+      <div class="principle">
+        <strong>D — Dependency Inversion</strong>
+        <p>
+          <code>utils.rs</code> concentra funciones puras sin dependencia
+          de <code>AppHandle</code>. Los comandos dependen de utilidades,
+          no al revés. <code>system_command()</code> abstrae diferencias
+          Windows/Linux (CREATE_NO_WINDOW, SSH_AUTH_SOCK).
+        </p>
+      </div>
+
+      <div class="highlight-box">
+        <p>
+          <strong>Resultado:</strong> 1 archivo monolítico → 16 módulos
+          enfocados. El test suite (137 tests) vive en <code>lib.rs</code>
+          y tiene acceso a todos los comandos vía <code>crate::commands::*</code>.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>Cron-Insta v0.3.3</span>
+    <span>SOLID · 1→16 módulos</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 6 — ESTRUCTURA DEL BACKEND                                -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<section class="slide" id="s6">
+  <div class="slide-number">06</div>
+
+  <h2>Backend — 15 módulos de dominio</h2>
+
+  <div class="grid-2">
+    <div>
+      <pre class="tree">src-tauri/src/
+├── <span class="dir">commands/</span>
+│   ├── <span class="file">mod.rs</span>          ← re-exports
+│   ├── <span class="file">project.rs</span>      ← crear, abrir, activar
+│   ├── <span class="file">chapters.rs</span>     ← CRUD capítulos
+│   ├── <span class="file">characters.rs</span>   ← CRUD personajes
+│   ├── <span class="file">places.rs</span>       ← CRUD lugares
+│   ├── <span class="file">notes.rs</span>        ← CRUD notas
+│   ├── <span class="file">timeline.rs</span>     ← eventos cronológicos
+│   ├── <span class="file">tramas.rs</span>       ← plotlines + drag & drop
+│   ├── <span class="file">media.rs</span>        ← upload, base64, fallback
+│   ├── <span class="file">git.rs</span>          ← init, push, log, remote
+│   ├── <span class="file">config.rs</span>       ← identidad, fuente, tabs
+│   ├── <span class="file">stats.rs</span>        ← sesiones, checkpoint
+│   ├── <span class="file">export.rs</span>       ← ZIP, import/export
+│   ├── <span class="file">repair.rs</span>       ← reconstruir índices
+│   └── <span class="file">shortcuts.rs</span>    ← atajos configurables
+├── <span class="file">models.rs</span>           ← structs, enums, Default
+├── <span class="file">utils.rs</span>            ← funciones puras
+├── <span class="file">lib.rs</span>              ← entry point + tests
+└── <span class="file">main.rs</span>             ← binario</pre>
+    </div>
+
+    <div>
+      <h3>Frontend — 7 componentes extraídos</h3>
+      <pre class="tree">src/lib/
+├── <span class="file">components/</span>
+│   ├── <span class="file">Editor.svelte</span>                ← TipTap wrapper
+│   ├── <span class="file">DockPanel.svelte</span>             ← personaje/nota/lugar/media
+│   ├── <span class="file">StatsFooter.svelte</span>           ← barra de estadísticas
+│   ├── <span class="file">GlobalSettingsDialog.svelte</span>  ← idioma + tema
+│   ├── <span class="file">GitIdentityDialog.svelte</span>     ← identidad Git
+│   ├── <span class="file">ProjectSettingsDialog.svelte</span> ← fuente, tabs, remote
+│   └── <span class="file">EditorContextMenu.svelte</span>     ← menú contextual
+├── <span class="file">i18n.svelte.ts</span>     ← 110+ claves ES/EN reactivas
+├── <span class="file">theme.svelte.ts</span>    ← ThemeManager con $state
+├── <span class="file">checkpoint.ts</span>      ← debounce + auto-push
+├── <span class="file">debounce.ts</span>        ← utilidad genérica
+└── <span class="file">tauri.ts</span>           ← wrappers de IPC</pre>
+
+      <div class="highlight-box" style="margin-top: 1rem;">
+        <p>
+          <strong>+page.svelte</strong> sigue siendo el archivo más grande
+          (~5700 líneas). Es el siguiente candidato a descomposición en
+          componentes de layout (sidebar, toolbar, panel de capítulos).
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>Cron-Insta v0.3.3</span>
+    <span>Backend 15 módulos · Frontend 7 componentes</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 7 — STACK TECNOLÓGICO                                     -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<section class="slide" id="s7">
+  <div class="slide-number">07</div>
+
+  <h2>Stack tecnológico</h2>
+
+  <div class="grid-3">
+    <div class="card">
+      <h3>🦀 Rust (backend)</h3>
+      <p>
+        <strong>Tauri v2</strong> como runtime de escritorio. 15 módulos
+        de comandos con <code>#[tauri::command]</code>. Estado compartido
+        vía <code>Mutex&lt;ProjectState&gt;</code>. Sin unsafe, sin GC.
+      </p>
+      <p style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-muted);">
+        Dependencias: serde, chrono, base64, zip, tokio (timers)
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>🧩 Svelte 5 (frontend)</h3>
+      <p>
+        <strong>Runes mode</strong> (<code>$state</code>, <code>$effect</code>,
+        <code>$derived</code>). Reactividad sin Virtual DOM.
+        i18n reactivo con <code>$state</code>. ThemeManager con
+        <code>data-theme</code> en <code>&lt;html&gt;</code>.
+      </p>
+      <p style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-muted);">
+        TipTap (ProseMirror) como editor rich text
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>📦 Build & CI</h3>
+      <p>
+        <strong>Vite</strong> con <code>manualChunks</code> para
+        tiptap/prosemirror (217 kB el chunk principal).
+        <strong>GitHub Actions</strong>: build matrices para
+        Windows, macOS y Linux. Release automática al pushear tag.
+      </p>
+      <p style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-muted);">
+        Sin gh CLI. El CI gestiona releases.
+      </p>
+    </div>
+  </div>
+
+  <div class="stats-row" style="margin-top: 2.5rem;">
+    <div class="stat">
+      <div class="value">137</div>
+      <div class="label">Tests Rust</div>
+    </div>
+    <div class="stat">
+      <div class="value">15</div>
+      <div class="label">Módulos backend</div>
+    </div>
+    <div class="stat">
+      <div class="value">7</div>
+      <div class="label">Componentes frontend</div>
+    </div>
+    <div class="stat">
+      <div class="value">31</div>
+      <div class="label">Atajos configurables</div>
+    </div>
+    <div class="stat">
+      <div class="value">110+</div>
+      <div class="label">Claves i18n</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>Cron-Insta v0.3.3</span>
+    <span>Stack · Rust + Svelte 5 + TipTap</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 8 — EVOLUCIÓN (parte 1)                                  -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<section class="slide" id="s8">
+  <div class="slide-number">08</div>
+
+  <h2>Evolución del proyecto</h2>
+
+  <div class="grid-2">
+    <div>
+      <div class="timeline">
+        <div class="timeline-entry">
+          <span class="version">Pre-v0.1.0</span>
+          <span class="date">Junio 17, 2026</span>
+          <p>
+            <strong>Scaffold.</strong> Bootstrap con <code>pnpm create tauri-app</code>.
+            5 comandos Rust en un solo archivo. Sin frontend real, solo estructura.
+            Diseño del sistema refinado de v1.0.0 a v1.1.0 con schemas de datos y
+            estrategia de testing.
+          </p>
+        </div>
+
+        <div class="timeline-entry">
+          <span class="version">v0.2.0 → v0.2.1</span>
+          <span class="date">Junio 18–21</span>
+          <p>
+            <strong>Editor funcional.</strong> Integración de TipTap con debounce
+            save. Sidebar con capítulos, personajes y notas. i18n ES/EN con 110+
+            claves. Persistencia de ventana. Auto-reopen del último proyecto.
+            Identidad Git configurable con 3-strike push.
+          </p>
+        </div>
+
+        <div class="timeline-entry">
+          <span class="version">Pre-v0.3.0</span>
+          <span class="date">Junio 23–24</span>
+          <p>
+            <strong>Configuración.</strong> Phosphor Icons reemplazan emojis.
+            Fuente configurable por proyecto. Tema claro pastel. Auto-detección
+            de git config del sistema.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="timeline">
+        <div class="timeline-entry">
+          <span class="version">v0.3.0</span>
+          <span class="date">Junio 27</span>
+          <p style="color: var(--accent); font-weight: 600;">
+            La sesión masiva — 40+ commits
+          </p>
+          <p>
+            4 temas visuales con CSS variables. Sistema de tramas con drag & drop.
+            Galería multimedia. Estadísticas de sesión. Dock unificado. Pestañas
+            opcionales. Autoguardado configurable. Settings global. Refactor SOLID:
+            backend de 1→16 módulos, +2 componentes frontend.
+          </p>
+        </div>
+
+        <div class="timeline-entry">
+          <span class="version">v0.3.1</span>
+          <span class="date">Junio 29</span>
+          <p>
+            Atajos configurables (31 acciones). Detección de conflictos.
+            Acordeones. Sistema de reparación de proyectos. Chunk splitting
+            de Vite (610→217 kB). Fix de teclado español.
+          </p>
+        </div>
+
+        <div class="timeline-entry">
+          <span class="version">v0.3.2</span>
+          <span class="date">Julio 3–4</span>
+          <p>
+            Imagen en personajes y lugares. Fallback case-insensitive
+            cross-platform. Toggle de pestaña Media. Galería responsive.
+            Limpieza de caché entre proyectos.
+          </p>
+        </div>
+
+        <div class="timeline-entry">
+          <span class="version">v0.3.3</span>
+          <span class="date">Julio 6</span>
+          <p>
+            Fix de fuga de estado entre proyectos (SessionTracker +
+            12 variables $state). Panel de stats funcional.
+            <strong>Estado actual.</strong>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>Cron-Insta v0.3.3</span>
+    <span>Evolución · Junio–Julio 2026</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 9 — FLUJO DE TRABAJO + BACKLOG                           -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<section class="slide" id="s9">
+  <div class="slide-number">09</div>
+
+  <h2>Flujo de trabajo y próximos pasos</h2>
+
+  <div class="grid-2">
+    <div>
+      <h3>Ciclo de desarrollo</h3>
+      <div style="margin-top: 1rem;">
+        <p style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+          <strong>SDD</strong> (Spec-Driven Development) en cada feature no trivial:
+        </p>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
+          <span class="tag">explore</span> <span style="color: var(--text-muted);">→</span>
+          <span class="tag">propose</span> <span style="color: var(--text-muted);">→</span>
+          <span class="tag">spec</span> <span style="color: var(--text-muted);">→</span>
+          <span class="tag">design</span> <span style="color: var(--text-muted);">→</span>
+          <span class="tag">tasks</span> <span style="color: var(--text-muted);">→</span>
+          <span class="tag">apply</span> <span style="color: var(--text-muted);">→</span>
+          <span class="tag">verify</span> <span style="color: var(--text-muted);">→</span>
+          <span class="tag">archive</span>
+        </div>
+        <ul style="font-size: 0.9rem; padding-left: 1.25rem;">
+          <li>6 ciclos SDD completados hasta la fecha</li>
+          <li>Memoria persistente con Engram (24 sesiones, ~400 observaciones)</li>
+          <li>Testing: Rust integrado. Sin test runner frontend aún</li>
+          <li>CI/CD: build multiplataforma + release automática por tag</li>
+        </ul>
+      </div>
+    </div>
+
+    <div>
+      <h3>Backlog priorizado</h3>
+      <div class="card" style="margin-top: 0.5rem;">
+        <p style="font-weight: 600; color: var(--accent); margin-bottom: 0.5rem;">
+          Dual dock panels
+        </p>
+        <p style="font-size: 0.9rem;">
+          Anclar dos fichas simultáneamente (izquierda + derecha del editor)
+          con Ctrl+Shift+Enter. Layout: <code>sidebar | left-dock | editor | right-dock</code>.
+        </p>
+      </div>
+
+      <div class="card" style="margin-top: 0.75rem;">
+        <p style="font-weight: 600; color: var(--accent); margin-bottom: 0.5rem;">
+          Gestión de imágenes
+        </p>
+        <p style="font-size: 0.9rem;">
+          Redimensionar y optimizar imágenes desde la app. Límites de tamaño,
+          conversión de formato. Pensado para la galería multimedia.
+        </p>
+      </div>
+
+      <div class="card" style="margin-top: 0.75rem;">
+        <p style="font-weight: 600; color: var(--accent); margin-bottom: 0.5rem;">
+          Auto-detect git config
+        </p>
+        <p style="font-size: 0.9rem;">
+          Leer <code>git config user.name</code> / <code>user.email</code> del
+          sistema al crear proyecto. SDD planificado, pendiente de implementar.
+        </p>
+      </div>
+
+      <div class="card" style="margin-top: 0.75rem;">
+        <p style="font-weight: 600; color: var(--accent); margin-bottom: 0.5rem;">
+          Descomposición de +page.svelte
+        </p>
+        <p style="font-size: 0.9rem;">
+          El archivo principal tiene ~5700 líneas. Extraer sidebar, toolbar,
+          panel de capítulos y formularios a componentes independientes.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>Cron-Insta v0.3.3</span>
+    <span>Flujo de trabajo · Backlog</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 10 — CIERRE                                                -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<section class="slide" id="s10">
+  <div class="slide-number">10</div>
+
+  <h1 style="font-size: 2.5rem;">Cron-Insta</h1>
+  <p class="subtitle" style="font-size: 1.2rem; margin-top: 0.5rem;">
+    Una herramienta que entiende cómo trabajan los escritores
+  </p>
+
+  <div class="stats-row" style="margin-top: 3rem;">
+    <div class="stat">
+      <div class="value">251</div>
+      <div class="label">Commits</div>
+    </div>
+    <div class="stat">
+      <div class="value">6</div>
+      <div class="label">Releases</div>
+    </div>
+    <div class="stat">
+      <div class="value">24</div>
+      <div class="label">Sesiones Dev</div>
+    </div>
+    <div class="stat">
+      <div class="value">3</div>
+      <div class="label">Plataformas</div>
+    </div>
+  </div>
+
+  <div style="margin-top: 3rem; text-align: center;">
+    <p style="color: var(--text-muted); font-size: 1rem;">
+      <strong>github.com/galejan/cron-insta</strong>
+    </p>
+    <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.5rem;">
+      Tauri v2 · Svelte 5 · Rust · TipTap · 4 temas · Git integrado · Local-first
+    </p>
+  </div>
+
+  <div class="footer">
+    <span>Cron-Insta v0.3.3</span>
+    <span>Julio 2026</span>
+  </div>
+</section>
+
+<!-- ── Navigation Dots ──────────────────────────────────────────── -->
+<nav class="nav-dots" aria-label="Slide navigation">
+  <a href="#s1" title="Portada"></a>
+  <a href="#s2" title="Qué es"></a>
+  <a href="#s3" title="Puntos fuertes"></a>
+  <a href="#s4" title="Git"></a>
+  <a href="#s5" title="SOLID"></a>
+  <a href="#s6" title="Estructura"></a>
+  <a href="#s7" title="Stack"></a>
+  <a href="#s8" title="Evolución"></a>
+  <a href="#s9" title="Backlog"></a>
+  <a href="#s10" title="Cierre"></a>
+</nav>
+
+</body>
+</html>
