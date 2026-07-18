@@ -5614,24 +5614,6 @@
     text-align: center;
   }
 
-  .shortcut-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0.2rem;
-    border-radius: 0.25rem;
-    line-height: 1;
-    color: var(--text-muted);
-  }
-
-  .shortcut-btn:hover {
-    color: var(--text-main);
-  }
-
-  .shortcut-cancel:hover {
-    color: #ef4444;
-  }
-
   .shortcut-reset-row {
     margin-top: 0.75rem;
     text-align: center;
